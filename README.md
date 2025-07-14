@@ -1,66 +1,21 @@
-## Foundry
+## Halyard Finance
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+**Cross-chain money market**
 
-Foundry consists of:
+## Development
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+A Sepolia node fork is required, and this project is built using Alchemy. Set the ALCHEMY_API_KEY before running the node to fork for a deployable environment.
 
-## Documentation
-
-https://book.getfoundry.sh/
-
-## Usage
-
-### Build
+### Start the local Anvil node
 
 ```shell
-$ forge build
+$ make node
 ```
 
-### Test
+### Deploy the contracts
 
 ```shell
-$ forge test
+$ make deploy-local
 ```
 
-### Format
 
-```shell
-$ forge fmt
-```
-
-### Gas Snapshots
-
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```

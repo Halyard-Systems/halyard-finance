@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import {Test, console2} from "forge-std/Test.sol";
+import {Test, console2} from "lib/forge-std/src/Test.sol";
 import {DepositManager} from "../src/DepositManager.sol";
 import {IStargateRouter} from "../src/interfaces/IStargateRouter.sol";
 
@@ -22,7 +22,11 @@ contract DepositManagerTest is Test {
         depositManager = new DepositManager(mockStargateRouter, mockPoolId);
 
         // Mock the Stargate router addLiquidity call to always succeed
-        vm.mockCall(mockStargateRouter, abi.encodeWithSelector(IStargateRouter.addLiquidity.selector), abi.encode());
+        vm.mockCall(
+            mockStargateRouter,
+            abi.encodeWithSelector(IStargateRouter.addLiquidity.selector),
+            abi.encode()
+        );
     }
 
     function test_InitialState() public view {
@@ -78,9 +82,18 @@ contract DepositManagerTest is Test {
         vm.prank(alice);
         depositManager.withdraw(withdrawAmount);
 
-        assertEq(depositManager.balanceOf(alice), depositAmount - withdrawAmount);
-        assertEq(depositManager.totalDeposits(), depositAmount - withdrawAmount);
-        assertEq(depositManager.totalScaledSupply(), depositAmount - withdrawAmount);
+        assertEq(
+            depositManager.balanceOf(alice),
+            depositAmount - withdrawAmount
+        );
+        assertEq(
+            depositManager.totalDeposits(),
+            depositAmount - withdrawAmount
+        );
+        assertEq(
+            depositManager.totalScaledSupply(),
+            depositAmount - withdrawAmount
+        );
     }
 
     function test_WithdrawMoreThanBalance() public {
@@ -114,10 +127,18 @@ contract DepositManagerTest is Test {
 
         // Alice should have earned interest
         uint256 aliceBalance = depositManager.balanceOf(alice);
-        assertGt(aliceBalance, depositAmount, "Alice should have earned interest");
+        assertGt(
+            aliceBalance,
+            depositAmount,
+            "Alice should have earned interest"
+        );
 
         // Check that liquidity index increased
-        assertGt(depositManager.liquidityIndex(), RAY, "Liquidity index should have increased");
+        assertGt(
+            depositManager.liquidityIndex(),
+            RAY,
+            "Liquidity index should have increased"
+        );
     }
 
     function test_CalculateSupplyRate_BelowKink() public {
@@ -138,7 +159,11 @@ contract DepositManagerTest is Test {
         depositManager.deposit(100e18);
 
         uint256 aliceBalance = depositManager.balanceOf(alice);
-        assertGt(aliceBalance, 1000e18, "Should earn interest at below-kink rate");
+        assertGt(
+            aliceBalance,
+            1000e18,
+            "Should earn interest at below-kink rate"
+        );
     }
 
     function test_CalculateSupplyRate_AboveKink() public {
@@ -156,7 +181,11 @@ contract DepositManagerTest is Test {
         depositManager.deposit(100e18);
 
         uint256 aliceBalance = depositManager.balanceOf(alice);
-        assertGt(aliceBalance, 1000e18, "Should earn interest at above-kink rate");
+        assertGt(
+            aliceBalance,
+            1000e18,
+            "Should earn interest at above-kink rate"
+        );
     }
 
     function test_ZeroUtilization() public {
@@ -172,8 +201,16 @@ contract DepositManagerTest is Test {
         depositManager.deposit(100e18);
 
         uint256 aliceBalance = depositManager.balanceOf(alice);
-        assertEq(aliceBalance, depositAmount, "Should not earn interest with 0 utilization");
-        assertEq(depositManager.liquidityIndex(), RAY, "Liquidity index should remain unchanged");
+        assertEq(
+            aliceBalance,
+            depositAmount,
+            "Should not earn interest with 0 utilization"
+        );
+        assertEq(
+            depositManager.liquidityIndex(),
+            RAY,
+            "Liquidity index should remain unchanged"
+        );
     }
 
     function test_UpdateLiquidityIndex_NoTimePassed() public {
@@ -188,7 +225,11 @@ contract DepositManagerTest is Test {
         vm.prank(bob);
         depositManager.deposit(100e18);
 
-        assertEq(depositManager.liquidityIndex(), initialIndex, "Index should not change when no time passed");
+        assertEq(
+            depositManager.liquidityIndex(),
+            initialIndex,
+            "Index should not change when no time passed"
+        );
     }
 
     function test_ComplexScenario() public {
@@ -223,12 +264,19 @@ contract DepositManagerTest is Test {
         uint256 bobBalance = depositManager.balanceOf(bob);
         uint256 charlieBalance = depositManager.balanceOf(charlie);
 
-        assertGt(aliceBalance, 800e18, "Alice should have earned interest on her remaining balance");
+        assertGt(
+            aliceBalance,
+            800e18,
+            "Alice should have earned interest on her remaining balance"
+        );
         assertGt(bobBalance, 500e18, "Bob should have earned interest");
         assertGt(charlieBalance, 300e18, "Charlie should have earned interest");
 
         // Total deposits should be correct
-        assertEq(depositManager.totalDeposits(), 1000e18 + 500e18 + 300e18 - 200e18);
+        assertEq(
+            depositManager.totalDeposits(),
+            1000e18 + 500e18 + 300e18 - 200e18
+        );
     }
 
     function test_Revert_WithdrawFromZeroBalance() public {
