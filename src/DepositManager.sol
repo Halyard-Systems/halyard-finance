@@ -12,7 +12,7 @@ contract DepositManager {
 
     // Interest rate model parameters (example values)
     uint256 public immutable baseRate = 0.02e27; // e.g. 2% in RAY = 0.02e27
-    uint256 public immutable slope1 = 0.10e27; // e.g. 10% in RAY = 0.10e27
+    uint256 public immutable slope1 = 0.1e27; // e.g. 10% in RAY = 0.10e27
     uint256 public immutable slope2 = 3.0e27; // e.g. 300% in RAY = 3.0e27
     uint256 public immutable kink = 0.8e18; // e.g. 80% utilization in 1e18 = 0.8e18
     uint256 public immutable reserveFactor = 0.1e27; // percent of interest kept (e.g. 10% = 0.1e27)
@@ -76,10 +76,7 @@ contract DepositManager {
         if (U <= kink) {
             borrowRate = baseRate + ((slope1 * U) / kink);
         } else {
-            borrowRate =
-                baseRate +
-                slope1 +
-                ((slope2 * (U - kink)) / (RAY - kink));
+            borrowRate = baseRate + slope1 + ((slope2 * (U - kink)) / (RAY - kink));
         }
         uint256 netRate = (borrowRate * (RAY - reserveFactor)) / RAY;
         return (netRate * U) / RAY;
