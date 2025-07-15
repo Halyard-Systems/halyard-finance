@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useAccount, useConnect, useDisconnect } from 'wagmi'
 import { injected } from 'wagmi/connectors'
+import { Button } from './components/ui/button'
+import halyardLogo from './assets/halyard-finance-navbar-logo.png'
 
 function App() {
   const [depositAmount, setDepositAmount] = useState('')
@@ -15,231 +17,107 @@ function App() {
   }
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        backgroundColor: '#f3f4f6',
-        paddingTop: '2rem',
-        paddingBottom: '2rem',
-      }}
-    >
-      <div
-        style={{
-          maxWidth: '56rem',
-          margin: '0 auto',
-          paddingLeft: '1rem',
-          paddingRight: '1rem',
-        }}
-      >
-        <h1
-          style={{
-            fontSize: '2.25rem',
-            fontWeight: '700',
-            textAlign: 'center',
-            marginBottom: '2rem',
-            color: '#1f2937',
-          }}
-        >
-          Halyard Finance
-        </h1>
+    <div className='min-h-screen bg-gray-50'>
+      {/* Header */}
+      <header className='bg-white shadow-sm border-b sticky top-0 z-50'>
+        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
+          <div className='flex justify-between items-center h-16'>
+            {/* Logo/Title */}
+            <img
+              src={halyardLogo}
+              alt='Halyard Finance Logo'
+              className='h-10 w-auto'
+            />
 
-        <div
-          style={{
-            backgroundColor: 'white',
-            borderRadius: '0.5rem',
-            boxShadow:
-              '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-            padding: '1.5rem',
-            marginBottom: '1.5rem',
-          }}
-        >
-          <h2
-            style={{
-              fontSize: '1.5rem',
-              fontWeight: '600',
-              marginBottom: '1rem',
-              color: '#1f2937',
-            }}
-          >
-            Wallet Connection
-          </h2>
+            {/* Wallet Connection */}
+            <div className='flex items-center space-x-4'>
+              {!isConnected ? (
+                <Button
+                  onClick={() => connect({ connector: injected() })}
+                  className='bg-blue-600 hover:bg-blue-700 text-white'
+                >
+                  Connect Wallet
+                </Button>
+              ) : (
+                <div className='flex items-center space-x-3'>
+                  <div className='text-sm text-gray-600'>
+                    <span className='font-medium'>Connected:</span>
+                    <span className='ml-1 font-mono text-xs'>
+                      {address?.slice(0, 6)}...{address?.slice(-4)}
+                    </span>
+                  </div>
+                  <Button onClick={() => disconnect()}>Disconnect</Button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </header>
 
-          {!isConnected ? (
-            <button
+      {/* Main Content */}
+      <main className='max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
+        {isConnected && (
+          <>
+            {/* Deposit Section */}
+            <div className='bg-white rounded-lg shadow-sm border p-6 mb-6'>
+              <h2 className='text-xl font-semibold text-gray-900 mb-4'>
+                Deposit
+              </h2>
+
+              <div className='space-y-4'>
+                <div>
+                  <label className='block text-sm font-medium text-gray-700 mb-2'>
+                    Amount (in wei)
+                  </label>
+                  <input
+                    type='number'
+                    value={depositAmount}
+                    onChange={(e) => setDepositAmount(e.target.value)}
+                    placeholder='1000000000000000000'
+                    className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                  />
+                </div>
+
+                <Button
+                  onClick={handleDeposit}
+                  disabled={!depositAmount}
+                  className='w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white'
+                >
+                  Deposit
+                </Button>
+              </div>
+            </div>
+
+            {/* Balance Section */}
+            <div className='bg-white rounded-lg shadow-sm border p-6'>
+              <h2 className='text-xl font-semibold text-gray-900 mb-4'>
+                Balance
+              </h2>
+              <p className='text-lg'>
+                Your balance: <span className='font-mono'>0 wei</span>
+              </p>
+            </div>
+          </>
+        )}
+
+        {!isConnected && (
+          <div className='bg-white rounded-lg shadow-sm border p-6 text-center'>
+            <h2 className='text-xl font-semibold text-gray-900 mb-4'>
+              Welcome to Halyard Finance
+            </h2>
+            <p className='text-gray-600 mb-6'>
+              Connect your wallet to start depositing and managing your funds.
+            </p>
+            <Button
               onClick={() => connect({ connector: injected() })}
-              style={{
-                backgroundColor: '#3b82f6',
-                color: 'white',
-                fontWeight: '700',
-                padding: '0.5rem 1rem',
-                borderRadius: '0.25rem',
-                border: 'none',
-                cursor: 'pointer',
-                transition: 'background-color 0.2s',
-              }}
-              onMouseOver={(e) =>
-                (e.currentTarget.style.backgroundColor = '#2563eb')
-              }
-              onMouseOut={(e) =>
-                (e.currentTarget.style.backgroundColor = '#3b82f6')
-              }
+              className='bg-blue-600 hover:bg-blue-700 text-white'
+              size='lg'
             >
               Connect Wallet
-            </button>
-          ) : (
-            <div
-              style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
-            >
-              <p style={{ color: '#6b7280' }}>
-                Connected:{' '}
-                <span style={{ fontFamily: 'monospace', fontSize: '0.875rem' }}>
-                  {address}
-                </span>
-              </p>
-              <button
-                onClick={() => disconnect()}
-                style={{
-                  backgroundColor: '#ef4444',
-                  color: 'white',
-                  fontWeight: '700',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '0.25rem',
-                  border: 'none',
-                  cursor: 'pointer',
-                  transition: 'background-color 0.2s',
-                }}
-                onMouseOver={(e) =>
-                  (e.currentTarget.style.backgroundColor = '#dc2626')
-                }
-                onMouseOut={(e) =>
-                  (e.currentTarget.style.backgroundColor = '#ef4444')
-                }
-              >
-                Disconnect
-              </button>
-            </div>
-          )}
-        </div>
-
-        {isConnected && (
-          <div
-            style={{
-              backgroundColor: 'white',
-              borderRadius: '0.5rem',
-              boxShadow:
-                '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-              padding: '1.5rem',
-              marginBottom: '1.5rem',
-            }}
-          >
-            <h2
-              style={{
-                fontSize: '1.5rem',
-                fontWeight: '600',
-                marginBottom: '1rem',
-                color: '#1f2937',
-              }}
-            >
-              Deposit
-            </h2>
-
-            <div
-              style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
-            >
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    color: '#374151',
-                    marginBottom: '0.5rem',
-                  }}
-                >
-                  Amount (in wei)
-                </label>
-                <input
-                  type='number'
-                  value={depositAmount}
-                  onChange={(e) => setDepositAmount(e.target.value)}
-                  placeholder='1000000000000000000'
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem 0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.375rem',
-                    outline: 'none',
-                    transition: 'border-color 0.2s, box-shadow 0.2s',
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#3b82f6'
-                    e.target.style.boxShadow =
-                      '0 0 0 3px rgba(59, 130, 246, 0.1)'
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = '#d1d5db'
-                    e.target.style.boxShadow = 'none'
-                  }}
-                />
-              </div>
-
-              <button
-                onClick={handleDeposit}
-                disabled={!depositAmount}
-                style={{
-                  backgroundColor: !depositAmount ? '#9ca3af' : '#10b981',
-                  color: 'white',
-                  fontWeight: '700',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '0.25rem',
-                  border: 'none',
-                  cursor: !depositAmount ? 'not-allowed' : 'pointer',
-                  transition: 'background-color 0.2s',
-                }}
-                onMouseOver={(e) => {
-                  if (depositAmount) {
-                    e.currentTarget.style.backgroundColor = '#059669'
-                  }
-                }}
-                onMouseOut={(e) => {
-                  if (depositAmount) {
-                    e.currentTarget.style.backgroundColor = '#10b981'
-                  }
-                }}
-              >
-                Deposit
-              </button>
-            </div>
+            </Button>
           </div>
         )}
-
-        {isConnected && (
-          <div
-            style={{
-              backgroundColor: 'white',
-              borderRadius: '0.5rem',
-              boxShadow:
-                '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-              padding: '1.5rem',
-            }}
-          >
-            <h2
-              style={{
-                fontSize: '1.5rem',
-                fontWeight: '600',
-                marginBottom: '1rem',
-                color: '#1f2937',
-              }}
-            >
-              Balance
-            </h2>
-            <p style={{ fontSize: '1.125rem' }}>
-              Your balance:{' '}
-              <span style={{ fontFamily: 'monospace' }}>0 wei</span>
-            </p>
-          </div>
-        )}
-      </div>
+      </main>
     </div>
   )
 }

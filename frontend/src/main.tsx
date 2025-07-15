@@ -5,6 +5,8 @@ import { WagmiProvider } from 'wagmi'
 import { config } from './lib/wagmi.ts'
 import App from './App.tsx'
 
+import './index.css'
+
 const queryClient = new QueryClient()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
