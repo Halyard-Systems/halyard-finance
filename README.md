@@ -1,6 +1,6 @@
 ## Halyard Finance
 
-**Cross-chain money market**
+**Multichain money market**
 
 ## Development
 
@@ -17,5 +17,19 @@ $ make node
 ```shell
 $ make deploy-local
 ```
+
+## Frontend
+
+A React + TypeScript frontend is included in the `frontend/` directory.
+
+### Setup Frontend
+
+```shell
+cd frontend
+pnpm install
+pnpm dev
+```
+
+See [frontend/README.md](frontend/README.md) for detailed frontend documentation.
 
 
