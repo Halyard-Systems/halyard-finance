@@ -18,6 +18,7 @@ function App() {
   const [depositAmount, setDepositAmount] = useState('')
   const [selectedToken, setSelectedToken] = useState(TOKENS[0])
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const [depositedBalance, setDepositedBalance] = useState(0)
   const { address, isConnected } = useAccount()
   const { connect } = useConnect()
   const { disconnect } = useDisconnect()
@@ -157,22 +158,36 @@ function App() {
               </div>
             </div>
             {/* Balance Section */}
-            <div className='bg-card rounded-lg shadow-sm border border-border p-6'>
+            <div className='bg-card rounded-lg shadow-sm border border-border p-6 mb-6'>
               <h2 className='text-xl font-semibold text-card-foreground mb-4'>
                 Deposited Balance
               </h2>
               <div className='flex justify-between items-center'>
                 <p className='text-lg text-card-foreground'>
-                  <span className='font-mono'>0 {selectedToken.symbol}</span>
+                  <span className='font-mono'>
+                    {depositedBalance} {selectedToken.symbol}
+                  </span>
                 </p>
-                <Button
-                  variant='outline'
-                  size='sm'
-                  onClick={() => console.log('Withdraw clicked')}
-                >
-                  Withdraw
-                </Button>
+                {depositedBalance > 0 && (
+                  <Button
+                    variant='outline'
+                    size='sm'
+                    onClick={() => console.log('Withdraw clicked')}
+                  >
+                    Withdraw
+                  </Button>
+                )}
               </div>
+            </div>
+
+            {/* Borrow Section */}
+            <div className='bg-card rounded-lg shadow-sm border border-border p-6'>
+              <h2 className='text-xl font-semibold text-card-foreground mb-4'>
+                Borrow
+              </h2>
+              <p className='text-muted-foreground'>
+                Deposit collateral to enable borrowing.
+              </p>
             </div>
           </>
         )}
