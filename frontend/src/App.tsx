@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAccount, useConnect, useDisconnect } from 'wagmi'
+import { useReadContract } from 'wagmi'
 import { injected } from 'wagmi/connectors'
 import { Button } from './components/ui/button'
 import halyardLogo from './assets/halyard-finance-navbar-logo-cyan-gold.png'
@@ -11,6 +12,24 @@ const TOKENS = [
     name: 'USD Coin',
     icon: '/usd-coin-usdc-logo.svg',
     decimals: 6,
+    address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+  },
+]
+
+const ERC20_ABI = [
+  {
+    type: 'function',
+    name: 'balanceOf',
+    stateMutability: 'view',
+    inputs: [{ name: 'owner', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'decimals',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint8' }],
   },
 ]
 
@@ -22,6 +41,19 @@ function App() {
   const { address, isConnected } = useAccount()
   const { connect } = useConnect()
   const { disconnect } = useDisconnect()
+
+  // Read USDC balance for connected account using useReadContract
+  const {
+    data: usdcBalanceRaw,
+    status: _usdcStatus,
+    error: _usdcError,
+  } = useReadContract({
+    address: selectedToken.address as `0x${string}`,
+    abi: ERC20_ABI,
+    functionName: 'balanceOf',
+    args: [address ?? '0x0000000000000000000000000000000000000000'],
+  })
+  const usdcBalance = usdcBalanceRaw ? Number(usdcBalanceRaw) / 1e6 : 0
 
   const handleDeposit = () => {
     if (!depositAmount) return
@@ -109,7 +141,6 @@ function App() {
                         />
                       </svg>
                     </button>
-
                     {isDropdownOpen && (
                       <div className='absolute z-10 w-full mt-1 bg-background border border-border rounded-md shadow-lg'>
                         {TOKENS.map((token) => (
@@ -139,6 +170,15 @@ function App() {
                   <label className='block text-sm font-medium text-card-foreground mb-2'>
                     Amount ({selectedToken.symbol})
                   </label>
+                  <p className='text-sm text-muted-foreground mb-2'>
+                    Available to deposit:{' '}
+                    <span className='font-mono'>
+                      {usdcBalance.toLocaleString(undefined, {
+                        maximumFractionDigits: 6,
+                      })}{' '}
+                      {selectedToken.symbol}
+                    </span>
+                  </p>
                   <input
                     type='number'
                     value={depositAmount}
@@ -157,6 +197,7 @@ function App() {
                 </Button>
               </div>
             </div>
+
             {/* Balance Section */}
             <div className='bg-card rounded-lg shadow-sm border border-border p-6 mb-6'>
               <h2 className='text-xl font-semibold text-card-foreground mb-4'>
