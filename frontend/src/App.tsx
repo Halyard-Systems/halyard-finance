@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useAccount, useConnect, useDisconnect } from 'wagmi'
-import { useReadContract } from 'wagmi'
+import { useReadContract, useWriteContract } from 'wagmi'
 import { injected } from 'wagmi/connectors'
 import { Button } from './components/ui/button'
 import halyardLogo from './assets/halyard-finance-navbar-logo-cyan-gold.png'
+import React from 'react' // Added missing import for React
 
 // Token data
 const TOKENS = [
@@ -31,7 +32,39 @@ const ERC20_ABI = [
     inputs: [],
     outputs: [{ name: '', type: 'uint8' }],
   },
+  {
+    type: 'function',
+    name: 'approve',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'spender', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
+  },
 ]
+
+// DepositManager contract ABI
+const DEPOSIT_MANAGER_ABI = [
+  {
+    type: 'function',
+    name: 'deposit',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'amount', type: 'uint256' }],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'balanceOf',
+    stateMutability: 'view',
+    inputs: [{ name: 'user', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+]
+
+// Contract addresses - you'll need to update these with your deployed contract addresses
+//const DEPOSIT_MANAGER_ADDRESS = '0x...' // Replace with your deployed contract address
+const DEPOSIT_MANAGER_ADDRESS = '0x2e590d65Dd357a7565EfB5ffB329F8465F18c494'
 
 function App() {
   const [depositAmount, setDepositAmount] = useState('')
@@ -45,8 +78,8 @@ function App() {
   // Read USDC balance for connected account using useReadContract
   const {
     data: usdcBalanceRaw,
-    status: _usdcStatus,
-    error: _usdcError,
+    status: usdcStatus,
+    error: usdcError,
   } = useReadContract({
     address: selectedToken.address as `0x${string}`,
     abi: ERC20_ABI,
@@ -55,9 +88,56 @@ function App() {
   })
   const usdcBalance = usdcBalanceRaw ? Number(usdcBalanceRaw) / 1e6 : 0
 
-  const handleDeposit = () => {
-    if (!depositAmount) return
-    console.log(`Depositing ${depositAmount} ${selectedToken.symbol}`)
+  // Read deposited balance from DepositManager contract
+  const { data: depositedBalanceRaw } = useReadContract({
+    address: DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
+    abi: DEPOSIT_MANAGER_ABI,
+    functionName: 'balanceOf',
+    args: [address ?? '0x0000000000000000000000000000000000000000'],
+  })
+
+  // Update deposited balance when data changes
+  React.useEffect(() => {
+    if (depositedBalanceRaw) {
+      setDepositedBalance(Number(depositedBalanceRaw) / 1e6)
+    }
+  }, [depositedBalanceRaw])
+
+  // Write contract hook for deposit
+  const {
+    writeContract,
+    isPending: isDepositing,
+    error: depositError,
+  } = useWriteContract()
+
+  const handleDeposit = async () => {
+    if (
+      !depositAmount ||
+      !address ||
+      !DEPOSIT_MANAGER_ADDRESS ||
+      DEPOSIT_MANAGER_ADDRESS === '0x...'
+    ) {
+      console.error('Invalid deposit amount, address, or contract not deployed')
+      return
+    }
+
+    try {
+      // Convert amount to wei (USDC has 6 decimals)
+      const amountInWei = BigInt(Math.floor(Number(depositAmount) * 1e6))
+
+      // Call the deposit function
+      await writeContract({
+        address: DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
+        abi: DEPOSIT_MANAGER_ABI,
+        functionName: 'deposit',
+        args: [amountInWei],
+      })
+
+      // Clear the input after successful deposit
+      setDepositAmount('')
+    } catch (error) {
+      console.error('Deposit failed:', error)
+    }
   }
 
   return (
@@ -185,16 +265,38 @@ function App() {
                     onChange={(e) => setDepositAmount(e.target.value)}
                     placeholder={`0.00 ${selectedToken.symbol}`}
                     className='w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground'
+                    disabled={isDepositing}
                   />
                 </div>
 
+                {/* Error Display */}
+                {depositError && (
+                  <div className='text-sm text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded-md'>
+                    Error: {depositError.message}
+                  </div>
+                )}
+
                 <Button
                   onClick={handleDeposit}
-                  disabled={!depositAmount}
+                  disabled={
+                    !depositAmount ||
+                    isDepositing ||
+                    DEPOSIT_MANAGER_ADDRESS === '0x...'
+                  }
                   className='w-full'
                 >
-                  Deposit {selectedToken.symbol}
+                  {isDepositing
+                    ? 'Depositing...'
+                    : `Deposit ${selectedToken.symbol}`}
                 </Button>
+
+                {/* Contract Not Deployed Warning */}
+                {DEPOSIT_MANAGER_ADDRESS === '0x...' && (
+                  <div className='text-sm text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-md'>
+                    ⚠️ Contract not deployed. Please deploy the DepositManager
+                    contract first.
+                  </div>
+                )}
               </div>
             </div>
 
@@ -206,7 +308,10 @@ function App() {
               <div className='flex justify-between items-center'>
                 <p className='text-lg text-card-foreground'>
                   <span className='font-mono'>
-                    {depositedBalance} {selectedToken.symbol}
+                    {depositedBalance.toLocaleString(undefined, {
+                      maximumFractionDigits: 6,
+                    })}{' '}
+                    {selectedToken.symbol}
                   </span>
                 </p>
                 {depositedBalance > 0 && (

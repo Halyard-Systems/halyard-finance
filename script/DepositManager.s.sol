@@ -7,8 +7,14 @@ import {DepositManager} from "../src/DepositManager.sol";
 contract DepositManagerScript is Script {
     DepositManager public depositManager;
 
-    address STARGATE_ROUTER_SEPOLIA_TESTNET =
-        0x2836045A50744FB50D3d04a9C8D18aD7B5012102;
+    //address STARGATE_ROUTER_SEPOLIA_TESTNET =
+    //    0x2836045A50744FB50D3d04a9C8D18aD7B5012102;
+
+    address STARGATE_ROUTER_MAINNET =
+        0x8731d54E9D02c286767d56ac03e8037C07e01e98;
+    //address STARGATE_USDC_POOL_MAINNET =
+    //    0xc026395860Db2d07ee33e05fE50ed7bD583189C7;
+
     uint256 USDC_POOL_ID_SEPOLIA_TESTNET = 1;
 
     function setUp() public {}
@@ -17,8 +23,8 @@ contract DepositManagerScript is Script {
         // Get constructor parameters from environment or set defaults
         address stargateRouter = vm.envOr(
             "STARGATE_ROUTER",
-            STARGATE_ROUTER_SEPOLIA_TESTNET
-        ); // Example: Polygon Stargate Router
+            STARGATE_ROUTER_MAINNET
+        );
         uint256 poolId = vm.envOr("POOL_ID", uint256(1)); // USDC pool ID
 
         vm.startBroadcast();

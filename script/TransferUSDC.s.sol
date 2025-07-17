@@ -28,7 +28,7 @@ contract TransferUSDC is Script {
 
         // Log balances (optional)
         console.log(
-            --"Recipient USDC Balance",
+            "Recipient USDC Balance",
             IERC20(USDC).balanceOf(recipient)
         );
         vm.stopBroadcast();
