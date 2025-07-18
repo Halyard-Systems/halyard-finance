@@ -1,0 +1,119 @@
+import React from 'react'
+import { Button } from './ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from './ui/dialog'
+
+interface Token {
+  symbol: string
+  name: string
+  icon: string
+  decimals: number
+  address: string
+}
+
+interface WithdrawFormProps {
+  isOpen: boolean
+  onClose: () => void
+  selectedToken: Token
+  withdrawAmount: string
+  setWithdrawAmount: (amount: string) => void
+  depositedBalance: number
+  withdrawError?: any
+  isWithdrawing: boolean
+  onWithdraw: () => void
+}
+
+export function WithdrawForm({
+  isOpen,
+  onClose,
+  selectedToken,
+  withdrawAmount,
+  setWithdrawAmount,
+  depositedBalance,
+  withdrawError,
+  isWithdrawing,
+  onWithdraw,
+}: WithdrawFormProps) {
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className='sm:max-w-md'>
+        <DialogHeader>
+          <DialogTitle>Withdraw</DialogTitle>
+        </DialogHeader>
+
+        <div className='space-y-4'>
+          {/* Token Info */}
+          <div className='flex items-center space-x-2 p-3 bg-muted rounded-md'>
+            <img
+              src={selectedToken.icon}
+              alt={`${selectedToken.symbol} icon`}
+              className='w-6 h-6'
+            />
+            <div>
+              <div className='font-medium text-card-foreground'>
+                {selectedToken.symbol}
+              </div>
+              <div className='text-sm text-muted-foreground'>
+                {selectedToken.name}
+              </div>
+            </div>
+          </div>
+
+          {/* Amount Input */}
+          <div>
+            <label className='block text-sm font-medium text-card-foreground mb-2'>
+              Amount ({selectedToken.symbol})
+            </label>
+            <p className='text-sm text-muted-foreground mb-2'>
+              Available to withdraw:{' '}
+              {depositedBalance.toLocaleString(undefined, {
+                maximumFractionDigits: 6,
+              })}
+            </p>
+            <input
+              type='number'
+              value={withdrawAmount}
+              onChange={(e) => setWithdrawAmount(e.target.value)}
+              placeholder={`0.00 ${selectedToken.symbol}`}
+              className='w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground'
+              disabled={isWithdrawing}
+              max={depositedBalance}
+            />
+          </div>
+
+          {/* Error Display */}
+          {withdrawError && (
+            <div className='text-sm text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded-md'>
+              Error: {withdrawError?.message}
+            </div>
+          )}
+        </div>
+
+        <DialogFooter className='flex space-x-2'>
+          <Button variant='outline' onClick={onClose} className='flex-1'>
+            Cancel
+          </Button>
+          <Button
+            onClick={onWithdraw}
+            disabled={
+              !withdrawAmount ||
+              isWithdrawing ||
+              Number(withdrawAmount) > depositedBalance ||
+              Number(withdrawAmount) <= 0
+            }
+            className='flex-1'
+          >
+            {isWithdrawing
+              ? 'Withdrawing...'
+              : `Withdraw ${selectedToken.symbol}`}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}

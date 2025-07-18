@@ -1,93 +1,24 @@
-import { useState } from 'react'
-import { useAccount, useConnect, useDisconnect } from 'wagmi'
-import { useReadContract, useWriteContract } from 'wagmi'
+import React, { useState } from 'react'
+import {
+  useAccount,
+  useConnect,
+  useDisconnect,
+  useReadContract,
+  useWriteContract,
+} from 'wagmi'
 import { injected } from 'wagmi/connectors'
 import { Button } from './components/ui/button'
+import { DepositForm } from './components/DepositForm'
+import { WithdrawForm } from './components/WithdrawForm'
 import halyardLogo from './assets/halyard-finance-navbar-logo-cyan-gold.png'
-import React from 'react' // Added missing import for React
 
-// Token data
-const TOKENS = [
-  {
-    symbol: 'USDC',
-    name: 'USD Coin',
-    icon: '/usd-coin-usdc-logo.svg',
-    decimals: 6,
-    address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
-  },
-]
-
-const ERC20_ABI = [
-  {
-    type: 'function',
-    name: 'balanceOf',
-    stateMutability: 'view',
-    inputs: [{ name: 'owner', type: 'address' }],
-    outputs: [{ name: '', type: 'uint256' }],
-  },
-  {
-    type: 'function',
-    name: 'decimals',
-    stateMutability: 'view',
-    inputs: [],
-    outputs: [{ name: '', type: 'uint8' }],
-  },
-  {
-    type: 'function',
-    name: 'approve',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'spender', type: 'address' },
-      { name: 'amount', type: 'uint256' },
-    ],
-    outputs: [{ name: '', type: 'bool' }],
-  },
-  {
-    type: 'function',
-    name: 'allowance',
-    stateMutability: 'view',
-    inputs: [
-      { name: 'owner', type: 'address' },
-      { name: 'spender', type: 'address' },
-    ],
-    outputs: [{ name: '', type: 'uint256' }],
-  },
-]
-
-// DepositManager contract ABI
-const DEPOSIT_MANAGER_ABI = [
-  {
-    type: 'function',
-    name: 'deposit',
-    stateMutability: 'nonpayable',
-    inputs: [{ name: 'amount', type: 'uint256' }],
-    outputs: [],
-  },
-  {
-    type: 'function',
-    name: 'withdraw',
-    stateMutability: 'nonpayable',
-    inputs: [{ name: 'amount', type: 'uint256' }],
-    outputs: [],
-  },
-  {
-    type: 'function',
-    name: 'balanceOf',
-    stateMutability: 'view',
-    inputs: [{ name: 'user', type: 'address' }],
-    outputs: [{ name: '', type: 'uint256' }],
-  },
-  {
-    type: 'function',
-    name: 'stargateRouter',
-    stateMutability: 'view',
-    inputs: [],
-    outputs: [{ name: '', type: 'address' }],
-  },
-]
+import TOKENS from './tokens.json'
+import ERC20_ABI from './abis/ERC20.json'
+import DEPOSIT_MANAGER_ABI from './abis/DepositManager.json'
 
 // Contract addresses - youll need to update these with your deployed contract addresses
 const DEPOSIT_MANAGER_ADDRESS = '0x2e590d65Dd357a7565EfB5ffB329F8465F18c494'
+
 function App() {
   const [depositAmount, setDepositAmount] = useState('')
   const [withdrawAmount, setWithdrawAmount] = useState('')
@@ -484,305 +415,43 @@ function App() {
         )}
 
         {/* Deposit Modal */}
-        {isDepositModalOpen && (
-          <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'>
-            <div className='bg-card rounded-lg shadow-lg border border-border p-6 w-full max-w-md mx-4'>
-              <div className='flex justify-between items-center mb-4'>
-                <h2 className='text-xl font-semibold text-card-foreground'>
-                  Deposit
-                </h2>
-                <button
-                  onClick={() => setIsDepositModalOpen(false)}
-                  className='text-muted-foreground hover:text-foreground'
-                >
-                  <svg
-                    className='w-6 h-6'
-                    fill='none'
-                    stroke='currentColor'
-                    viewBox='0 0 24 24'
-                  >
-                    <path
-                      strokeLinecap='round'
-                      strokeLinejoin='round'
-                      strokeWidth={2}
-                      d='M6 18L18 6M6 6l12 12'
-                    />
-                  </svg>
-                </button>
-              </div>
-
-              <div className='space-y-4'>
-                {/* Token Selection */}
-                <div>
-                  <label className='block text-sm font-medium text-card-foreground mb-2'>
-                    Token
-                  </label>
-                  <div className='relative'>
-                    <button
-                      type='button'
-                      onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                      className='w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground flex items-center justify-between'
-                    >
-                      <div className='flex items-center space-x-2'>
-                        <img
-                          src={selectedToken.icon}
-                          alt={`${selectedToken.symbol} icon`}
-                          className='w-5 h-5'
-                        />
-                        <span>{selectedToken.symbol}</span>
-                      </div>
-                      <svg
-                        className={`w-4 h-4 transition-transform ${
-                          isDropdownOpen ? 'rotate-180' : ''
-                        }`}
-                        fill='none'
-                        stroke='currentColor'
-                        viewBox='0 0 24 24'
-                      >
-                        <path
-                          strokeLinecap='round'
-                          strokeLinejoin='round'
-                          strokeWidth={2}
-                          d='M19 9l-7 7-7-7'
-                        />
-                      </svg>
-                    </button>
-                    {isDropdownOpen && (
-                      <div className='absolute z-10 w-full mt-1 bg-background border border-border rounded-md shadow-lg'>
-                        {TOKENS.map((token) => (
-                          <button
-                            key={token.symbol}
-                            onClick={() => {
-                              setSelectedToken(token)
-                              setIsDropdownOpen(false)
-                            }}
-                            className='w-full px-3 py-2 text-left hover:bg-accent hover:text-accent-foreground flex items-center space-x-2'
-                          >
-                            <img
-                              src={token.icon}
-                              alt={`${token.symbol} icon`}
-                              className='w-5 h-5'
-                            />
-                            <span>{token.symbol}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Amount Input */}
-                <div>
-                  <label className='block text-sm font-medium text-card-foreground mb-2'>
-                    Amount ({selectedToken.symbol})
-                  </label>
-                  <p className='text-sm text-muted-foreground mb-2'>
-                    Available:{' '}
-                    {usdcBalance.toLocaleString(undefined, {
-                      maximumFractionDigits: 6,
-                    })}
-                  </p>
-                  <input
-                    type='number'
-                    value={depositAmount}
-                    onChange={(e) => setDepositAmount(e.target.value)}
-                    placeholder={`0.00 ${selectedToken.symbol}`}
-                    className='w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground'
-                    disabled={isDepositing || isApproving}
-                  />
-                </div>
-
-                {/* Approval Status */}
-                {depositAmount && (
-                  <div className='text-sm text-muted-foreground p-3 bg-muted rounded-md'>
-                    <div className='space-y-2'>
-                      <div className='flex justify-between items-center'>
-                        <span>DepositManager allowance:</span>
-                        <span className='font-mono'>
-                          {allowance.toLocaleString(undefined, {
-                            maximumFractionDigits: 6,
-                          })}{' '}
-                          {selectedToken.symbol}
-                        </span>
-                      </div>
-                      {stargateRouterAddress ? (
-                        <div className='flex justify-between items-center'>
-                          <span>Stargate allowance:</span>
-                          <span className='font-mono'>
-                            {stargateAllowance.toLocaleString('en-US', {
-                              maximumFractionDigits: 6,
-                            })}{' '}
-                            {selectedToken.symbol}
-                          </span>
-                        </div>
-                      ) : null}
-                    </div>
-                    {needsApproval && (
-                      <div className='mt-2 text-yellow-600'>
-                        ⚠️ Approval required before deposit
-                        {needsDepositManagerApproval &&
-                          needsStargateApproval && (
-                            <span> (both DepositManager and Stargate)</span>
-                          )}
-                        {needsDepositManagerApproval &&
-                          !needsStargateApproval && (
-                            <span> (DepositManager)</span>
-                          )}
-                        {!needsDepositManagerApproval &&
-                          needsStargateApproval && <span> (Stargate)</span>}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Error Display */}
-                {(approvalError || depositError) && (
-                  <div className='text-sm text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded-md'>
-                    Error: {(approvalError || depositError)?.message}
-                  </div>
-                )}
-
-                {/* Action Buttons */}
-                <div className='flex space-x-2 pt-4'>
-                  <Button
-                    variant='outline'
-                    onClick={() => setIsDepositModalOpen(false)}
-                    className='flex-1'
-                  >
-                    Cancel
-                  </Button>
-                  {needsApproval && depositAmount && (
-                    <Button
-                      onClick={handleApproval}
-                      disabled={!depositAmount || isApproving}
-                      className='flex-1'
-                    >
-                      {getApprovalButtonText()}
-                    </Button>
-                  )}
-                  <Button
-                    onClick={handleDeposit}
-                    disabled={
-                      !depositAmount ||
-                      isDepositing ||
-                      isApproving ||
-                      needsApproval
-                    }
-                    className='flex-1'
-                  >
-                    {isDepositing
-                      ? 'Depositing...'
-                      : `Deposit ${selectedToken.symbol}`}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        <DepositForm
+          isOpen={isDepositModalOpen}
+          onClose={() => setIsDepositModalOpen(false)}
+          selectedToken={selectedToken}
+          depositAmount={depositAmount}
+          setDepositAmount={setDepositAmount}
+          usdcBalance={usdcBalance}
+          allowance={allowance}
+          stargateAllowance={stargateAllowance}
+          stargateRouterAddress={stargateRouterAddress as string | undefined}
+          needsApproval={needsApproval}
+          needsDepositManagerApproval={needsDepositManagerApproval}
+          needsStargateApproval={needsStargateApproval}
+          isDropdownOpen={isDropdownOpen}
+          setIsDropdownOpen={setIsDropdownOpen}
+          setSelectedToken={setSelectedToken}
+          approvalError={approvalError}
+          depositError={depositError}
+          isApproving={isApproving}
+          isDepositing={isDepositing}
+          onApproval={handleApproval}
+          onDeposit={handleDeposit}
+          getApprovalButtonText={getApprovalButtonText}
+        />
 
         {/* Withdraw Modal */}
-        {isWithdrawModalOpen && (
-          <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'>
-            <div className='bg-card rounded-lg shadow-lg border border-border p-6 w-full max-w-md mx-4'>
-              <div className='flex justify-between items-center mb-4'>
-                <h2 className='text-xl font-semibold text-card-foreground'>
-                  Withdraw
-                </h2>
-                <button
-                  onClick={() => setIsWithdrawModalOpen(false)}
-                  className='text-muted-foreground hover:text-foreground'
-                >
-                  <svg
-                    className='w-6 h-6'
-                    fill='none'
-                    stroke='currentColor'
-                    viewBox='0 0 24 24'
-                  >
-                    <path
-                      strokeLinecap='round'
-                      strokeLinejoin='round'
-                      strokeWidth={2}
-                      d='M6 18L18 6M6 6l12 12'
-                    />
-                  </svg>
-                </button>
-              </div>
-
-              <div className='space-y-4'>
-                {/* Token Info */}
-                <div className='flex items-center space-x-2 p-3 bg-muted rounded-md'>
-                  <img
-                    src={selectedToken.icon}
-                    alt={`${selectedToken.symbol} icon`}
-                    className='w-6 h-6'
-                  />
-                  <div>
-                    <div className='font-medium text-card-foreground'>
-                      {selectedToken.symbol}
-                    </div>
-                    <div className='text-sm text-muted-foreground'>
-                      {selectedToken.name}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Amount Input */}
-                <div>
-                  <label className='block text-sm font-medium text-card-foreground mb-2'>
-                    Amount ({selectedToken.symbol})
-                  </label>
-                  <p className='text-sm text-muted-foreground mb-2'>
-                    Available to withdraw:{' '}
-                    {depositedBalance.toLocaleString(undefined, {
-                      maximumFractionDigits: 6,
-                    })}
-                  </p>
-                  <input
-                    type='number'
-                    value={withdrawAmount}
-                    onChange={(e) => setWithdrawAmount(e.target.value)}
-                    placeholder={`0.00 ${selectedToken.symbol}`}
-                    className='w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground'
-                    disabled={isWithdrawing}
-                    max={depositedBalance}
-                  />
-                </div>
-
-                {/* Error Display */}
-                {withdrawError && (
-                  <div className='text-sm text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded-md'>
-                    Error: {withdrawError?.message}
-                  </div>
-                )}
-
-                {/* Action Buttons */}
-                <div className='flex space-x-2 pt-4'>
-                  <Button
-                    variant='outline'
-                    onClick={() => setIsWithdrawModalOpen(false)}
-                    className='flex-1'
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handleWithdraw}
-                    disabled={
-                      !withdrawAmount ||
-                      isWithdrawing ||
-                      Number(withdrawAmount) > depositedBalance ||
-                      Number(withdrawAmount) <= 0
-                    }
-                    className='flex-1'
-                  >
-                    {isWithdrawing
-                      ? 'Withdrawing...'
-                      : `Withdraw ${selectedToken.symbol}`}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        <WithdrawForm
+          isOpen={isWithdrawModalOpen}
+          onClose={() => setIsWithdrawModalOpen(false)}
+          selectedToken={selectedToken}
+          withdrawAmount={withdrawAmount}
+          setWithdrawAmount={setWithdrawAmount}
+          depositedBalance={depositedBalance}
+          withdrawError={withdrawError}
+          isWithdrawing={isWithdrawing}
+          onWithdraw={handleWithdraw}
+        />
       </main>
     </div>
   )
