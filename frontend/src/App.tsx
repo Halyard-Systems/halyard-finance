@@ -65,6 +65,13 @@ const DEPOSIT_MANAGER_ABI = [
   },
   {
     type: 'function',
+    name: 'withdraw',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'amount', type: 'uint256' }],
+    outputs: [],
+  },
+  {
+    type: 'function',
     name: 'balanceOf',
     stateMutability: 'view',
     inputs: [{ name: 'user', type: 'address' }],
@@ -83,9 +90,12 @@ const DEPOSIT_MANAGER_ABI = [
 const DEPOSIT_MANAGER_ADDRESS = '0x2e590d65Dd357a7565EfB5ffB329F8465F18c494'
 function App() {
   const [depositAmount, setDepositAmount] = useState('')
+  const [withdrawAmount, setWithdrawAmount] = useState('')
   const [selectedToken, setSelectedToken] = useState(TOKENS[0])
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [depositedBalance, setDepositedBalance] = useState(0)
+  const [isDepositModalOpen, setIsDepositModalOpen] = useState(false)
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false)
   const [approvalStep, setApprovalStep] = useState<
     'none' | 'depositManager' | 'stargate'
   >('none')
@@ -176,6 +186,13 @@ function App() {
     error: depositError,
   } = useWriteContract()
 
+  // Write contract hook for withdraw
+  const {
+    writeContract: writeWithdraw,
+    isPending: isWithdrawing,
+    error: withdrawError,
+  } = useWriteContract()
+
   const handleApproval = async () => {
     if (!depositAmount || !address) {
       console.error('Invalid deposit amount or address')
@@ -240,6 +257,32 @@ function App() {
       setDepositAmount('')
     } catch (error) {
       console.error('Deposit failed:', error)
+    }
+  }
+
+  const handleWithdraw = async () => {
+    if (!withdrawAmount || !address) {
+      console.error('Invalid withdraw amount or address')
+      return
+    }
+
+    try {
+      // Convert amount to wei (USDC has 6 decimals)
+      const amountInWei = BigInt(Math.floor(Number(withdrawAmount) * 1e6))
+
+      // Call the withdraw function
+      await writeWithdraw({
+        address: DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
+        abi: DEPOSIT_MANAGER_ABI,
+        functionName: 'withdraw',
+        args: [amountInWei],
+      })
+
+      // Clear the input after successful withdraw
+      setWithdrawAmount('')
+      setIsWithdrawModalOpen(false)
+    } catch (error) {
+      console.error('Withdraw failed:', error)
     }
   }
 
@@ -308,11 +351,166 @@ function App() {
       <main className='max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
         {isConnected && (
           <>
-            {/* Deposit Section */}
-            <div className='bg-card rounded-lg shadow-sm border border-border p-6 mb-6'>
-              <h2 className='text-xl font-semibold text-card-foreground mb-4'>
-                Deposit
-              </h2>
+            {/* Deposit & Borrow Section */}
+            <div className='bg-card rounded-lg shadow-sm border border-border p-6'>
+              <div className='overflow-x-auto'>
+                <table className='w-full'>
+                  <thead>
+                    <tr className='border-b border-border'>
+                      <th className='text-left py-3 px-4 font-medium text-card-foreground'>
+                        Asset
+                      </th>
+                      <th className='text-left py-3 px-4 font-medium text-card-foreground'>
+                        Deposits
+                      </th>
+                      <th className='text-left py-3 px-4 font-medium text-card-foreground'>
+                        Borrows
+                      </th>
+                      <th className='text-left py-3 px-4 font-medium text-card-foreground'>
+                        Deposit APY
+                      </th>
+                      <th className='text-left py-3 px-4 font-medium text-card-foreground'>
+                        Borrow APY
+                      </th>
+                      <th className='text-left py-3 px-4 font-medium text-card-foreground'>
+                        Your Deposits
+                      </th>
+                      <th className='text-left py-3 px-4 font-medium text-card-foreground'>
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className='border-b border-border'>
+                      {/* Asset */}
+                      <td className='py-4 px-4'>
+                        <div className='flex items-center space-x-2'>
+                          <img
+                            src={selectedToken.icon}
+                            alt={`${selectedToken.symbol} icon`}
+                            className='w-6 h-6'
+                          />
+                          <div>
+                            <div className='font-medium text-card-foreground'>
+                              {selectedToken.symbol}
+                            </div>
+                            <div className='text-sm text-muted-foreground'>
+                              {selectedToken.name}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Deposits */}
+                      <td className='py-4 px-4'>
+                        <div className='font-mono text-card-foreground'>
+                          {depositedBalance.toLocaleString(undefined, {
+                            maximumFractionDigits: 6,
+                          })}{' '}
+                          {selectedToken.symbol}
+                        </div>
+                      </td>
+
+                      {/* Borrows */}
+                      <td className='py-4 px-4'>
+                        <div className='font-mono text-card-foreground'>
+                          0.00 {selectedToken.symbol}
+                        </div>
+                      </td>
+
+                      {/* Deposit APY */}
+                      <td className='py-4 px-4'>
+                        <div className='text-green-600 font-medium'>2.5%</div>
+                      </td>
+
+                      {/* Borrow APY */}
+                      <td className='py-4 px-4'>
+                        <div className='text-red-600 font-medium'>4.2%</div>
+                      </td>
+
+                      {/* Your Deposits */}
+                      <td className='py-4 px-4'>
+                        <div className='font-mono text-card-foreground'>
+                          {depositedBalance.toLocaleString(undefined, {
+                            maximumFractionDigits: 6,
+                          })}{' '}
+                          {selectedToken.symbol}
+                        </div>
+                      </td>
+
+                      {/* Actions */}
+                      <td className='py-4 px-4'>
+                        <div className='flex space-x-2'>
+                          <Button
+                            variant='outline'
+                            size='sm'
+                            onClick={() => setIsDepositModalOpen(true)}
+                          >
+                            Deposit
+                          </Button>
+                          {depositedBalance > 0 && (
+                            <Button
+                              variant='outline'
+                              size='sm'
+                              onClick={() => setIsWithdrawModalOpen(true)}
+                            >
+                              Withdraw
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        )}
+        {!isConnected && (
+          <div className='bg-card rounded-lg shadow-sm border border-border p-6 text-center'>
+            <h2 className='text-xl font-semibold text-card-foreground mb-4'>
+              Welcome to Halyard Finance
+            </h2>
+            <p className='text-muted-foreground mb-6'>
+              Connect your wallet to start depositing and managing your funds.
+            </p>
+            <Button
+              onClick={() => connect({ connector: injected() })}
+              size='lg'
+            >
+              Connect Wallet
+            </Button>
+          </div>
+        )}
+
+        {/* Deposit Modal */}
+        {isDepositModalOpen && (
+          <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'>
+            <div className='bg-card rounded-lg shadow-lg border border-border p-6 w-full max-w-md mx-4'>
+              <div className='flex justify-between items-center mb-4'>
+                <h2 className='text-xl font-semibold text-card-foreground'>
+                  Deposit
+                </h2>
+                <button
+                  onClick={() => setIsDepositModalOpen(false)}
+                  className='text-muted-foreground hover:text-foreground'
+                >
+                  <svg
+                    className='w-6 h-6'
+                    fill='none'
+                    stroke='currentColor'
+                    viewBox='0 0 24 24'
+                  >
+                    <path
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      strokeWidth={2}
+                      d='M6 18L18 6M6 6l12 12'
+                    />
+                  </svg>
+                </button>
+              </div>
+
               <div className='space-y-4'>
                 {/* Token Selection */}
                 <div>
@@ -379,13 +577,10 @@ function App() {
                     Amount ({selectedToken.symbol})
                   </label>
                   <p className='text-sm text-muted-foreground mb-2'>
-                    Available to deposit:{' '}
-                    <span className='font-mono'>
-                      {usdcBalance.toLocaleString(undefined, {
-                        maximumFractionDigits: 6,
-                      })}{' '}
-                      {selectedToken.symbol}
-                    </span>
+                    Available:{' '}
+                    {usdcBalance.toLocaleString(undefined, {
+                      maximumFractionDigits: 6,
+                    })}
                   </p>
                   <input
                     type='number'
@@ -447,87 +642,145 @@ function App() {
                   </div>
                 )}
 
-                {/* Approval Button */}
-                {needsApproval && depositAmount && (
+                {/* Action Buttons */}
+                <div className='flex space-x-2 pt-4'>
                   <Button
-                    onClick={handleApproval}
-                    disabled={!depositAmount || isApproving}
                     variant='outline'
-                    className='w-full'
+                    onClick={() => setIsDepositModalOpen(false)}
+                    className='flex-1'
                   >
-                    {getApprovalButtonText()}
+                    Cancel
                   </Button>
-                )}
-
-                {/* Deposit Button */}
-                <Button
-                  onClick={handleDeposit}
-                  disabled={
-                    !depositAmount ||
-                    isDepositing ||
-                    isApproving ||
-                    needsApproval
-                  }
-                  className='w-full'
-                >
-                  {isDepositing
-                    ? 'Depositing...'
-                    : `Deposit ${selectedToken.symbol}`}
-                </Button>
+                  {needsApproval && depositAmount && (
+                    <Button
+                      onClick={handleApproval}
+                      disabled={!depositAmount || isApproving}
+                      className='flex-1'
+                    >
+                      {getApprovalButtonText()}
+                    </Button>
+                  )}
+                  <Button
+                    onClick={handleDeposit}
+                    disabled={
+                      !depositAmount ||
+                      isDepositing ||
+                      isApproving ||
+                      needsApproval
+                    }
+                    className='flex-1'
+                  >
+                    {isDepositing
+                      ? 'Depositing...'
+                      : `Deposit ${selectedToken.symbol}`}
+                  </Button>
+                </div>
               </div>
             </div>
+          </div>
+        )}
 
-            {/* Balance Section */}
-            <div className='bg-card rounded-lg shadow-sm border border-border p-6 mb-6'>
-              <h2 className='text-xl font-semibold text-card-foreground mb-4'>
-                Deposited Balance
-              </h2>
-              <div className='flex justify-between items-center'>
-                <p className='text-lg text-card-foreground'>
-                  <span className='font-mono'>
+        {/* Withdraw Modal */}
+        {isWithdrawModalOpen && (
+          <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'>
+            <div className='bg-card rounded-lg shadow-lg border border-border p-6 w-full max-w-md mx-4'>
+              <div className='flex justify-between items-center mb-4'>
+                <h2 className='text-xl font-semibold text-card-foreground'>
+                  Withdraw
+                </h2>
+                <button
+                  onClick={() => setIsWithdrawModalOpen(false)}
+                  className='text-muted-foreground hover:text-foreground'
+                >
+                  <svg
+                    className='w-6 h-6'
+                    fill='none'
+                    stroke='currentColor'
+                    viewBox='0 0 24 24'
+                  >
+                    <path
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      strokeWidth={2}
+                      d='M6 18L18 6M6 6l12 12'
+                    />
+                  </svg>
+                </button>
+              </div>
+
+              <div className='space-y-4'>
+                {/* Token Info */}
+                <div className='flex items-center space-x-2 p-3 bg-muted rounded-md'>
+                  <img
+                    src={selectedToken.icon}
+                    alt={`${selectedToken.symbol} icon`}
+                    className='w-6 h-6'
+                  />
+                  <div>
+                    <div className='font-medium text-card-foreground'>
+                      {selectedToken.symbol}
+                    </div>
+                    <div className='text-sm text-muted-foreground'>
+                      {selectedToken.name}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Amount Input */}
+                <div>
+                  <label className='block text-sm font-medium text-card-foreground mb-2'>
+                    Amount ({selectedToken.symbol})
+                  </label>
+                  <p className='text-sm text-muted-foreground mb-2'>
+                    Available to withdraw:{' '}
                     {depositedBalance.toLocaleString(undefined, {
                       maximumFractionDigits: 6,
-                    })}{' '}
-                    {selectedToken.symbol}
-                  </span>
-                </p>
-                {depositedBalance > 0 && (
+                    })}
+                  </p>
+                  <input
+                    type='number'
+                    value={withdrawAmount}
+                    onChange={(e) => setWithdrawAmount(e.target.value)}
+                    placeholder={`0.00 ${selectedToken.symbol}`}
+                    className='w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground'
+                    disabled={isWithdrawing}
+                    max={depositedBalance}
+                  />
+                </div>
+
+                {/* Error Display */}
+                {withdrawError && (
+                  <div className='text-sm text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded-md'>
+                    Error: {withdrawError?.message}
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className='flex space-x-2 pt-4'>
                   <Button
                     variant='outline'
-                    size='sm'
-                    onClick={() => console.log('Withdraw clicked')}
+                    onClick={() => setIsWithdrawModalOpen(false)}
+                    className='flex-1'
                   >
-                    Withdraw
+                    Cancel
                   </Button>
-                )}
+                  <Button
+                    onClick={handleWithdraw}
+                    disabled={
+                      !withdrawAmount ||
+                      isWithdrawing ||
+                      Number(withdrawAmount) > depositedBalance ||
+                      Number(withdrawAmount) <= 0
+                    }
+                    className='flex-1'
+                  >
+                    {isWithdrawing
+                      ? 'Withdrawing...'
+                      : `Withdraw ${selectedToken.symbol}`}
+                  </Button>
+                </div>
               </div>
             </div>
-
-            {/* Borrow Section */}
-            <div className='bg-card rounded-lg shadow-sm border border-border p-6'>
-              <h2 className='text-xl font-semibold text-card-foreground mb-4'>
-                Borrow
-              </h2>
-              <p className='text-muted-foreground'>
-                Deposit collateral to enable borrowing.
-              </p>
-            </div>
-          </>
-        )}
-        {!isConnected && (
-          <div className='bg-card rounded-lg shadow-sm border border-border p-6 text-center'>
-            <h2 className='text-xl font-semibold text-card-foreground mb-4'>
-              Welcome to Halyard Finance
-            </h2>
-            <p className='text-muted-foreground mb-6'>
-              Connect your wallet to start depositing and managing your funds.
-            </p>
-            <Button
-              onClick={() => connect({ connector: injected() })}
-              size='lg'
-            >
-              Connect Wallet
-            </Button>
           </div>
         )}
       </main>

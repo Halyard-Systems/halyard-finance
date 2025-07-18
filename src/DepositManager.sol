@@ -70,12 +70,6 @@ contract DepositManager {
 
         _updateLiquidityIndex();
 
-        // Approve USDC for Stargate router
-        IERC20(USDC).approve(address(stargateRouter), amount);
-
-        // Add liquidity to Stargate pool
-        stargateRouter.addLiquidity(poolId, amount, address(this));
-
         // Mint scaled receipt tokens
         uint256 scaled = (amount * RAY) / liquidityIndex;
         scaledBalance[msg.sender] += scaled;
@@ -89,7 +83,6 @@ contract DepositManager {
         scaledBalance[msg.sender] -= scaled;
         totalScaledSupply -= scaled;
         totalDeposits -= amount;
-        //stargateRouter.instantRedeemLocal(...);
     }
 
     // TODO: implement
