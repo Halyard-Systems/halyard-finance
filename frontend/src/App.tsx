@@ -42,6 +42,16 @@ const ERC20_ABI = [
     ],
     outputs: [{ name: '', type: 'bool' }],
   },
+  {
+    type: 'function',
+    name: 'allowance',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'owner', type: 'address' },
+      { name: 'spender', type: 'address' },
+    ],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
 ]
 
 // DepositManager contract ABI
@@ -60,17 +70,25 @@ const DEPOSIT_MANAGER_ABI = [
     inputs: [{ name: 'user', type: 'address' }],
     outputs: [{ name: '', type: 'uint256' }],
   },
+  {
+    type: 'function',
+    name: 'stargateRouter',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+  },
 ]
 
-// Contract addresses - you'll need to update these with your deployed contract addresses
-//const DEPOSIT_MANAGER_ADDRESS = '0x...' // Replace with your deployed contract address
+// Contract addresses - youll need to update these with your deployed contract addresses
 const DEPOSIT_MANAGER_ADDRESS = '0x2e590d65Dd357a7565EfB5ffB329F8465F18c494'
-
 function App() {
   const [depositAmount, setDepositAmount] = useState('')
   const [selectedToken, setSelectedToken] = useState(TOKENS[0])
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [depositedBalance, setDepositedBalance] = useState(0)
+  const [approvalStep, setApprovalStep] = useState<
+    'none' | 'depositManager' | 'stargate'
+  >('none')
   const { address, isConnected } = useAccount()
   const { connect } = useConnect()
   const { disconnect } = useDisconnect()
@@ -88,6 +106,47 @@ function App() {
   })
   const usdcBalance = usdcBalanceRaw ? Number(usdcBalanceRaw) / 1e6 : 0
 
+  // Read USDC allowance for DepositManager contract
+  const {
+    data: allowanceRaw,
+    status: allowanceStatus,
+    error: allowanceError,
+  } = useReadContract({
+    address: selectedToken.address as `0x${string}`,
+    abi: ERC20_ABI,
+    functionName: 'allowance',
+    args: [
+      address ?? '0x0000000000000000000000000000000000000000',
+      DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
+    ],
+  })
+  const allowance = allowanceRaw ? Number(allowanceRaw) / 1e6 : 0
+
+  // Read Stargate router address from DepositManager
+  const { data: stargateRouterAddress } = useReadContract({
+    address: DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
+    abi: DEPOSIT_MANAGER_ABI,
+    functionName: 'stargateRouter',
+  })
+
+  // Read USDC allowance for Stargate router
+  const {
+    data: stargateAllowanceRaw,
+    status: stargateAllowanceStatus,
+    error: stargateAllowanceError,
+  } = useReadContract({
+    address: selectedToken.address as `0x${string}`,
+    abi: ERC20_ABI,
+    functionName: 'allowance',
+    args: [
+      address ?? '0x0000000000000000000000000000000000000000',
+      stargateRouterAddress ?? '0x0000000000000000000000000000000000000000',
+    ],
+  })
+  const stargateAllowance = stargateAllowanceRaw
+    ? Number(stargateAllowanceRaw) / 1e6
+    : 0
+
   // Read deposited balance from DepositManager contract
   const { data: depositedBalanceRaw } = useReadContract({
     address: DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
@@ -103,21 +162,65 @@ function App() {
     }
   }, [depositedBalanceRaw])
 
+  // Write contract hook for approval
+  const {
+    writeContract: writeApproval,
+    isPending: isApproving,
+    error: approvalError,
+  } = useWriteContract()
+
   // Write contract hook for deposit
   const {
-    writeContract,
+    writeContract: writeDeposit,
     isPending: isDepositing,
     error: depositError,
   } = useWriteContract()
 
+  const handleApproval = async () => {
+    if (!depositAmount || !address) {
+      console.error('Invalid deposit amount or address')
+      return
+    }
+
+    try {
+      // Convert amount to wei (USDC has 6 decimals)
+      const amountInWei = BigInt(Math.floor(Number(depositAmount) * 1e6))
+
+      // Determine which approval is needed
+      const depositAmountNumber = Number(depositAmount)
+      const needsDepositManagerApproval = depositAmountNumber > allowance
+      const needsStargateApproval = depositAmountNumber > stargateAllowance
+
+      if (needsDepositManagerApproval) {
+        setApprovalStep('depositManager')
+        // Call the approve function for DepositManager
+        await writeApproval({
+          address: selectedToken.address as `0x${string}`,
+          abi: ERC20_ABI,
+          functionName: 'approve',
+          args: [DEPOSIT_MANAGER_ADDRESS as `0x${string}`, amountInWei],
+        })
+      } else if (needsStargateApproval && stargateRouterAddress) {
+        setApprovalStep('stargate')
+        // Call the approve function for Stargate router
+        await writeApproval({
+          address: selectedToken.address as `0x${string}`,
+          abi: ERC20_ABI,
+          functionName: 'approve',
+          args: [stargateRouterAddress as `0x${string}`, amountInWei],
+        })
+      }
+
+      setApprovalStep('none')
+    } catch (error) {
+      console.error('Approval failed:', error)
+      setApprovalStep('none')
+    }
+  }
+
   const handleDeposit = async () => {
-    if (
-      !depositAmount ||
-      !address ||
-      !DEPOSIT_MANAGER_ADDRESS ||
-      DEPOSIT_MANAGER_ADDRESS === '0x...'
-    ) {
-      console.error('Invalid deposit amount, address, or contract not deployed')
+    if (!depositAmount || !address) {
+      console.error('Invalid deposit amount or address')
       return
     }
 
@@ -126,7 +229,7 @@ function App() {
       const amountInWei = BigInt(Math.floor(Number(depositAmount) * 1e6))
 
       // Call the deposit function
-      await writeContract({
+      await writeDeposit({
         address: DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
         abi: DEPOSIT_MANAGER_ABI,
         functionName: 'deposit',
@@ -138,6 +241,31 @@ function App() {
     } catch (error) {
       console.error('Deposit failed:', error)
     }
+  }
+
+  // Check if approval is needed
+  const depositAmountNumber = Number(depositAmount) || 0
+  const needsDepositManagerApproval = depositAmountNumber > allowance
+  const needsStargateApproval = depositAmountNumber > stargateAllowance
+  const needsApproval = needsDepositManagerApproval || needsStargateApproval
+
+  // Get approval button text
+  const getApprovalButtonText = () => {
+    if (isApproving) {
+      if (approvalStep === 'depositManager') {
+        return 'Approving for DepositManager...'
+      } else if (approvalStep === 'stargate') {
+        return 'Approving for Stargate...'
+      }
+      return 'Approving...'
+    }
+
+    if (needsDepositManagerApproval) {
+      return `Approve ${selectedToken.symbol} for DepositManager`
+    } else if (needsStargateApproval) {
+      return `Approve ${selectedToken.symbol} for Stargate`
+    }
+    return `Approve ${selectedToken.symbol}`
   }
 
   return (
@@ -265,23 +393,80 @@ function App() {
                     onChange={(e) => setDepositAmount(e.target.value)}
                     placeholder={`0.00 ${selectedToken.symbol}`}
                     className='w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground'
-                    disabled={isDepositing}
+                    disabled={isDepositing || isApproving}
                   />
                 </div>
 
-                {/* Error Display */}
-                {depositError && (
-                  <div className='text-sm text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded-md'>
-                    Error: {depositError.message}
+                {/* Approval Status */}
+                {depositAmount && (
+                  <div className='text-sm text-muted-foreground p-3 bg-muted rounded-md'>
+                    <div className='space-y-2'>
+                      <div className='flex justify-between items-center'>
+                        <span>DepositManager allowance:</span>
+                        <span className='font-mono'>
+                          {allowance.toLocaleString(undefined, {
+                            maximumFractionDigits: 6,
+                          })}{' '}
+                          {selectedToken.symbol}
+                        </span>
+                      </div>
+                      {stargateRouterAddress ? (
+                        <div className='flex justify-between items-center'>
+                          <span>Stargate allowance:</span>
+                          <span className='font-mono'>
+                            {stargateAllowance.toLocaleString('en-US', {
+                              maximumFractionDigits: 6,
+                            })}{' '}
+                            {selectedToken.symbol}
+                          </span>
+                        </div>
+                      ) : null}
+                    </div>
+                    {needsApproval && (
+                      <div className='mt-2 text-yellow-600'>
+                        ⚠️ Approval required before deposit
+                        {needsDepositManagerApproval &&
+                          needsStargateApproval && (
+                            <span> (both DepositManager and Stargate)</span>
+                          )}
+                        {needsDepositManagerApproval &&
+                          !needsStargateApproval && (
+                            <span> (DepositManager)</span>
+                          )}
+                        {!needsDepositManagerApproval &&
+                          needsStargateApproval && <span> (Stargate)</span>}
+                      </div>
+                    )}
                   </div>
                 )}
 
+                {/* Error Display */}
+                {(approvalError || depositError) && (
+                  <div className='text-sm text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded-md'>
+                    Error: {(approvalError || depositError)?.message}
+                  </div>
+                )}
+
+                {/* Approval Button */}
+                {needsApproval && depositAmount && (
+                  <Button
+                    onClick={handleApproval}
+                    disabled={!depositAmount || isApproving}
+                    variant='outline'
+                    className='w-full'
+                  >
+                    {getApprovalButtonText()}
+                  </Button>
+                )}
+
+                {/* Deposit Button */}
                 <Button
                   onClick={handleDeposit}
                   disabled={
                     !depositAmount ||
                     isDepositing ||
-                    DEPOSIT_MANAGER_ADDRESS === '0x...'
+                    isApproving ||
+                    needsApproval
                   }
                   className='w-full'
                 >
@@ -289,14 +474,6 @@ function App() {
                     ? 'Depositing...'
                     : `Deposit ${selectedToken.symbol}`}
                 </Button>
-
-                {/* Contract Not Deployed Warning */}
-                {DEPOSIT_MANAGER_ADDRESS === '0x...' && (
-                  <div className='text-sm text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-md'>
-                    ⚠️ Contract not deployed. Please deploy the DepositManager
-                    contract first.
-                  </div>
-                )}
               </div>
             </div>
 

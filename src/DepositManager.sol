@@ -60,7 +60,7 @@ contract DepositManager {
     }
 
     function deposit(uint256 amount) external {
-        IERC20(USDC).approve(address(this), amount);
+        // Transfer USDC from user to this contract
         bool success = IERC20(USDC).transferFrom(
             msg.sender,
             address(this),
@@ -70,14 +70,17 @@ contract DepositManager {
 
         _updateLiquidityIndex();
 
-        //IERC20(USDC).approve(address(stargateRouter), amount);
-        //stargateRouter.addLiquidity(poolId, amount, address(this));
-        stargateRouter.addLiquidity(poolId, amount, msg.sender);
+        // Approve USDC for Stargate router
+        IERC20(USDC).approve(address(stargateRouter), amount);
+
+        // Add liquidity to Stargate pool
+        stargateRouter.addLiquidity(poolId, amount, address(this));
+
         // Mint scaled receipt tokens
-        // uint256 scaled = (amount * RAY) / liquidityIndex;
-        // scaledBalance[msg.sender] += scaled;
-        // totalScaledSupply += scaled;
-        // totalDeposits += amount;
+        uint256 scaled = (amount * RAY) / liquidityIndex;
+        scaledBalance[msg.sender] += scaled;
+        totalScaledSupply += scaled;
+        totalDeposits += amount;
     }
 
     function withdraw(uint256 amount) external {
