@@ -24,11 +24,7 @@ contract MockUSDC {
         return true;
     }
 
-    function transferFrom(
-        address from,
-        address to,
-        uint256 amount
-    ) external returns (bool) {
+    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
         require(balanceOf[from] >= amount, "USDC transfer failed");
         require(allowance[from][msg.sender] >= amount, "USDC transfer failed");
         balanceOf[from] -= amount;
@@ -62,18 +58,10 @@ contract DepositManagerTest is Test {
 
         // Mock Stargate router address and pool ID for testing
         uint256 mockPoolId = 1;
-        depositManager = new DepositManager(
-            mockStargateRouter,
-            mockPoolId,
-            address(mockUSDC)
-        );
+        depositManager = new DepositManager(mockStargateRouter, mockPoolId, address(mockUSDC));
 
         // Mock the Stargate router addLiquidity call to always succeed
-        vm.mockCall(
-            mockStargateRouter,
-            abi.encodeWithSelector(IStargateRouter.addLiquidity.selector),
-            abi.encode()
-        );
+        vm.mockCall(mockStargateRouter, abi.encodeWithSelector(IStargateRouter.addLiquidity.selector), abi.encode());
 
         // Give users some USDC
         mockUSDC.mint(alice, 10000 * USDC_DECIMALS);
@@ -178,18 +166,9 @@ contract DepositManagerTest is Test {
         vm.prank(alice);
         depositManager.withdraw(withdrawAmount);
 
-        assertEq(
-            depositManager.balanceOf(alice),
-            depositAmount - withdrawAmount
-        );
-        assertEq(
-            depositManager.totalDeposits(),
-            depositAmount - withdrawAmount
-        );
-        assertEq(
-            depositManager.totalScaledSupply(),
-            depositAmount - withdrawAmount
-        );
+        assertEq(depositManager.balanceOf(alice), depositAmount - withdrawAmount);
+        assertEq(depositManager.totalDeposits(), depositAmount - withdrawAmount);
+        assertEq(depositManager.totalScaledSupply(), depositAmount - withdrawAmount);
     }
 
     function test_WithdrawZeroAmount() public {
@@ -305,11 +284,7 @@ contract DepositManagerTest is Test {
         depositManager.deposit(100 * USDC_DECIMALS);
 
         uint256 aliceBalance = depositManager.balanceOf(alice);
-        assertGt(
-            aliceBalance,
-            1000 * USDC_DECIMALS,
-            "Should earn interest at above-kink rate"
-        );
+        assertGt(aliceBalance, 1000 * USDC_DECIMALS, "Should earn interest at above-kink rate");
     }
 
     // function test_CalculateSupplyRate_AtKink() public {
@@ -346,16 +321,8 @@ contract DepositManagerTest is Test {
         depositManager.deposit(100 * USDC_DECIMALS);
 
         uint256 aliceBalance = depositManager.balanceOf(alice);
-        assertEq(
-            aliceBalance,
-            depositAmount,
-            "Should not earn interest with 0 utilization"
-        );
-        assertEq(
-            depositManager.liquidityIndex(),
-            RAY,
-            "Liquidity index should remain unchanged"
-        );
+        assertEq(aliceBalance, depositAmount, "Should not earn interest with 0 utilization");
+        assertEq(depositManager.liquidityIndex(), RAY, "Liquidity index should remain unchanged");
     }
 
     function test_UpdateLiquidityIndex_NoTimePassed() public {
@@ -370,11 +337,7 @@ contract DepositManagerTest is Test {
         vm.prank(bob);
         depositManager.deposit(100 * USDC_DECIMALS);
 
-        assertEq(
-            depositManager.liquidityIndex(),
-            initialIndex,
-            "Index should not change when no time passed"
-        );
+        assertEq(depositManager.liquidityIndex(), initialIndex, "Index should not change when no time passed");
     }
 
     function test_UpdateLiquidityIndex_NoDeposits() public {
@@ -384,11 +347,7 @@ contract DepositManagerTest is Test {
         vm.prank(alice);
         depositManager.deposit(100 * USDC_DECIMALS);
 
-        assertEq(
-            depositManager.liquidityIndex(),
-            RAY,
-            "Index should remain RAY when no deposits exist"
-        );
+        assertEq(depositManager.liquidityIndex(), RAY, "Index should remain RAY when no deposits exist");
     }
 
     // function test_ComplexScenario() public {
@@ -581,11 +540,7 @@ contract DepositManagerTest is Test {
         depositManager.deposit(100 * USDC_DECIMALS);
 
         uint256 aliceBalance = depositManager.balanceOf(alice);
-        assertGt(
-            aliceBalance,
-            1000 * USDC_DECIMALS,
-            "Should earn high interest rate"
-        );
+        assertGt(aliceBalance, 1000 * USDC_DECIMALS, "Should earn high interest rate");
     }
 
     function test_InterestRateModel_100PercentUtilization() public {
@@ -602,11 +557,7 @@ contract DepositManagerTest is Test {
         depositManager.deposit(100 * USDC_DECIMALS);
 
         uint256 aliceBalance = depositManager.balanceOf(alice);
-        assertGt(
-            aliceBalance,
-            1000 * USDC_DECIMALS,
-            "Should earn maximum interest rate"
-        );
+        assertGt(aliceBalance, 1000 * USDC_DECIMALS, "Should earn maximum interest rate");
     }
 
     // function test_WithdrawAfterInterest() public {

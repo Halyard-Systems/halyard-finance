@@ -62,11 +62,7 @@ contract DepositManager {
 
     function deposit(uint256 amount) external {
         // Transfer USDC from user to this contract
-        bool success = IERC20(USDC).transferFrom(
-            msg.sender,
-            address(this),
-            amount
-        );
+        bool success = IERC20(USDC).transferFrom(msg.sender, address(this), amount);
         require(success, "USDC transfer failed");
 
         _updateLiquidityIndex();
@@ -102,10 +98,7 @@ contract DepositManager {
         if (U <= kink) {
             borrowRate = baseRate + ((slope1 * U) / kink);
         } else {
-            borrowRate =
-                baseRate +
-                slope1 +
-                ((slope2 * (U - kink)) / (1e18 - kink));
+            borrowRate = baseRate + slope1 + ((slope2 * (U - kink)) / (1e18 - kink));
         }
         uint256 netRate = (borrowRate * (RAY - reserveFactor)) / RAY;
         return (netRate * U) / RAY;
