@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAccount } from 'wagmi'
 import { DepositForm } from './components/DepositForm'
 import { WithdrawForm } from './components/WithdrawForm'
-import { MarketTable, type MarketRow } from './components/MarketTable'
+import { MarketTable } from './components/MarketTable'
 import { Header } from './components/Header'
 import { Connect } from './components/Connect'
 
@@ -65,39 +65,56 @@ function App() {
     ])
   }
 
+  const marketRows = TOKENS.map((token) => ({
+    token,
+    deposits: depositedBalance,
+    borrows: 0,
+    depositApy: 2.5,
+    borrowApy: 4.2,
+    userDeposits: depositedBalance,
+    onDeposit: () => {
+      setSelectedToken(token)
+      setIsDepositModalOpen(true)
+    },
+    onWithdraw: () => {
+      setSelectedToken(token)
+      setIsWithdrawModalOpen(true)
+    },
+  }))
+
   // Prepare market data for the table
-  const marketRows: MarketRow[] = [
-    {
-      token: TOKENS[0],
-      deposits: depositedBalance,
-      borrows: 0,
-      depositApy: 2.5,
-      borrowApy: 4.2,
-      userDeposits: depositedBalance,
-      onDeposit: () => setIsDepositModalOpen(true),
-      onWithdraw: () => setIsWithdrawModalOpen(true),
-    },
-    {
-      token: TOKENS[1],
-      deposits: depositedBalance,
-      borrows: 0,
-      depositApy: 2.5,
-      borrowApy: 4.2,
-      userDeposits: depositedBalance,
-      onDeposit: () => setIsDepositModalOpen(true),
-      onWithdraw: () => setIsWithdrawModalOpen(true),
-    },
-    {
-      token: TOKENS[2],
-      deposits: depositedBalance,
-      borrows: 0,
-      depositApy: 2.5,
-      borrowApy: 4.2,
-      userDeposits: depositedBalance,
-      onDeposit: () => setIsDepositModalOpen(true),
-      onWithdraw: () => setIsWithdrawModalOpen(true),
-    },
-  ]
+  // const marketRows: MarketRow[] = [
+  //   {
+  //     token: TOKENS[0],
+  //     deposits: depositedBalance,
+  //     borrows: 0,
+  //     depositApy: 2.5,
+  //     borrowApy: 4.2,
+  //     userDeposits: depositedBalance,
+  //     onDeposit: () => setIsDepositModalOpen(true),
+  //     onWithdraw: () => setIsWithdrawModalOpen(true),
+  //   },
+  //   {
+  //     token: TOKENS[1],
+  //     deposits: depositedBalance,
+  //     borrows: 0,
+  //     depositApy: 2.5,
+  //     borrowApy: 4.2,
+  //     userDeposits: depositedBalance,
+  //     onDeposit: () => setIsDepositModalOpen(true),
+  //     onWithdraw: () => setIsWithdrawModalOpen(true),
+  //   },
+  //   {
+  //     token: TOKENS[2],
+  //     deposits: depositedBalance,
+  //     borrows: 0,
+  //     depositApy: 2.5,
+  //     borrowApy: 4.2,
+  //     userDeposits: depositedBalance,
+  //     onDeposit: () => setIsDepositModalOpen(true),
+  //     onWithdraw: () => setIsWithdrawModalOpen(true),
+  //   },
+  // ]
 
   return (
     <div className='min-h-screen bg-background'>

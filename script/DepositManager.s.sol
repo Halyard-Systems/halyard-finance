@@ -12,7 +12,8 @@ contract DepositManagerScript is Script {
     //address STARGATE_ROUTER_SEPOLIA_TESTNET =
     //    0x2836045A50744FB50D3d04a9C8D18aD7B5012102;
 
-    address STARGATE_ROUTER_MAINNET = 0x8731d54E9D02c286767d56ac03e8037C07e01e98;
+    address STARGATE_ROUTER_MAINNET =
+        0x8731d54E9D02c286767d56ac03e8037C07e01e98;
     //address STARGATE_USDC_POOL_MAINNET =
     //    0xc026395860Db2d07ee33e05fE50ed7bD583189C7;
 
@@ -22,12 +23,15 @@ contract DepositManagerScript is Script {
 
     function run() public {
         // Get constructor parameters from environment or set defaults
-        address stargateRouter = vm.envOr("STARGATE_ROUTER", STARGATE_ROUTER_MAINNET);
+        address stargateRouter = vm.envOr(
+            "STARGATE_ROUTER",
+            STARGATE_ROUTER_MAINNET
+        );
         uint256 poolId = vm.envOr("POOL_ID", uint256(1)); // USDC pool ID
 
         vm.startBroadcast();
 
-        depositManager = new DepositManager(stargateRouter, poolId, USDC_MAINNET);
+        depositManager = new DepositManager(stargateRouter, poolId);
 
         console.log("DepositManager deployed at:", address(depositManager));
         console.log("Stargate Router:", stargateRouter);
