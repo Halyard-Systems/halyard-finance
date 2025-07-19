@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from './ui/button'
 import {
   Dialog,
@@ -12,7 +12,11 @@ import ERC20_ABI from '../abis/ERC20.json'
 import DEPOSIT_MANAGER_ABI from '../abis/DepositManager.json'
 import type { Token } from '../lib/types'
 
-import { useAccount, useWriteContract } from 'wagmi'
+import {
+  useAccount,
+  useWriteContract,
+  useWaitForTransactionReceipt,
+} from 'wagmi'
 
 interface DepositFormProps {
   isOpen: boolean
@@ -20,6 +24,7 @@ interface DepositFormProps {
   selectedToken: Token
   usdcBalance: number
   allowance: number
+  onTransactionComplete?: () => void
 }
 
 export function DepositForm({
@@ -28,6 +33,7 @@ export function DepositForm({
   selectedToken,
   usdcBalance,
   allowance,
+  onTransactionComplete,
 }: DepositFormProps) {
   const { address } = useAccount()
   const [approvalStep, setApprovalStep] = useState<'none' | 'depositManager'>(
@@ -43,13 +49,46 @@ export function DepositForm({
     writeContract: writeApproval,
     isPending: isApproving,
     error: approvalError,
+    data: approvalData,
   } = useWriteContract()
 
   const {
     writeContract: writeDeposit,
     isPending: isDepositing,
     error: depositError,
+    data: depositData,
   } = useWriteContract()
+
+  // Wait for transaction receipts and handle completion
+  const { isLoading: isApprovalConfirming, isSuccess: isApprovalConfirmed } =
+    useWaitForTransactionReceipt({
+      hash: approvalData,
+    })
+
+  const { isLoading: isDepositConfirming, isSuccess: isDepositConfirmed } =
+    useWaitForTransactionReceipt({
+      hash: depositData,
+    })
+
+  // Handle approval completion
+  useEffect(() => {
+    if (isApprovalConfirmed) {
+      setApprovalStep('none')
+      // Trigger data refresh after approval
+      onTransactionComplete?.()
+    }
+  }, [isApprovalConfirmed, onTransactionComplete])
+
+  // Handle deposit completion
+  useEffect(() => {
+    if (isDepositConfirmed) {
+      // Clear the input after successful deposit
+      setDepositAmount('')
+      onClose()
+      // Trigger data refresh
+      onTransactionComplete?.()
+    }
+  }, [isDepositConfirmed, onTransactionComplete, onClose])
 
   const getApprovalButtonText = () => {
     if (isApproving) {
@@ -79,8 +118,6 @@ export function DepositForm({
           amountInWei,
         ],
       })
-
-      setApprovalStep('none')
     } catch (error) {
       console.error('Approval failed:', error)
       setApprovalStep('none')
@@ -104,9 +141,6 @@ export function DepositForm({
         functionName: 'deposit',
         args: [amountInWei],
       })
-
-      // Clear the input after successful deposit
-      setDepositAmount('')
     } catch (error) {
       console.error('Deposit failed:', error)
     }
@@ -155,7 +189,12 @@ export function DepositForm({
               onChange={(e) => setDepositAmount(e.target.value)}
               placeholder={`0.00 ${selectedToken.symbol}`}
               className='w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground'
-              disabled={isDepositing || isApproving}
+              disabled={
+                isDepositing ||
+                isDepositConfirming ||
+                isApproving ||
+                isApprovalConfirming
+              }
             />
           </div>
 
@@ -196,20 +235,33 @@ export function DepositForm({
           {needsApproval && depositAmount && (
             <Button
               onClick={handleApproval}
-              disabled={!depositAmount || isApproving}
+              disabled={!depositAmount || isApproving || isApprovalConfirming}
               className='flex-1'
             >
-              {getApprovalButtonText()}
+              {isApproving
+                ? 'Approving...'
+                : isApprovalConfirming
+                ? 'Confirming Approval...'
+                : getApprovalButtonText()}
             </Button>
           )}
           <Button
             onClick={handleDeposit}
             disabled={
-              !depositAmount || isDepositing || isApproving || needsApproval
+              !depositAmount ||
+              isDepositing ||
+              isDepositConfirming ||
+              isApproving ||
+              isApprovalConfirming ||
+              needsApproval
             }
             className='flex-1'
           >
-            {isDepositing ? 'Depositing...' : `Deposit ${selectedToken.symbol}`}
+            {isDepositing
+              ? 'Depositing...'
+              : isDepositConfirming
+              ? 'Confirming Deposit...'
+              : `Deposit ${selectedToken.symbol}`}
           </Button>
         </DialogFooter>
       </DialogContent>

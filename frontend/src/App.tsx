@@ -27,6 +27,7 @@ function App() {
     data: usdcBalanceRaw,
     status: usdcStatus,
     error: usdcError,
+    refetch: refetchUsdcBalance,
   } = useReadERC20Balance(selectedToken)
   const usdcBalance = usdcBalanceRaw ? Number(usdcBalanceRaw) / 1e6 : 0
 
@@ -35,6 +36,7 @@ function App() {
     data: allowanceRaw,
     status: allowanceStatus,
     error: allowanceError,
+    refetch: refetchAllowance,
   } = useReadDepositManagerAllowance(
     address ?? '0x0000000000000000000000000000000000000000',
     selectedToken
@@ -42,9 +44,10 @@ function App() {
   const allowance = allowanceRaw ? Number(allowanceRaw) / 1e6 : 0
 
   // Read deposited balance from DepositManager contract
-  const { data: depositedBalanceRaw } = useReadDepositManagerBalance(
-    address ?? '0x0000000000000000000000000000000000000000'
-  )
+  const { data: depositedBalanceRaw, refetch: refetchDepositedBalance } =
+    useReadDepositManagerBalance(
+      address ?? '0x0000000000000000000000000000000000000000'
+    )
 
   // Update deposited balance when data changes
   useEffect(() => {
@@ -52,6 +55,15 @@ function App() {
       setDepositedBalance(Number(depositedBalanceRaw) / 1e6)
     }
   }, [depositedBalanceRaw])
+
+  // Function to refresh all data after transaction completion
+  const handleTransactionComplete = async () => {
+    await Promise.all([
+      refetchUsdcBalance(),
+      refetchAllowance(),
+      refetchDepositedBalance(),
+    ])
+  }
 
   // Prepare market data for the table
   const marketRows: MarketRow[] = [
@@ -89,6 +101,7 @@ function App() {
           selectedToken={selectedToken}
           usdcBalance={usdcBalance}
           allowance={allowance}
+          onTransactionComplete={handleTransactionComplete}
         />
 
         {/* Withdraw Modal */}
@@ -97,6 +110,7 @@ function App() {
           onClose={() => setIsWithdrawModalOpen(false)}
           selectedToken={selectedToken}
           depositedBalance={depositedBalance}
+          onTransactionComplete={handleTransactionComplete}
         />
       </main>
     </div>

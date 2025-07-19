@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from './ui/button'
 import {
   Dialog,
@@ -7,7 +7,11 @@ import {
   DialogTitle,
   DialogFooter,
 } from './ui/dialog'
-import { useAccount, useWriteContract } from 'wagmi'
+import {
+  useAccount,
+  useWriteContract,
+  useWaitForTransactionReceipt,
+} from 'wagmi'
 
 import DEPOSIT_MANAGER_ABI from '../abis/DepositManager.json'
 interface Token {
@@ -23,6 +27,7 @@ interface WithdrawFormProps {
   onClose: () => void
   selectedToken: Token
   depositedBalance: number
+  onTransactionComplete?: () => void
 }
 
 export function WithdrawForm({
@@ -30,6 +35,7 @@ export function WithdrawForm({
   onClose,
   selectedToken,
   depositedBalance,
+  onTransactionComplete,
 }: WithdrawFormProps) {
   const [withdrawAmount, setWithdrawAmount] = useState('')
 
@@ -39,7 +45,25 @@ export function WithdrawForm({
     writeContract: writeWithdraw,
     isPending: isWithdrawing,
     error: withdrawError,
+    data: withdrawData,
   } = useWriteContract()
+
+  // Wait for transaction receipt and handle completion
+  const { isLoading: isConfirming, isSuccess: isConfirmed } =
+    useWaitForTransactionReceipt({
+      hash: withdrawData,
+    })
+
+  // Handle transaction completion
+  useEffect(() => {
+    if (isConfirmed) {
+      // Clear the input after successful withdraw
+      setWithdrawAmount('')
+      onClose()
+      // Trigger data refresh
+      onTransactionComplete?.()
+    }
+  }, [isConfirmed, onTransactionComplete, onClose])
 
   const handleWithdraw = async () => {
     if (!withdrawAmount || !address) {
@@ -58,10 +82,6 @@ export function WithdrawForm({
         functionName: 'withdraw',
         args: [amountInWei],
       })
-
-      // Clear the input after successful withdraw
-      setWithdrawAmount('')
-      onClose()
     } catch (error) {
       console.error('Withdraw failed:', error)
     }
@@ -109,7 +129,7 @@ export function WithdrawForm({
               onChange={(e) => setWithdrawAmount(e.target.value)}
               placeholder={`0.00 ${selectedToken.symbol}`}
               className='w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground'
-              disabled={isWithdrawing}
+              disabled={isWithdrawing || isConfirming}
               max={depositedBalance}
             />
           </div>
@@ -131,6 +151,7 @@ export function WithdrawForm({
             disabled={
               !withdrawAmount ||
               isWithdrawing ||
+              isConfirming ||
               Number(withdrawAmount) > depositedBalance ||
               Number(withdrawAmount) <= 0
             }
@@ -138,6 +159,8 @@ export function WithdrawForm({
           >
             {isWithdrawing
               ? 'Withdrawing...'
+              : isConfirming
+              ? 'Confirming...'
               : `Withdraw ${selectedToken.symbol}`}
           </Button>
         </DialogFooter>
