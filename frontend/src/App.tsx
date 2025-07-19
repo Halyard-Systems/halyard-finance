@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   useAccount,
   useConnect,
@@ -17,11 +17,11 @@ import ERC20_ABI from './abis/ERC20.json'
 import DEPOSIT_MANAGER_ABI from './abis/DepositManager.json'
 
 // Contract addresses - youll need to update these with your deployed contract addresses
-const DEPOSIT_MANAGER_ADDRESS = '0x2e590d65Dd357a7565EfB5ffB329F8465F18c494'
+//const DEPOSIT_MANAGER_ADDRESS = '0x2e590d65Dd357a7565EfB5ffB329F8465F18c494'
 
 function App() {
   const [depositAmount, setDepositAmount] = useState('')
-  const [withdrawAmount, setWithdrawAmount] = useState('')
+  //const [withdrawAmount, setWithdrawAmount] = useState('')
   const [selectedToken, setSelectedToken] = useState(TOKENS[0])
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [depositedBalance, setDepositedBalance] = useState(0)
@@ -58,14 +58,14 @@ function App() {
     functionName: 'allowance',
     args: [
       address ?? '0x0000000000000000000000000000000000000000',
-      DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
+      import.meta.env.VITE_DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
     ],
   })
   const allowance = allowanceRaw ? Number(allowanceRaw) / 1e6 : 0
 
   // Read Stargate router address from DepositManager
   const { data: stargateRouterAddress } = useReadContract({
-    address: DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
+    address: import.meta.env.VITE_DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
     abi: DEPOSIT_MANAGER_ABI,
     functionName: 'stargateRouter',
   })
@@ -90,14 +90,14 @@ function App() {
 
   // Read deposited balance from DepositManager contract
   const { data: depositedBalanceRaw } = useReadContract({
-    address: DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
+    address: import.meta.env.VITE_DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
     abi: DEPOSIT_MANAGER_ABI,
     functionName: 'balanceOf',
     args: [address ?? '0x0000000000000000000000000000000000000000'],
   })
 
   // Update deposited balance when data changes
-  React.useEffect(() => {
+  useEffect(() => {
     if (depositedBalanceRaw) {
       setDepositedBalance(Number(depositedBalanceRaw) / 1e6)
     }
@@ -118,11 +118,11 @@ function App() {
   } = useWriteContract()
 
   // Write contract hook for withdraw
-  const {
-    writeContract: writeWithdraw,
-    isPending: isWithdrawing,
-    error: withdrawError,
-  } = useWriteContract()
+  // const {
+  //   writeContract: writeWithdraw,
+  //   isPending: isWithdrawing,
+  //   error: withdrawError,
+  // } = useWriteContract()
 
   const handleApproval = async () => {
     if (!depositAmount || !address) {
@@ -146,7 +146,10 @@ function App() {
           address: selectedToken.address as `0x${string}`,
           abi: ERC20_ABI,
           functionName: 'approve',
-          args: [DEPOSIT_MANAGER_ADDRESS as `0x${string}`, amountInWei],
+          args: [
+            import.meta.env.VITE_DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
+            amountInWei,
+          ],
         })
       } else if (needsStargateApproval && stargateRouterAddress) {
         setApprovalStep('stargate')
@@ -178,7 +181,7 @@ function App() {
 
       // Call the deposit function
       await writeDeposit({
-        address: DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
+        address: import.meta.env.VITE_DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
         abi: DEPOSIT_MANAGER_ABI,
         functionName: 'deposit',
         args: [amountInWei],
@@ -191,31 +194,31 @@ function App() {
     }
   }
 
-  const handleWithdraw = async () => {
-    if (!withdrawAmount || !address) {
-      console.error('Invalid withdraw amount or address')
-      return
-    }
+  // const handleWithdraw = async () => {
+  //   if (!withdrawAmount || !address) {
+  //     console.error('Invalid withdraw amount or address')
+  //     return
+  //   }
 
-    try {
-      // Convert amount to wei (USDC has 6 decimals)
-      const amountInWei = BigInt(Math.floor(Number(withdrawAmount) * 1e6))
+  //   try {
+  //     // Convert amount to wei (USDC has 6 decimals)
+  //     const amountInWei = BigInt(Math.floor(Number(withdrawAmount) * 1e6))
 
-      // Call the withdraw function
-      await writeWithdraw({
-        address: DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
-        abi: DEPOSIT_MANAGER_ABI,
-        functionName: 'withdraw',
-        args: [amountInWei],
-      })
+  //     // Call the withdraw function
+  //     await writeWithdraw({
+  //       address: VITE_DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
+  //       abi: DEPOSIT_MANAGER_ABI,
+  //       functionName: 'withdraw',
+  //       args: [amountInWei],
+  //     })
 
-      // Clear the input after successful withdraw
-      setWithdrawAmount('')
-      setIsWithdrawModalOpen(false)
-    } catch (error) {
-      console.error('Withdraw failed:', error)
-    }
-  }
+  //     // Clear the input after successful withdraw
+  //     setWithdrawAmount('')
+  //     setIsWithdrawModalOpen(false)
+  //   } catch (error) {
+  //     console.error('Withdraw failed:', error)
+  //   }
+  // }
 
   // Check if approval is needed
   const depositAmountNumber = Number(depositAmount) || 0
@@ -443,14 +446,15 @@ function App() {
         {/* Withdraw Modal */}
         <WithdrawForm
           isOpen={isWithdrawModalOpen}
+          //setIsWithdrawModalOpen={setIsWithdrawModalOpen}
           onClose={() => setIsWithdrawModalOpen(false)}
           selectedToken={selectedToken}
-          withdrawAmount={withdrawAmount}
-          setWithdrawAmount={setWithdrawAmount}
+          //withdrawAmount={withdrawAmount}
+          //setWithdrawAmount={setWithdrawAmount}
           depositedBalance={depositedBalance}
-          withdrawError={withdrawError}
-          isWithdrawing={isWithdrawing}
-          onWithdraw={handleWithdraw}
+          //withdrawError={withdrawError}
+          //isWithdrawing={isWithdrawing}
+          //onWithdraw={handleWithdraw}
         />
       </main>
     </div>

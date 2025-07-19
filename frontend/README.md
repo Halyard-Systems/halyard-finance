@@ -22,7 +22,7 @@ A React + TypeScript frontend for the Halyard Finance protocol, built with Vite 
 
 3. **Update contract address:**
    - Deploy your DepositManager contract
-   - Update `DEPOSIT_MANAGER_ADDRESS` in `src/App.tsx`
+   - Update `VITE_DEPOSIT_MANAGER_ADDRESS` in `src/App.tsx`
 
 ## Development
 

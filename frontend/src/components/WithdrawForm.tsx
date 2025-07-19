@@ -1,4 +1,4 @@
-import React from 'react'
+import { useState } from 'react'
 import { Button } from './ui/button'
 import {
   Dialog,
@@ -7,7 +7,9 @@ import {
   DialogTitle,
   DialogFooter,
 } from './ui/dialog'
+import { useAccount, useWriteContract } from 'wagmi'
 
+import DEPOSIT_MANAGER_ABI from '../abis/DepositManager.json'
 interface Token {
   symbol: string
   name: string
@@ -20,25 +22,64 @@ interface WithdrawFormProps {
   isOpen: boolean
   onClose: () => void
   selectedToken: Token
-  withdrawAmount: string
-  setWithdrawAmount: (amount: string) => void
+  //setIsWithdrawModalOpen: (isOpen: boolean) => void
+  //withdrawAmount: string
+  //setWithdrawAmount: (amount: string) => void
   depositedBalance: number
-  withdrawError?: any
-  isWithdrawing: boolean
-  onWithdraw: () => void
+  //withdrawError?: any
+  //isWithdrawing: boolean
+  //onWithdraw: () => void
 }
 
 export function WithdrawForm({
   isOpen,
   onClose,
   selectedToken,
-  withdrawAmount,
-  setWithdrawAmount,
+  //setIsWithdrawModalOpen,
+  //withdrawAmount,
+  //setWithdrawAmount,
   depositedBalance,
-  withdrawError,
-  isWithdrawing,
-  onWithdraw,
-}: WithdrawFormProps) {
+}: //withdrawError,
+//isWithdrawing,
+//onWithdraw,
+WithdrawFormProps) {
+  const [withdrawAmount, setWithdrawAmount] = useState('')
+
+  const { address } = useAccount()
+
+  const {
+    writeContract: writeWithdraw,
+    isPending: isWithdrawing,
+    error: withdrawError,
+  } = useWriteContract()
+
+  const handleWithdraw = async () => {
+    if (!withdrawAmount || !address) {
+      console.error('Invalid withdraw amount or address')
+      return
+    }
+
+    try {
+      // Convert amount to wei (USDC has 6 decimals)
+      const amountInWei = BigInt(Math.floor(Number(withdrawAmount) * 1e6))
+
+      // Call the withdraw function
+      await writeWithdraw({
+        address: import.meta.env.VITE_DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
+        abi: DEPOSIT_MANAGER_ABI,
+        functionName: 'withdraw',
+        args: [amountInWei],
+      })
+
+      // Clear the input after successful withdraw
+      setWithdrawAmount('')
+      //setIsWithdrawModalOpen(false)
+      onClose()
+    } catch (error) {
+      console.error('Withdraw failed:', error)
+    }
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className='sm:max-w-md'>
@@ -99,7 +140,7 @@ export function WithdrawForm({
             Cancel
           </Button>
           <Button
-            onClick={onWithdraw}
+            onClick={handleWithdraw}
             disabled={
               !withdrawAmount ||
               isWithdrawing ||
