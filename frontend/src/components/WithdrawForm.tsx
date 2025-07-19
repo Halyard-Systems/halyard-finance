@@ -22,27 +22,15 @@ interface WithdrawFormProps {
   isOpen: boolean
   onClose: () => void
   selectedToken: Token
-  //setIsWithdrawModalOpen: (isOpen: boolean) => void
-  //withdrawAmount: string
-  //setWithdrawAmount: (amount: string) => void
   depositedBalance: number
-  //withdrawError?: any
-  //isWithdrawing: boolean
-  //onWithdraw: () => void
 }
 
 export function WithdrawForm({
   isOpen,
   onClose,
   selectedToken,
-  //setIsWithdrawModalOpen,
-  //withdrawAmount,
-  //setWithdrawAmount,
   depositedBalance,
-}: //withdrawError,
-//isWithdrawing,
-//onWithdraw,
-WithdrawFormProps) {
+}: WithdrawFormProps) {
   const [withdrawAmount, setWithdrawAmount] = useState('')
 
   const { address } = useAccount()
@@ -73,7 +61,6 @@ WithdrawFormProps) {
 
       // Clear the input after successful withdraw
       setWithdrawAmount('')
-      //setIsWithdrawModalOpen(false)
       onClose()
     } catch (error) {
       console.error('Withdraw failed:', error)

@@ -16,12 +16,8 @@ import TOKENS from './tokens.json'
 import ERC20_ABI from './abis/ERC20.json'
 import DEPOSIT_MANAGER_ABI from './abis/DepositManager.json'
 
-// Contract addresses - youll need to update these with your deployed contract addresses
-//const DEPOSIT_MANAGER_ADDRESS = '0x2e590d65Dd357a7565EfB5ffB329F8465F18c494'
-
 function App() {
   const [depositAmount, setDepositAmount] = useState('')
-  //const [withdrawAmount, setWithdrawAmount] = useState('')
   const [selectedToken, setSelectedToken] = useState(TOKENS[0])
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [depositedBalance, setDepositedBalance] = useState(0)
@@ -117,13 +113,6 @@ function App() {
     error: depositError,
   } = useWriteContract()
 
-  // Write contract hook for withdraw
-  // const {
-  //   writeContract: writeWithdraw,
-  //   isPending: isWithdrawing,
-  //   error: withdrawError,
-  // } = useWriteContract()
-
   const handleApproval = async () => {
     if (!depositAmount || !address) {
       console.error('Invalid deposit amount or address')
@@ -193,32 +182,6 @@ function App() {
       console.error('Deposit failed:', error)
     }
   }
-
-  // const handleWithdraw = async () => {
-  //   if (!withdrawAmount || !address) {
-  //     console.error('Invalid withdraw amount or address')
-  //     return
-  //   }
-
-  //   try {
-  //     // Convert amount to wei (USDC has 6 decimals)
-  //     const amountInWei = BigInt(Math.floor(Number(withdrawAmount) * 1e6))
-
-  //     // Call the withdraw function
-  //     await writeWithdraw({
-  //       address: VITE_DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
-  //       abi: DEPOSIT_MANAGER_ABI,
-  //       functionName: 'withdraw',
-  //       args: [amountInWei],
-  //     })
-
-  //     // Clear the input after successful withdraw
-  //     setWithdrawAmount('')
-  //     setIsWithdrawModalOpen(false)
-  //   } catch (error) {
-  //     console.error('Withdraw failed:', error)
-  //   }
-  // }
 
   // Check if approval is needed
   const depositAmountNumber = Number(depositAmount) || 0
@@ -446,15 +409,9 @@ function App() {
         {/* Withdraw Modal */}
         <WithdrawForm
           isOpen={isWithdrawModalOpen}
-          //setIsWithdrawModalOpen={setIsWithdrawModalOpen}
           onClose={() => setIsWithdrawModalOpen(false)}
           selectedToken={selectedToken}
-          //withdrawAmount={withdrawAmount}
-          //setWithdrawAmount={setWithdrawAmount}
           depositedBalance={depositedBalance}
-          //withdrawError={withdrawError}
-          //isWithdrawing={isWithdrawing}
-          //onWithdraw={handleWithdraw}
         />
       </main>
     </div>
