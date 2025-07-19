@@ -20,8 +20,6 @@ interface DepositFormProps {
   selectedToken: Token
   usdcBalance: number
   allowance: number
-  stargateAllowance: number
-  stargateRouterAddress?: string | undefined
 }
 
 export function DepositForm({
@@ -30,20 +28,16 @@ export function DepositForm({
   selectedToken,
   usdcBalance,
   allowance,
-  stargateAllowance,
-  stargateRouterAddress,
 }: DepositFormProps) {
   const { address } = useAccount()
-  const [approvalStep, setApprovalStep] = useState<
-    'none' | 'depositManager' | 'stargate'
-  >('none')
+  const [approvalStep, setApprovalStep] = useState<'none' | 'depositManager'>(
+    'none'
+  )
   const [depositAmount, setDepositAmount] = useState('')
 
   // Check if approval is needed
   const depositAmountNumber = Number(depositAmount) || 0
-  const needsDepositManagerApproval = depositAmountNumber > allowance
-  const needsStargateApproval = depositAmountNumber > stargateAllowance
-  const needsApproval = needsDepositManagerApproval || needsStargateApproval
+  const needsApproval = depositAmountNumber > allowance
 
   const {
     writeContract: writeApproval,
@@ -59,20 +53,9 @@ export function DepositForm({
 
   const getApprovalButtonText = () => {
     if (isApproving) {
-      if (approvalStep === 'depositManager') {
-        return 'Approving for DepositManager...'
-      } else if (approvalStep === 'stargate') {
-        return 'Approving for Stargate...'
-      }
-      return 'Approving...'
+      return 'Approving for DepositManager...'
     }
-
-    if (needsDepositManagerApproval) {
-      return `Approve ${selectedToken.symbol} for DepositManager`
-    } else if (needsStargateApproval) {
-      return `Approve ${selectedToken.symbol} for Stargate`
-    }
-    return `Approve ${selectedToken.symbol}`
+    return `Approve ${selectedToken.symbol} for DepositManager`
   }
 
   const handleApproval = async () => {
@@ -85,33 +68,17 @@ export function DepositForm({
       // Convert amount to wei (USDC has 6 decimals)
       const amountInWei = BigInt(Math.floor(Number(depositAmount) * 1e6))
 
-      // Determine which approval is needed
-      const depositAmountNumber = Number(depositAmount)
-      const needsDepositManagerApproval = depositAmountNumber > allowance
-      const needsStargateApproval = depositAmountNumber > stargateAllowance
-
-      if (needsDepositManagerApproval) {
-        setApprovalStep('depositManager')
-        // Call the approve function for DepositManager
-        await writeApproval({
-          address: selectedToken.address as `0x${string}`,
-          abi: ERC20_ABI,
-          functionName: 'approve',
-          args: [
-            import.meta.env.VITE_DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
-            amountInWei,
-          ],
-        })
-      } else if (needsStargateApproval && stargateRouterAddress) {
-        setApprovalStep('stargate')
-        // Call the approve function for Stargate router
-        await writeApproval({
-          address: selectedToken.address as `0x${string}`,
-          abi: ERC20_ABI,
-          functionName: 'approve',
-          args: [stargateRouterAddress as `0x${string}`, amountInWei],
-        })
-      }
+      setApprovalStep('depositManager')
+      // Call the approve function for DepositManager
+      await writeApproval({
+        address: selectedToken.address as `0x${string}`,
+        abi: ERC20_ABI,
+        functionName: 'approve',
+        args: [
+          import.meta.env.VITE_DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
+          amountInWei,
+        ],
+      })
 
       setApprovalStep('none')
     } catch (error) {
@@ -205,30 +172,10 @@ export function DepositForm({
                     {selectedToken.symbol}
                   </span>
                 </div>
-                {stargateRouterAddress ? (
-                  <div className='flex justify-between items-center'>
-                    <span>Stargate allowance:</span>
-                    <span className='font-mono'>
-                      {stargateAllowance.toLocaleString('en-US', {
-                        maximumFractionDigits: 6,
-                      })}{' '}
-                      {selectedToken.symbol}
-                    </span>
-                  </div>
-                ) : null}
               </div>
               {needsApproval && (
                 <div className='mt-2 text-yellow-600'>
                   ⚠️ Approval required before deposit
-                  {needsDepositManagerApproval && needsStargateApproval && (
-                    <span> (both DepositManager and Stargate)</span>
-                  )}
-                  {needsDepositManagerApproval && !needsStargateApproval && (
-                    <span> (DepositManager)</span>
-                  )}
-                  {!needsDepositManagerApproval && needsStargateApproval && (
-                    <span> (Stargate)</span>
-                  )}
                 </div>
               )}
             </div>

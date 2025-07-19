@@ -12,8 +12,6 @@ import {
   useReadDepositManagerAllowance,
   useReadDepositManagerBalance,
   useReadERC20Balance,
-  useReadStargateAllowance,
-  useReadStargateRouterContract,
 } from './lib/queries'
 
 function App() {
@@ -44,23 +42,6 @@ function App() {
     selectedToken
   )
   const allowance = allowanceRaw ? Number(allowanceRaw) / 1e6 : 0
-
-  // Read Stargate router address from DepositManager
-  const { data: stargateRouterAddress } = useReadStargateRouterContract()
-
-  // Read USDC allowance for Stargate router
-  const {
-    data: stargateAllowanceRaw,
-    status: stargateAllowanceStatus,
-    error: stargateAllowanceError,
-  } = useReadStargateAllowance(
-    address ?? '0x0000000000000000000000000000000000000000',
-    stargateRouterAddress as string,
-    selectedToken
-  )
-  const stargateAllowance = stargateAllowanceRaw
-    ? Number(stargateAllowanceRaw) / 1e6
-    : 0
 
   // Read deposited balance from DepositManager contract
   const { data: depositedBalanceRaw } = useReadDepositManagerBalance(
@@ -253,8 +234,6 @@ function App() {
           selectedToken={selectedToken}
           usdcBalance={usdcBalance}
           allowance={allowance}
-          stargateAllowance={stargateAllowance}
-          stargateRouterAddress={stargateRouterAddress as string | undefined}
         />
 
         {/* Withdraw Modal */}

@@ -42,25 +42,3 @@ export const useReadDepositManagerBalance = (
     args: [address],
   })
 }
-
-// Read Stargate router address from DepositManager contract
-export const useReadStargateRouterContract = (): UseReadContractReturnType => {
-  return useReadContract({
-    address: DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
-    abi: DEPOSIT_MANAGER_ABI,
-    functionName: 'stargateRouter',
-  })
-}
-
-export const useReadStargateAllowance = (
-  address: string,
-  stargateRouterAddress: string,
-  token: Token
-): UseReadContractReturnType => {
-  return useReadContract({
-    address: token.address as `0x${string}`,
-    abi: ERC20_ABI,
-    functionName: 'allowance',
-    args: [address, stargateRouterAddress],
-  })
-}
