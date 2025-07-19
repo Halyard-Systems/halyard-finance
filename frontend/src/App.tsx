@@ -4,6 +4,7 @@ import { injected } from 'wagmi/connectors'
 import { Button } from './components/ui/button'
 import { DepositForm } from './components/DepositForm'
 import { WithdrawForm } from './components/WithdrawForm'
+import { MarketTable, type MarketRow } from './components/MarketTable'
 import halyardLogo from './assets/halyard-finance-navbar-logo-cyan-gold.png'
 
 import TOKENS from './tokens.json'
@@ -55,6 +56,20 @@ function App() {
     }
   }, [depositedBalanceRaw])
 
+  // Prepare market data for the table
+  const marketRows: MarketRow[] = [
+    {
+      token: selectedToken,
+      deposits: depositedBalance,
+      borrows: 0,
+      depositApy: 2.5,
+      borrowApy: 4.2,
+      userDeposits: depositedBalance,
+      onDeposit: () => setIsDepositModalOpen(true),
+      onWithdraw: () => setIsWithdrawModalOpen(true),
+    },
+  ]
+
   return (
     <div className='min-h-screen bg-background'>
       {/* Header */}
@@ -92,122 +107,11 @@ function App() {
       </header>
 
       {/* Main Content */}
-      <main className='max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
+      <main className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
         {isConnected && (
           <>
             {/* Deposit & Borrow Section */}
-            <div className='bg-card rounded-lg shadow-sm border border-border p-6'>
-              <div className='overflow-x-auto'>
-                <table className='w-full'>
-                  <thead>
-                    <tr className='border-b border-border'>
-                      <th className='text-left py-3 px-4 font-medium text-card-foreground'>
-                        Asset
-                      </th>
-                      <th className='text-left py-3 px-4 font-medium text-card-foreground'>
-                        Deposits
-                      </th>
-                      <th className='text-left py-3 px-4 font-medium text-card-foreground'>
-                        Borrows
-                      </th>
-                      <th className='text-left py-3 px-4 font-medium text-card-foreground'>
-                        Deposit APY
-                      </th>
-                      <th className='text-left py-3 px-4 font-medium text-card-foreground'>
-                        Borrow APY
-                      </th>
-                      <th className='text-left py-3 px-4 font-medium text-card-foreground'>
-                        Your Deposits
-                      </th>
-                      <th className='text-left py-3 px-4 font-medium text-card-foreground'>
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className='border-b border-border'>
-                      {/* Asset */}
-                      <td className='py-4 px-4'>
-                        <div className='flex items-center space-x-2'>
-                          <img
-                            src={selectedToken.icon}
-                            alt={`${selectedToken.symbol} icon`}
-                            className='w-6 h-6'
-                          />
-                          <div>
-                            <div className='font-medium text-card-foreground'>
-                              {selectedToken.symbol}
-                            </div>
-                            <div className='text-sm text-muted-foreground'>
-                              {selectedToken.name}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Deposits */}
-                      <td className='py-4 px-4'>
-                        <div className='font-mono text-card-foreground'>
-                          {depositedBalance.toLocaleString(undefined, {
-                            maximumFractionDigits: 6,
-                          })}{' '}
-                          {selectedToken.symbol}
-                        </div>
-                      </td>
-
-                      {/* Borrows */}
-                      <td className='py-4 px-4'>
-                        <div className='font-mono text-card-foreground'>
-                          0.00 {selectedToken.symbol}
-                        </div>
-                      </td>
-
-                      {/* Deposit APY */}
-                      <td className='py-4 px-4'>
-                        <div className='text-green-600 font-medium'>2.5%</div>
-                      </td>
-
-                      {/* Borrow APY */}
-                      <td className='py-4 px-4'>
-                        <div className='text-red-600 font-medium'>4.2%</div>
-                      </td>
-
-                      {/* Your Deposits */}
-                      <td className='py-4 px-4'>
-                        <div className='font-mono text-card-foreground'>
-                          {depositedBalance.toLocaleString(undefined, {
-                            maximumFractionDigits: 6,
-                          })}{' '}
-                          {selectedToken.symbol}
-                        </div>
-                      </td>
-
-                      {/* Actions */}
-                      <td className='py-4 px-4'>
-                        <div className='flex space-x-2'>
-                          <Button
-                            variant='outline'
-                            size='sm'
-                            onClick={() => setIsDepositModalOpen(true)}
-                          >
-                            Deposit
-                          </Button>
-                          {depositedBalance > 0 && (
-                            <Button
-                              variant='outline'
-                              size='sm'
-                              onClick={() => setIsWithdrawModalOpen(true)}
-                            >
-                              Withdraw
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <MarketTable rows={marketRows} />
           </>
         )}
         {!isConnected && (
