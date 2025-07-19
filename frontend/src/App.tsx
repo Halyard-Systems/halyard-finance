@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
-import { useAccount, useConnect, useDisconnect } from 'wagmi'
-import { injected } from 'wagmi/connectors'
-import { Button } from './components/ui/button'
+import { useAccount } from 'wagmi'
 import { DepositForm } from './components/DepositForm'
 import { WithdrawForm } from './components/WithdrawForm'
 import { MarketTable, type MarketRow } from './components/MarketTable'
-import halyardLogo from './assets/halyard-finance-navbar-logo-cyan-gold.png'
+import { Header } from './components/Header'
+import { Connect } from './components/Connect'
 
 import TOKENS from './tokens.json'
 
@@ -22,8 +21,6 @@ function App() {
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false)
 
   const { address, isConnected } = useAccount()
-  const { connect } = useConnect()
-  const { disconnect } = useDisconnect()
 
   // Read USDC balance for connected account using useReadContract
   const {
@@ -73,38 +70,7 @@ function App() {
   return (
     <div className='min-h-screen bg-background'>
       {/* Header */}
-      <header className='bg-card shadow-sm border-b border-border sticky top-0 z-50'>
-        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
-          <div className='flex justify-between items-center h-16'>
-            {/* Logo/Title */}
-            <img
-              src={halyardLogo}
-              alt='Halyard Finance Logo'
-              className='h-10 w-auto'
-            />
-            {/* Wallet Connection */}
-            <div className='flex items-center space-x-4'>
-              {!isConnected ? (
-                <Button onClick={() => connect({ connector: injected() })}>
-                  Connect Wallet
-                </Button>
-              ) : (
-                <div className='flex items-center space-x-3'>
-                  <div className='text-sm text-muted-foreground'>
-                    <span className='font-medium'>Connected:</span>
-                    <span className='ml-1 font-mono text-xs'>
-                      {address?.slice(0, 6)}...{address?.slice(-4)}
-                    </span>
-                  </div>
-                  <Button variant='secondary' onClick={() => disconnect()}>
-                    Disconnect
-                  </Button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
+      <Header />
 
       {/* Main Content */}
       <main className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
@@ -114,22 +80,7 @@ function App() {
             <MarketTable rows={marketRows} />
           </>
         )}
-        {!isConnected && (
-          <div className='bg-card rounded-lg shadow-sm border border-border p-6 text-center'>
-            <h2 className='text-xl font-semibold text-card-foreground mb-4'>
-              Welcome to Halyard Finance
-            </h2>
-            <p className='text-muted-foreground mb-6'>
-              Connect your wallet to start depositing and managing your funds.
-            </p>
-            <Button
-              onClick={() => connect({ connector: injected() })}
-              size='lg'
-            >
-              Connect Wallet
-            </Button>
-          </div>
-        )}
+        {!isConnected && <Connect />}
 
         {/* Deposit Modal */}
         <DepositForm
