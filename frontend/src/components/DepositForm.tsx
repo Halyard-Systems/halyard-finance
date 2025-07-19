@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Button } from './ui/button'
 import {
   Dialog,
@@ -7,65 +8,143 @@ import {
   DialogFooter,
 } from './ui/dialog'
 
-import TOKENS from '../tokens.json'
+import ERC20_ABI from '../abis/ERC20.json'
+import DEPOSIT_MANAGER_ABI from '../abis/DepositManager.json'
+import type { Token } from '../lib/types'
 
-interface Token {
-  symbol: string
-  name: string
-  icon: string
-  decimals: number
-  address: string
-}
+import { useAccount, useWriteContract } from 'wagmi'
 
 interface DepositFormProps {
   isOpen: boolean
   onClose: () => void
   selectedToken: Token
-  depositAmount: string
-  setDepositAmount: (amount: string) => void
   usdcBalance: number
   allowance: number
   stargateAllowance: number
   stargateRouterAddress?: string | undefined
-  needsApproval: boolean
-  needsDepositManagerApproval: boolean
-  needsStargateApproval: boolean
-  isDropdownOpen: boolean
-  setIsDropdownOpen: (open: boolean) => void
-  setSelectedToken: (token: Token) => void
-  approvalError?: any
-  depositError?: any
-  isApproving: boolean
-  isDepositing: boolean
-  onApproval: () => void
-  onDeposit: () => void
-  getApprovalButtonText: () => string
 }
 
 export function DepositForm({
   isOpen,
   onClose,
   selectedToken,
-  depositAmount,
-  setDepositAmount,
   usdcBalance,
   allowance,
   stargateAllowance,
   stargateRouterAddress,
-  needsApproval,
-  needsDepositManagerApproval,
-  needsStargateApproval,
-  isDropdownOpen,
-  setIsDropdownOpen,
-  setSelectedToken,
-  approvalError,
-  depositError,
-  isApproving,
-  isDepositing,
-  onApproval,
-  onDeposit,
-  getApprovalButtonText,
 }: DepositFormProps) {
+  const { address } = useAccount()
+  const [approvalStep, setApprovalStep] = useState<
+    'none' | 'depositManager' | 'stargate'
+  >('none')
+  const [depositAmount, setDepositAmount] = useState('')
+
+  // Check if approval is needed
+  const depositAmountNumber = Number(depositAmount) || 0
+  const needsDepositManagerApproval = depositAmountNumber > allowance
+  const needsStargateApproval = depositAmountNumber > stargateAllowance
+  const needsApproval = needsDepositManagerApproval || needsStargateApproval
+
+  const {
+    writeContract: writeApproval,
+    isPending: isApproving,
+    error: approvalError,
+  } = useWriteContract()
+
+  const {
+    writeContract: writeDeposit,
+    isPending: isDepositing,
+    error: depositError,
+  } = useWriteContract()
+
+  const getApprovalButtonText = () => {
+    if (isApproving) {
+      if (approvalStep === 'depositManager') {
+        return 'Approving for DepositManager...'
+      } else if (approvalStep === 'stargate') {
+        return 'Approving for Stargate...'
+      }
+      return 'Approving...'
+    }
+
+    if (needsDepositManagerApproval) {
+      return `Approve ${selectedToken.symbol} for DepositManager`
+    } else if (needsStargateApproval) {
+      return `Approve ${selectedToken.symbol} for Stargate`
+    }
+    return `Approve ${selectedToken.symbol}`
+  }
+
+  const handleApproval = async () => {
+    if (!depositAmount || !address) {
+      console.error('Invalid deposit amount or address')
+      return
+    }
+
+    try {
+      // Convert amount to wei (USDC has 6 decimals)
+      const amountInWei = BigInt(Math.floor(Number(depositAmount) * 1e6))
+
+      // Determine which approval is needed
+      const depositAmountNumber = Number(depositAmount)
+      const needsDepositManagerApproval = depositAmountNumber > allowance
+      const needsStargateApproval = depositAmountNumber > stargateAllowance
+
+      if (needsDepositManagerApproval) {
+        setApprovalStep('depositManager')
+        // Call the approve function for DepositManager
+        await writeApproval({
+          address: selectedToken.address as `0x${string}`,
+          abi: ERC20_ABI,
+          functionName: 'approve',
+          args: [
+            import.meta.env.VITE_DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
+            amountInWei,
+          ],
+        })
+      } else if (needsStargateApproval && stargateRouterAddress) {
+        setApprovalStep('stargate')
+        // Call the approve function for Stargate router
+        await writeApproval({
+          address: selectedToken.address as `0x${string}`,
+          abi: ERC20_ABI,
+          functionName: 'approve',
+          args: [stargateRouterAddress as `0x${string}`, amountInWei],
+        })
+      }
+
+      setApprovalStep('none')
+    } catch (error) {
+      console.error('Approval failed:', error)
+      setApprovalStep('none')
+    }
+  }
+
+  const handleDeposit = async () => {
+    if (!depositAmount || !address) {
+      console.error('Invalid deposit amount or address')
+      return
+    }
+
+    try {
+      // Convert amount to wei (USDC has 6 decimals)
+      const amountInWei = BigInt(Math.floor(Number(depositAmount) * 1e6))
+
+      // Call the deposit function
+      await writeDeposit({
+        address: import.meta.env.VITE_DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
+        abi: DEPOSIT_MANAGER_ABI,
+        functionName: 'deposit',
+        args: [amountInWei],
+      })
+
+      // Clear the input after successful deposit
+      setDepositAmount('')
+    } catch (error) {
+      console.error('Deposit failed:', error)
+    }
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className='sm:max-w-md'>
@@ -74,62 +153,21 @@ export function DepositForm({
         </DialogHeader>
 
         <div className='space-y-4'>
-          {/* Token Selection */}
+          {/* Token Display */}
           <div>
             <label className='block text-sm font-medium text-card-foreground mb-2'>
               Token
             </label>
-            <div className='relative'>
-              <button
-                type='button'
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className='w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground flex items-center justify-between'
-              >
-                <div className='flex items-center space-x-2'>
-                  <img
-                    src={selectedToken.icon}
-                    alt={`${selectedToken.symbol} icon`}
-                    className='w-5 h-5'
-                  />
-                  <span>{selectedToken.symbol}</span>
-                </div>
-                <svg
-                  className={`w-4 h-4 transition-transform ${
-                    isDropdownOpen ? 'rotate-180' : ''
-                  }`}
-                  fill='none'
-                  stroke='currentColor'
-                  viewBox='0 0 24 24'
-                >
-                  <path
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
-                    strokeWidth={2}
-                    d='M19 9l-7 7-7-7'
-                  />
-                </svg>
-              </button>
-              {isDropdownOpen && (
-                <div className='absolute z-10 w-full mt-1 bg-background border border-border rounded-md shadow-lg'>
-                  {TOKENS.map((token: Token) => (
-                    <button
-                      key={token.symbol}
-                      onClick={() => {
-                        setSelectedToken(token)
-                        setIsDropdownOpen(false)
-                      }}
-                      className='w-full px-3 py-2 text-left hover:bg-accent hover:text-accent-foreground flex items-center space-x-2'
-                    >
-                      <img
-                        src={token.icon}
-                        alt={`${token.symbol} icon`}
-                        className='w-5 h-5'
-                      />
-                      <span>{token.symbol}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
+            <div className='px-3 py-2 border border-input rounded-md bg-muted flex items-center space-x-2'>
+              <img
+                src={selectedToken.icon}
+                alt={`${selectedToken.symbol} icon`}
+                className='w-5 h-5'
+              />
+              <span className='font-medium'>{selectedToken.symbol}</span>
+              <span className='text-muted-foreground'>
+                ({selectedToken.name})
+              </span>
             </div>
           </div>
 
@@ -210,7 +248,7 @@ export function DepositForm({
           </Button>
           {needsApproval && depositAmount && (
             <Button
-              onClick={onApproval}
+              onClick={handleApproval}
               disabled={!depositAmount || isApproving}
               className='flex-1'
             >
@@ -218,7 +256,7 @@ export function DepositForm({
             </Button>
           )}
           <Button
-            onClick={onDeposit}
+            onClick={handleDeposit}
             disabled={
               !depositAmount || isDepositing || isApproving || needsApproval
             }

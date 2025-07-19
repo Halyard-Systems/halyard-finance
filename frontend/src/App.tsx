@@ -1,11 +1,5 @@
-import React, { useEffect, useState } from 'react'
-import {
-  useAccount,
-  useConnect,
-  useDisconnect,
-  useReadContract,
-  useWriteContract,
-} from 'wagmi'
+import { useEffect, useState } from 'react'
+import { useAccount, useConnect, useDisconnect } from 'wagmi'
 import { injected } from 'wagmi/connectors'
 import { Button } from './components/ui/button'
 import { DepositForm } from './components/DepositForm'
@@ -13,19 +7,21 @@ import { WithdrawForm } from './components/WithdrawForm'
 import halyardLogo from './assets/halyard-finance-navbar-logo-cyan-gold.png'
 
 import TOKENS from './tokens.json'
-import ERC20_ABI from './abis/ERC20.json'
-import DEPOSIT_MANAGER_ABI from './abis/DepositManager.json'
+
+import {
+  useReadDepositManagerAllowance,
+  useReadDepositManagerBalance,
+  useReadERC20Balance,
+  useReadStargateAllowance,
+  useReadStargateRouterContract,
+} from './lib/queries'
 
 function App() {
-  const [depositAmount, setDepositAmount] = useState('')
   const [selectedToken, setSelectedToken] = useState(TOKENS[0])
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [depositedBalance, setDepositedBalance] = useState(0)
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false)
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false)
-  const [approvalStep, setApprovalStep] = useState<
-    'none' | 'depositManager' | 'stargate'
-  >('none')
+
   const { address, isConnected } = useAccount()
   const { connect } = useConnect()
   const { disconnect } = useDisconnect()
@@ -35,12 +31,7 @@ function App() {
     data: usdcBalanceRaw,
     status: usdcStatus,
     error: usdcError,
-  } = useReadContract({
-    address: selectedToken.address as `0x${string}`,
-    abi: ERC20_ABI,
-    functionName: 'balanceOf',
-    args: [address ?? '0x0000000000000000000000000000000000000000'],
-  })
+  } = useReadERC20Balance(selectedToken)
   const usdcBalance = usdcBalanceRaw ? Number(usdcBalanceRaw) / 1e6 : 0
 
   // Read USDC allowance for DepositManager contract
@@ -48,49 +39,33 @@ function App() {
     data: allowanceRaw,
     status: allowanceStatus,
     error: allowanceError,
-  } = useReadContract({
-    address: selectedToken.address as `0x${string}`,
-    abi: ERC20_ABI,
-    functionName: 'allowance',
-    args: [
-      address ?? '0x0000000000000000000000000000000000000000',
-      import.meta.env.VITE_DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
-    ],
-  })
+  } = useReadDepositManagerAllowance(
+    address ?? '0x0000000000000000000000000000000000000000',
+    selectedToken
+  )
   const allowance = allowanceRaw ? Number(allowanceRaw) / 1e6 : 0
 
   // Read Stargate router address from DepositManager
-  const { data: stargateRouterAddress } = useReadContract({
-    address: import.meta.env.VITE_DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
-    abi: DEPOSIT_MANAGER_ABI,
-    functionName: 'stargateRouter',
-  })
+  const { data: stargateRouterAddress } = useReadStargateRouterContract()
 
   // Read USDC allowance for Stargate router
   const {
     data: stargateAllowanceRaw,
     status: stargateAllowanceStatus,
     error: stargateAllowanceError,
-  } = useReadContract({
-    address: selectedToken.address as `0x${string}`,
-    abi: ERC20_ABI,
-    functionName: 'allowance',
-    args: [
-      address ?? '0x0000000000000000000000000000000000000000',
-      stargateRouterAddress ?? '0x0000000000000000000000000000000000000000',
-    ],
-  })
+  } = useReadStargateAllowance(
+    address ?? '0x0000000000000000000000000000000000000000',
+    stargateRouterAddress as string,
+    selectedToken
+  )
   const stargateAllowance = stargateAllowanceRaw
     ? Number(stargateAllowanceRaw) / 1e6
     : 0
 
   // Read deposited balance from DepositManager contract
-  const { data: depositedBalanceRaw } = useReadContract({
-    address: import.meta.env.VITE_DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
-    abi: DEPOSIT_MANAGER_ABI,
-    functionName: 'balanceOf',
-    args: [address ?? '0x0000000000000000000000000000000000000000'],
-  })
+  const { data: depositedBalanceRaw } = useReadDepositManagerBalance(
+    address ?? '0x0000000000000000000000000000000000000000'
+  )
 
   // Update deposited balance when data changes
   useEffect(() => {
@@ -98,115 +73,6 @@ function App() {
       setDepositedBalance(Number(depositedBalanceRaw) / 1e6)
     }
   }, [depositedBalanceRaw])
-
-  // Write contract hook for approval
-  const {
-    writeContract: writeApproval,
-    isPending: isApproving,
-    error: approvalError,
-  } = useWriteContract()
-
-  // Write contract hook for deposit
-  const {
-    writeContract: writeDeposit,
-    isPending: isDepositing,
-    error: depositError,
-  } = useWriteContract()
-
-  const handleApproval = async () => {
-    if (!depositAmount || !address) {
-      console.error('Invalid deposit amount or address')
-      return
-    }
-
-    try {
-      // Convert amount to wei (USDC has 6 decimals)
-      const amountInWei = BigInt(Math.floor(Number(depositAmount) * 1e6))
-
-      // Determine which approval is needed
-      const depositAmountNumber = Number(depositAmount)
-      const needsDepositManagerApproval = depositAmountNumber > allowance
-      const needsStargateApproval = depositAmountNumber > stargateAllowance
-
-      if (needsDepositManagerApproval) {
-        setApprovalStep('depositManager')
-        // Call the approve function for DepositManager
-        await writeApproval({
-          address: selectedToken.address as `0x${string}`,
-          abi: ERC20_ABI,
-          functionName: 'approve',
-          args: [
-            import.meta.env.VITE_DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
-            amountInWei,
-          ],
-        })
-      } else if (needsStargateApproval && stargateRouterAddress) {
-        setApprovalStep('stargate')
-        // Call the approve function for Stargate router
-        await writeApproval({
-          address: selectedToken.address as `0x${string}`,
-          abi: ERC20_ABI,
-          functionName: 'approve',
-          args: [stargateRouterAddress as `0x${string}`, amountInWei],
-        })
-      }
-
-      setApprovalStep('none')
-    } catch (error) {
-      console.error('Approval failed:', error)
-      setApprovalStep('none')
-    }
-  }
-
-  const handleDeposit = async () => {
-    if (!depositAmount || !address) {
-      console.error('Invalid deposit amount or address')
-      return
-    }
-
-    try {
-      // Convert amount to wei (USDC has 6 decimals)
-      const amountInWei = BigInt(Math.floor(Number(depositAmount) * 1e6))
-
-      // Call the deposit function
-      await writeDeposit({
-        address: import.meta.env.VITE_DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
-        abi: DEPOSIT_MANAGER_ABI,
-        functionName: 'deposit',
-        args: [amountInWei],
-      })
-
-      // Clear the input after successful deposit
-      setDepositAmount('')
-    } catch (error) {
-      console.error('Deposit failed:', error)
-    }
-  }
-
-  // Check if approval is needed
-  const depositAmountNumber = Number(depositAmount) || 0
-  const needsDepositManagerApproval = depositAmountNumber > allowance
-  const needsStargateApproval = depositAmountNumber > stargateAllowance
-  const needsApproval = needsDepositManagerApproval || needsStargateApproval
-
-  // Get approval button text
-  const getApprovalButtonText = () => {
-    if (isApproving) {
-      if (approvalStep === 'depositManager') {
-        return 'Approving for DepositManager...'
-      } else if (approvalStep === 'stargate') {
-        return 'Approving for Stargate...'
-      }
-      return 'Approving...'
-    }
-
-    if (needsDepositManagerApproval) {
-      return `Approve ${selectedToken.symbol} for DepositManager`
-    } else if (needsStargateApproval) {
-      return `Approve ${selectedToken.symbol} for Stargate`
-    }
-    return `Approve ${selectedToken.symbol}`
-  }
 
   return (
     <div className='min-h-screen bg-background'>
@@ -385,25 +251,10 @@ function App() {
           isOpen={isDepositModalOpen}
           onClose={() => setIsDepositModalOpen(false)}
           selectedToken={selectedToken}
-          depositAmount={depositAmount}
-          setDepositAmount={setDepositAmount}
           usdcBalance={usdcBalance}
           allowance={allowance}
           stargateAllowance={stargateAllowance}
           stargateRouterAddress={stargateRouterAddress as string | undefined}
-          needsApproval={needsApproval}
-          needsDepositManagerApproval={needsDepositManagerApproval}
-          needsStargateApproval={needsStargateApproval}
-          isDropdownOpen={isDropdownOpen}
-          setIsDropdownOpen={setIsDropdownOpen}
-          setSelectedToken={setSelectedToken}
-          approvalError={approvalError}
-          depositError={depositError}
-          isApproving={isApproving}
-          isDepositing={isDepositing}
-          onApproval={handleApproval}
-          onDeposit={handleDeposit}
-          getApprovalButtonText={getApprovalButtonText}
         />
 
         {/* Withdraw Modal */}
