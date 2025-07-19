@@ -68,7 +68,27 @@ function App() {
   // Prepare market data for the table
   const marketRows: MarketRow[] = [
     {
-      token: selectedToken,
+      token: TOKENS[0],
+      deposits: depositedBalance,
+      borrows: 0,
+      depositApy: 2.5,
+      borrowApy: 4.2,
+      userDeposits: depositedBalance,
+      onDeposit: () => setIsDepositModalOpen(true),
+      onWithdraw: () => setIsWithdrawModalOpen(true),
+    },
+    {
+      token: TOKENS[1],
+      deposits: depositedBalance,
+      borrows: 0,
+      depositApy: 2.5,
+      borrowApy: 4.2,
+      userDeposits: depositedBalance,
+      onDeposit: () => setIsDepositModalOpen(true),
+      onWithdraw: () => setIsWithdrawModalOpen(true),
+    },
+    {
+      token: TOKENS[2],
       deposits: depositedBalance,
       borrows: 0,
       depositApy: 2.5,
