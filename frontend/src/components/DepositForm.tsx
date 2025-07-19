@@ -148,25 +148,27 @@ export function DepositForm({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className='sm:max-w-md'>
+      <DialogContent className='sm:max-w-xl w-[95vw] max-w-[600px]'>
         <DialogHeader>
           <DialogTitle>Deposit</DialogTitle>
         </DialogHeader>
 
-        <div className='space-y-4'>
+        <div className='space-y-4 w-full'>
           {/* Token Display */}
-          <div>
+          <div className='w-full'>
             <label className='block text-sm font-medium text-card-foreground mb-2'>
               Token
             </label>
-            <div className='px-3 py-2 border border-input rounded-md bg-muted flex items-center space-x-2'>
+            <div className='px-3 py-2 border border-input rounded-md bg-muted flex items-center space-x-2 w-full min-w-0'>
               <img
                 src={selectedToken.icon}
                 alt={`${selectedToken.symbol} icon`}
-                className='w-5 h-5'
+                className='w-5 h-5 flex-shrink-0'
               />
-              <span className='font-medium'>{selectedToken.symbol}</span>
-              <span className='text-muted-foreground'>
+              <span className='font-medium truncate'>
+                {selectedToken.symbol}
+              </span>
+              <span className='text-muted-foreground truncate'>
                 ({selectedToken.name})
               </span>
             </div>
@@ -200,11 +202,13 @@ export function DepositForm({
 
           {/* Approval Status */}
           {depositAmount && (
-            <div className='text-sm text-muted-foreground p-3 bg-muted rounded-md'>
-              <div className='space-y-2'>
-                <div className='flex justify-between items-center'>
-                  <span>DepositManager allowance:</span>
-                  <span className='font-mono'>
+            <div className='text-sm text-muted-foreground p-3 bg-muted rounded-md w-full'>
+              <div className='space-y-2 w-full'>
+                <div className='flex justify-between items-center w-full min-w-0'>
+                  <span className='truncate mr-2'>
+                    DepositManager allowance:
+                  </span>
+                  <span className='font-mono text-right flex-shrink-0'>
                     {allowance.toLocaleString(undefined, {
                       maximumFractionDigits: 6,
                     })}{' '}
@@ -213,7 +217,7 @@ export function DepositForm({
                 </div>
               </div>
               {needsApproval && (
-                <div className='mt-2 text-yellow-600'>
+                <div className='mt-2 text-yellow-600 break-words'>
                   ⚠️ Approval required before deposit
                 </div>
               )}
