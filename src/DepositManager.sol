@@ -7,22 +7,23 @@ import "forge-std/console.sol";
 
 contract DepositManager {
     uint256 public constant RAY = 1e27;
-    address constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+    address public immutable USDC;
 
     // Stargate router for liquidity operations
     IStargateRouter public immutable stargateRouter;
     uint256 public immutable poolId;
 
-    // Interest rate model parameters (example values)
-    uint256 public immutable baseRate = 0.02e27; // e.g. 2% in RAY = 0.02e27
-    uint256 public immutable slope1 = 0.1e27; // e.g. 10% in RAY = 0.10e27
-    uint256 public immutable slope2 = 3.0e27; // e.g. 300% in RAY = 3.0e27
+    // Interest rate model parameters (example values) - increased for testing
+    uint256 public immutable baseRate = 0.1e27; // e.g. 10% in RAY = 0.1e27
+    uint256 public immutable slope1 = 0.5e27; // e.g. 50% in RAY = 0.5e27
+    uint256 public immutable slope2 = 5.0e27; // e.g. 500% in RAY = 5.0e27
     uint256 public immutable kink = 0.8e18; // e.g. 80% utilization in 1e18 = 0.8e18
     uint256 public immutable reserveFactor = 0.1e27; // percent of interest kept (e.g. 10% = 0.1e27)
 
-    constructor(address _stargateRouter, uint256 _poolId) {
+    constructor(address _stargateRouter, uint256 _poolId, address _usdc) {
         stargateRouter = IStargateRouter(_stargateRouter);
         poolId = _poolId;
+        USDC = _usdc;
     }
 
     uint256 public liquidityIndex = RAY; // 1e27
@@ -104,7 +105,7 @@ contract DepositManager {
             borrowRate =
                 baseRate +
                 slope1 +
-                ((slope2 * (U - kink)) / (RAY - kink));
+                ((slope2 * (U - kink)) / (1e18 - kink));
         }
         uint256 netRate = (borrowRate * (RAY - reserveFactor)) / RAY;
         return (netRate * U) / RAY;

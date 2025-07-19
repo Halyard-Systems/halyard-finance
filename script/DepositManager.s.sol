@@ -7,6 +7,8 @@ import {DepositManager} from "../src/DepositManager.sol";
 contract DepositManagerScript is Script {
     DepositManager public depositManager;
 
+    address USDC_MAINNET = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+
     //address STARGATE_ROUTER_SEPOLIA_TESTNET =
     //    0x2836045A50744FB50D3d04a9C8D18aD7B5012102;
 
@@ -29,7 +31,11 @@ contract DepositManagerScript is Script {
 
         vm.startBroadcast();
 
-        depositManager = new DepositManager(stargateRouter, poolId);
+        depositManager = new DepositManager(
+            stargateRouter,
+            poolId,
+            USDC_MAINNET
+        );
 
         console.log("DepositManager deployed at:", address(depositManager));
         console.log("Stargate Router:", stargateRouter);
