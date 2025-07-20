@@ -18,6 +18,12 @@ contract DepositManager {
         uint256 totalScaledSupply;
         uint256 totalDeposits;
         uint256 totalBorrows;
+        // Interest rate model parameters
+        uint256 baseRate;
+        uint256 slope1;
+        uint256 slope2;
+        uint256 kink;
+        uint256 reserveFactor;
     }
 
     // User balance tracking per token
@@ -34,13 +40,6 @@ contract DepositManager {
     mapping(bytes32 => Asset) public assets;
     mapping(bytes32 => mapping(address => UserBalance)) public userBalances;
     bytes32[] public supportedTokens;
-
-    // Interest rate model parameters (example values) - increased for testing
-    uint256 public immutable baseRate = 0.1e27; // e.g. 10% in RAY = 0.1e27
-    uint256 public immutable slope1 = 0.5e27; // e.g. 50% in RAY = 0.5e27
-    uint256 public immutable slope2 = 5.0e27; // e.g. 500% in RAY = 5.0e27
-    uint256 public immutable kink = 0.8e18; // e.g. 80% utilization in 1e18 = 0.8e18
-    uint256 public immutable reserveFactor = 0.1e27; // percent of interest kept (e.g. 10% = 0.1e27)
 
     // Events
     event TokenAdded(
@@ -78,18 +77,19 @@ contract DepositManager {
     constructor(address _stargateRouter, uint256 _poolId) {
         stargateRouter = IStargateRouter(_stargateRouter);
         poolId = _poolId;
-
-        // Initialize supported tokens
-        _addToken("ETH", address(0), 18); // ETH is represented as address(0)
-        _addToken("USDC", 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48, 6);
-        _addToken("USDT", 0xdAC17F958D2ee523a2206206994597C13D831ec7, 6);
     }
 
-    function _addToken(
+    function addToken(
         string memory symbol,
         address tokenAddress,
-        uint8 decimals
-    ) internal {
+        uint8 decimals,
+        uint256 baseRate,
+        uint256 slope1,
+        uint256 slope2,
+        uint256 kink,
+        uint256 reserveFactor
+    ) external {
+        // TODO: Add access control for admin functions
         bytes32 tokenId = keccak256(abi.encodePacked(symbol));
         require(
             assets[tokenId].tokenAddress == address(0),
@@ -104,7 +104,12 @@ contract DepositManager {
             lastUpdateTimestamp: block.timestamp,
             totalScaledSupply: 0,
             totalDeposits: 0,
-            totalBorrows: 0
+            totalBorrows: 0,
+            baseRate: baseRate,
+            slope1: slope1,
+            slope2: slope2,
+            kink: kink,
+            reserveFactor: reserveFactor
         });
 
         supportedTokens.push(tokenId);
@@ -135,7 +140,14 @@ contract DepositManager {
             console.log("About to calculate U");
             uint256 U = (asset.totalBorrows * 1e18) / asset.totalDeposits;
             console.log("U is", U);
-            uint256 supplyRate = _calculateSupplyRate(U);
+            uint256 supplyRate = _calculateSupplyRate(
+                U,
+                asset.baseRate,
+                asset.slope1,
+                asset.slope2,
+                asset.kink,
+                asset.reserveFactor
+            );
             console.log("Supply rate is", supplyRate);
             uint256 accrued = (supplyRate * delta) / (365 days);
             console.log("Accrued is", accrued);
@@ -260,15 +272,6 @@ contract DepositManager {
         return supportedTokens;
     }
 
-    function addToken(
-        string memory symbol,
-        address tokenAddress,
-        uint8 decimals
-    ) external {
-        // TODO: Add access control for admin functions
-        _addToken(symbol, tokenAddress, decimals);
-    }
-
     function setTokenActive(bytes32 tokenId, bool isActive) external {
         // TODO: Add access control for admin functions
         Asset storage config = assets[tokenId];
@@ -277,7 +280,14 @@ contract DepositManager {
         config.isActive = isActive;
     }
 
-    function _calculateSupplyRate(uint256 U) internal pure returns (uint256) {
+    function _calculateSupplyRate(
+        uint256 U,
+        uint256 baseRate,
+        uint256 slope1,
+        uint256 slope2,
+        uint256 kink,
+        uint256 reserveFactor
+    ) internal pure returns (uint256) {
         uint256 borrowRate;
         if (U <= kink) {
             borrowRate = baseRate + ((slope1 * U) / kink);

@@ -33,6 +33,40 @@ contract DepositManagerScript is Script {
 
         depositManager = new DepositManager(stargateRouter, poolId);
 
+        depositManager.addToken(
+            "ETH",
+            address(0),
+            18,
+            0.1e27,
+            0.5e27,
+            5.0e27,
+            0.8e18,
+            0.1e27
+        );
+        console.log("ETH token added to protocol");
+        depositManager.addToken(
+            "USDC",
+            0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48,
+            6,
+            0.05e27,
+            0.3e27,
+            3.0e27,
+            0.8e18,
+            0.1e27
+        );
+        console.log("USDC token added to protocol");
+        depositManager.addToken(
+            "USDT",
+            0xdAC17F958D2ee523a2206206994597C13D831ec7,
+            6,
+            0.05e27,
+            0.3e27,
+            3.0e27,
+            0.8e18,
+            0.1e27
+        );
+        console.log("USDT token added to protocol");
+
         console.log("DepositManager deployed at:", address(depositManager));
         console.log("Stargate Router:", stargateRouter);
         console.log("Pool ID:", poolId);
