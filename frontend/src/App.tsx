@@ -24,8 +24,6 @@ function App() {
     address ?? '0x0000000000000000000000000000000000000000'
   )
 
-  console.log(tokenData)
-
   // Function to refresh all data after transaction completion
   const handleTransactionComplete = async () => {
     // The useTokenData hook will automatically refetch when dependencies change

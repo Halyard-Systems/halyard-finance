@@ -1,4 +1,8 @@
-import { useReadContract, type UseReadContractReturnType } from 'wagmi'
+import {
+  useReadContract,
+  useBalance,
+  type UseReadContractReturnType,
+} from 'wagmi'
 import { useMemo } from 'react'
 
 import DEPOSIT_MANAGER_ABI from '../abis/DepositManager.json'
@@ -6,6 +10,11 @@ import ERC20_ABI from '../abis/ERC20.json'
 import type { Token, Asset } from './types'
 
 const DEPOSIT_MANAGER_ADDRESS = import.meta.env.VITE_DEPOSIT_MANAGER_ADDRESS
+
+// Helper function to check if a token is native ETH
+const isNativeETH = (token: Token): boolean => {
+  return token.address === '0x0000000000000000000000000000000000000000'
+}
 
 // Read ERC20 balance of a token
 export const useReadERC20Balance = (
@@ -104,14 +113,33 @@ export const useTokenData = (tokens: Token[], userAddress: string) => {
 
   // Get user's wallet balance for each token
   const walletBalanceQueries = tokens.map((token) => {
-    return useReadERC20Balance(token, userAddress)
+    if (isNativeETH(token)) {
+      // Use useBalance for native ETH
+      return useBalance({
+        address: userAddress as `0x${string}`,
+      })
+    } else {
+      // Use useReadERC20Balance for ERC20 tokens
+      return useReadERC20Balance(token, userAddress)
+    }
   })
 
-  // Get user's allowance for each token
+  // Get user's allowance for each token (only for ERC20 tokens)
   const allowanceQueries = tokens.map((token) => {
-    return useReadDepositManagerAllowance(userAddress, token)
+    if (isNativeETH(token)) {
+      // Return a mock query result for ETH (no allowance needed)
+      return {
+        data: undefined,
+        isLoading: false,
+        error: undefined,
+      }
+    } else {
+      // Use useReadDepositManagerAllowance for ERC20 tokens
+      return useReadDepositManagerAllowance(userAddress, token)
+    }
   })
 
+  // TODO: Replace with contract interest rate model
   // Calculate APY from asset data
   const calculateAPY = (
     asset: Asset | undefined
@@ -142,8 +170,6 @@ export const useTokenData = (tokens: Token[], userAddress: string) => {
       const asset = assetQueries[index]?.data as Asset | undefined
       const userDeposits = userDepositsQueries[index]?.data
       const walletBalance = walletBalanceQueries[index]?.data
-      console.log(`${token.symbol} balance for ${userAddress}:`, walletBalance)
-      console.log(`${token.symbol} contract address:`, token.address)
       const allowance = allowanceQueries[index]?.data
 
       // Calculate APY from asset data
@@ -159,9 +185,21 @@ export const useTokenData = (tokens: Token[], userAddress: string) => {
       const userDepositsValue = userDeposits
         ? Number(userDeposits) / Math.pow(10, token.decimals)
         : 0
-      const walletBalanceValue = walletBalance
-        ? Number(walletBalance) / Math.pow(10, token.decimals)
-        : 0
+
+      // Handle wallet balance conversion based on token type
+      let walletBalanceValue = 0
+      if (isNativeETH(token)) {
+        // For native ETH, use the formatted value from useBalance
+        walletBalanceValue = walletBalance
+          ? Number(walletBalance) / Math.pow(10, token.decimals)
+          : 0
+      } else {
+        // For ERC20 tokens, use the data property from useReadERC20Balance
+        walletBalanceValue = walletBalance
+          ? Number(walletBalance) / Math.pow(10, token.decimals)
+          : 0
+      }
+
       const allowanceValue = allowance
         ? Number(allowance) / Math.pow(10, token.decimals)
         : 0
