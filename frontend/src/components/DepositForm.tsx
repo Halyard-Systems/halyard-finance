@@ -11,6 +11,7 @@ import {
 import ERC20_ABI from '../abis/ERC20.json'
 import DEPOSIT_MANAGER_ABI from '../abis/DepositManager.json'
 import type { Token } from '../lib/types'
+import { toWei } from '../lib/utils'
 
 import {
   useAccount,
@@ -22,7 +23,8 @@ interface DepositFormProps {
   isOpen: boolean
   onClose: () => void
   selectedToken: Token
-  usdcBalance: number
+  tokenId?: `0x${string}`
+  walletBalance: number
   allowance: number
   onTransactionComplete?: () => void
 }
@@ -31,19 +33,20 @@ export function DepositForm({
   isOpen,
   onClose,
   selectedToken,
-  usdcBalance,
+  tokenId,
+  walletBalance,
   allowance,
   onTransactionComplete,
 }: DepositFormProps) {
-  const { address } = useAccount()
-  const [approvalStep, setApprovalStep] = useState<'none' | 'depositManager'>(
-    'none'
-  )
   const [depositAmount, setDepositAmount] = useState('')
 
-  // Check if approval is needed
+  const { address } = useAccount()
+
+  // Check if approval is needed (only for ERC20 tokens, not ETH)
   const depositAmountNumber = Number(depositAmount) || 0
-  const needsApproval = depositAmountNumber > allowance
+  const isETH =
+    selectedToken.address === '0x0000000000000000000000000000000000000000'
+  const needsApproval = !isETH && depositAmountNumber > allowance
 
   const {
     writeContract: writeApproval,
@@ -73,7 +76,6 @@ export function DepositForm({
   // Handle approval completion
   useEffect(() => {
     if (isApprovalConfirmed) {
-      setApprovalStep('none')
       // Trigger data refresh after approval
       onTransactionComplete?.()
     }
@@ -90,24 +92,15 @@ export function DepositForm({
     }
   }, [isDepositConfirmed, onTransactionComplete, onClose])
 
-  const getApprovalButtonText = () => {
-    if (isApproving) {
-      return 'Approving for DepositManager...'
-    }
-    return `Approve ${selectedToken.symbol} for DepositManager`
-  }
-
   const handleApproval = async () => {
-    if (!depositAmount || !address) {
-      console.error('Invalid deposit amount or address')
+    if (!depositAmount || !address || isETH) {
+      console.error('Invalid deposit amount, address, or trying to approve ETH')
       return
     }
 
     try {
-      // Convert amount to wei (USDC has 6 decimals)
-      const amountInWei = BigInt(Math.floor(Number(depositAmount) * 1e6))
+      const amountInWei = toWei(Number(depositAmount), selectedToken.decimals)
 
-      setApprovalStep('depositManager')
       // Call the approve function for DepositManager
       await writeApproval({
         address: selectedToken.address as `0x${string}`,
@@ -120,27 +113,40 @@ export function DepositForm({
       })
     } catch (error) {
       console.error('Approval failed:', error)
-      setApprovalStep('none')
     }
   }
 
   const handleDeposit = async () => {
-    if (!depositAmount || !address) {
-      console.error('Invalid deposit amount or address')
+    if (!depositAmount || !address || !tokenId) {
+      console.error('Invalid deposit amount, address, or token ID')
       return
     }
 
     try {
-      // Convert amount to wei (USDC has 6 decimals)
-      const amountInWei = BigInt(Math.floor(Number(depositAmount) * 1e6))
+      if (isETH) {
+        // Handle ETH deposit
+        const amountInWei = toWei(Number(depositAmount), selectedToken.decimals)
 
-      // Call the deposit function
-      await writeDeposit({
-        address: import.meta.env.VITE_DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
-        abi: DEPOSIT_MANAGER_ABI,
-        functionName: 'deposit',
-        args: [amountInWei],
-      })
+        await writeDeposit({
+          address: import.meta.env
+            .VITE_DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
+          abi: DEPOSIT_MANAGER_ABI,
+          functionName: 'deposit',
+          args: [tokenId, amountInWei],
+          value: amountInWei, // Send ETH with the transaction
+        })
+      } else {
+        // Handle ERC20 token deposit
+        const amountInWei = toWei(Number(depositAmount), selectedToken.decimals)
+
+        await writeDeposit({
+          address: import.meta.env
+            .VITE_DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
+          abi: DEPOSIT_MANAGER_ABI,
+          functionName: 'deposit',
+          args: [tokenId, amountInWei],
+        })
+      }
     } catch (error) {
       console.error('Deposit failed:', error)
     }
@@ -150,7 +156,7 @@ export function DepositForm({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className='sm:max-w-xl w-[95vw] max-w-[600px]'>
         <DialogHeader>
-          <DialogTitle>Deposit</DialogTitle>
+          <DialogTitle>Deposit {selectedToken.symbol}</DialogTitle>
         </DialogHeader>
 
         <div className='space-y-4 w-full'>
@@ -181,7 +187,7 @@ export function DepositForm({
             </label>
             <p className='text-sm text-muted-foreground mb-2'>
               Available:{' '}
-              {usdcBalance.toLocaleString(undefined, {
+              {walletBalance.toLocaleString(undefined, {
                 maximumFractionDigits: 6,
               })}
             </p>
@@ -201,7 +207,7 @@ export function DepositForm({
           </div>
 
           {/* Approval Status */}
-          {depositAmount && (
+          {depositAmount && !isETH && (
             <div className='text-sm text-muted-foreground p-3 bg-muted rounded-md w-full'>
               <div className='space-y-2 w-full'>
                 <div className='flex justify-between items-center w-full min-w-0'>
@@ -246,13 +252,14 @@ export function DepositForm({
                 ? 'Approving...'
                 : isApprovalConfirming
                 ? 'Confirming Approval...'
-                : getApprovalButtonText()}
+                : `Approve ${selectedToken.symbol} for DepositManager`}
             </Button>
           )}
           <Button
             onClick={handleDeposit}
             disabled={
               !depositAmount ||
+              !tokenId ||
               isDepositing ||
               isDepositConfirming ||
               isApproving ||

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useAccount } from 'wagmi'
 import { DepositForm } from './components/DepositForm'
 import { WithdrawForm } from './components/WithdrawForm'
@@ -8,113 +8,52 @@ import { Connect } from './components/Connect'
 
 import TOKENS from './tokens.json'
 
-import {
-  useReadDepositManagerAllowance,
-  useReadDepositManagerBalance,
-  useReadERC20Balance,
-} from './lib/queries'
+import { useTokenData } from './lib/queries'
+import type { Token } from './lib/types'
 
 function App() {
-  const [selectedToken, setSelectedToken] = useState(TOKENS[0])
-  const [depositedBalance, setDepositedBalance] = useState(0)
+  const [selectedToken, setSelectedToken] = useState<Token>(TOKENS[0])
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false)
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false)
 
   const { address, isConnected } = useAccount()
 
-  // Read USDC balance for connected account using useReadContract
-  const {
-    data: usdcBalanceRaw,
-    status: usdcStatus,
-    error: usdcError,
-    refetch: refetchUsdcBalance,
-  } = useReadERC20Balance(selectedToken)
-  const usdcBalance = usdcBalanceRaw ? Number(usdcBalanceRaw) / 1e6 : 0
-
-  // Read USDC allowance for DepositManager contract
-  const {
-    data: allowanceRaw,
-    status: allowanceStatus,
-    error: allowanceError,
-    refetch: refetchAllowance,
-  } = useReadDepositManagerAllowance(
-    address ?? '0x0000000000000000000000000000000000000000',
-    selectedToken
+  // Get all token data using the custom hook
+  const tokenData = useTokenData(
+    TOKENS,
+    address ?? '0x0000000000000000000000000000000000000000'
   )
-  const allowance = allowanceRaw ? Number(allowanceRaw) / 1e6 : 0
 
-  // Read deposited balance from DepositManager contract
-  const { data: depositedBalanceRaw, refetch: refetchDepositedBalance } =
-    useReadDepositManagerBalance(
-      address ?? '0x0000000000000000000000000000000000000000'
-    )
-
-  // Update deposited balance when data changes
-  useEffect(() => {
-    if (depositedBalanceRaw) {
-      setDepositedBalance(Number(depositedBalanceRaw) / 1e6)
-    }
-  }, [depositedBalanceRaw])
+  console.log(tokenData)
 
   // Function to refresh all data after transaction completion
   const handleTransactionComplete = async () => {
-    await Promise.all([
-      refetchUsdcBalance(),
-      refetchAllowance(),
-      refetchDepositedBalance(),
-    ])
+    // The useTokenData hook will automatically refetch when dependencies change
+    // For now, we'll rely on the automatic refetching
   }
 
-  const marketRows = TOKENS.map((token) => ({
-    token,
-    deposits: depositedBalance,
-    borrows: 0,
-    depositApy: 2.5,
-    borrowApy: 4.2,
-    userDeposits: depositedBalance,
+  // Create market rows with real data for each token
+  const marketRows = tokenData.map((data) => ({
+    token: data.token,
+    deposits: data.deposits,
+    borrows: data.borrows,
+    depositApy: data.depositApy,
+    borrowApy: data.borrowApy,
+    userDeposits: data.userDeposits,
     onDeposit: () => {
-      setSelectedToken(token)
+      setSelectedToken(data.token)
       setIsDepositModalOpen(true)
     },
     onWithdraw: () => {
-      setSelectedToken(token)
+      setSelectedToken(data.token)
       setIsWithdrawModalOpen(true)
     },
   }))
 
-  // Prepare market data for the table
-  // const marketRows: MarketRow[] = [
-  //   {
-  //     token: TOKENS[0],
-  //     deposits: depositedBalance,
-  //     borrows: 0,
-  //     depositApy: 2.5,
-  //     borrowApy: 4.2,
-  //     userDeposits: depositedBalance,
-  //     onDeposit: () => setIsDepositModalOpen(true),
-  //     onWithdraw: () => setIsWithdrawModalOpen(true),
-  //   },
-  //   {
-  //     token: TOKENS[1],
-  //     deposits: depositedBalance,
-  //     borrows: 0,
-  //     depositApy: 2.5,
-  //     borrowApy: 4.2,
-  //     userDeposits: depositedBalance,
-  //     onDeposit: () => setIsDepositModalOpen(true),
-  //     onWithdraw: () => setIsWithdrawModalOpen(true),
-  //   },
-  //   {
-  //     token: TOKENS[2],
-  //     deposits: depositedBalance,
-  //     borrows: 0,
-  //     depositApy: 2.5,
-  //     borrowApy: 4.2,
-  //     userDeposits: depositedBalance,
-  //     onDeposit: () => setIsDepositModalOpen(true),
-  //     onWithdraw: () => setIsWithdrawModalOpen(true),
-  //   },
-  // ]
+  // Get selected token data for modals
+  const selectedTokenData = tokenData.find(
+    (data) => data.token.symbol === selectedToken.symbol
+  )
 
   return (
     <div className='min-h-screen bg-background'>
@@ -136,8 +75,9 @@ function App() {
           isOpen={isDepositModalOpen}
           onClose={() => setIsDepositModalOpen(false)}
           selectedToken={selectedToken}
-          usdcBalance={usdcBalance}
-          allowance={allowance}
+          tokenId={selectedTokenData?.tokenId}
+          walletBalance={selectedTokenData?.walletBalance ?? 0}
+          allowance={selectedTokenData?.allowance ?? 0}
           onTransactionComplete={handleTransactionComplete}
         />
 
@@ -146,7 +86,8 @@ function App() {
           isOpen={isWithdrawModalOpen}
           onClose={() => setIsWithdrawModalOpen(false)}
           selectedToken={selectedToken}
-          depositedBalance={depositedBalance}
+          tokenId={selectedTokenData?.tokenId}
+          depositedBalance={selectedTokenData?.userDeposits ?? 0}
           onTransactionComplete={handleTransactionComplete}
         />
       </main>

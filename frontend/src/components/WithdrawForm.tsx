@@ -14,18 +14,14 @@ import {
 } from 'wagmi'
 
 import DEPOSIT_MANAGER_ABI from '../abis/DepositManager.json'
-interface Token {
-  symbol: string
-  name: string
-  icon: string
-  decimals: number
-  address: string
-}
+import { toWei } from '../lib/utils'
+import type { Token } from '../lib/types'
 
 interface WithdrawFormProps {
   isOpen: boolean
   onClose: () => void
   selectedToken: Token
+  tokenId?: `0x${string}`
   depositedBalance: number
   onTransactionComplete?: () => void
 }
@@ -34,6 +30,7 @@ export function WithdrawForm({
   isOpen,
   onClose,
   selectedToken,
+  tokenId,
   depositedBalance,
   onTransactionComplete,
 }: WithdrawFormProps) {
@@ -66,21 +63,21 @@ export function WithdrawForm({
   }, [isConfirmed, onTransactionComplete, onClose])
 
   const handleWithdraw = async () => {
-    if (!withdrawAmount || !address) {
-      console.error('Invalid withdraw amount or address')
+    if (!withdrawAmount || !address || !tokenId) {
+      console.error('Invalid withdraw amount, address, or token ID')
       return
     }
 
     try {
-      // Convert amount to wei (USDC has 6 decimals)
-      const amountInWei = BigInt(Math.floor(Number(withdrawAmount) * 1e6))
+      // Convert amount to wei using token decimals
+      const amountInWei = toWei(Number(withdrawAmount), selectedToken.decimals)
 
       // Call the withdraw function
       await writeWithdraw({
         address: import.meta.env.VITE_DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
         abi: DEPOSIT_MANAGER_ABI,
         functionName: 'withdraw',
-        args: [amountInWei],
+        args: [tokenId, amountInWei],
       })
     } catch (error) {
       console.error('Withdraw failed:', error)
@@ -91,7 +88,7 @@ export function WithdrawForm({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className='sm:max-w-md'>
         <DialogHeader>
-          <DialogTitle>Withdraw</DialogTitle>
+          <DialogTitle>Withdraw {selectedToken.symbol}</DialogTitle>
         </DialogHeader>
 
         <div className='space-y-4'>
@@ -150,6 +147,7 @@ export function WithdrawForm({
             onClick={handleWithdraw}
             disabled={
               !withdrawAmount ||
+              !tokenId ||
               isWithdrawing ||
               isConfirming ||
               Number(withdrawAmount) > depositedBalance ||
