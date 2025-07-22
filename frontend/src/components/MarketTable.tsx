@@ -10,6 +10,8 @@ export interface MarketRow {
   userDeposits: number
   onDeposit: () => void
   onWithdraw: () => void
+  onBorrow: () => void
+  showBorrow: boolean // Add this line
 }
 
 interface MarketTableProps {
@@ -17,6 +19,8 @@ interface MarketTableProps {
 }
 
 export function MarketTable({ rows }: MarketTableProps) {
+  // Determine if the user has any deposits in any asset
+  const anyDeposits = rows.some((row) => row.userDeposits > 0)
   return (
     <div className='bg-card rounded-lg shadow-sm border border-border p-6'>
       <div className='overflow-x-auto'>
@@ -118,6 +122,15 @@ export function MarketTable({ rows }: MarketTableProps) {
                     <Button variant='outline' size='sm' onClick={row.onDeposit}>
                       Deposit
                     </Button>
+                    {anyDeposits && (
+                      <Button
+                        variant='outline'
+                        size='sm'
+                        onClick={row.onBorrow}
+                      >
+                        Borrow
+                      </Button>
+                    )}
                     {row.userDeposits > 0 && (
                       <Button
                         variant='outline'

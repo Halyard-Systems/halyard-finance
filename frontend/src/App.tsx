@@ -6,6 +6,7 @@ import { WithdrawForm } from './components/WithdrawForm'
 import { MarketTable } from './components/MarketTable'
 import { Header } from './components/Header'
 import { Connect } from './components/Connect'
+import { BorrowForm } from './components/BorrowForm'
 
 import TOKENS from './tokens.json'
 
@@ -16,6 +17,7 @@ function App() {
   const [selectedToken, setSelectedToken] = useState<Token>(TOKENS[0])
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false)
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false)
+  const [isBorrowModalOpen, setIsBorrowModalOpen] = useState(false)
 
   const { address, isConnected } = useAccount()
   const queryClient = useQueryClient()
@@ -46,6 +48,10 @@ function App() {
     onWithdraw: () => {
       setSelectedToken(data.token)
       setIsWithdrawModalOpen(true)
+    },
+    onBorrow: () => {
+      setSelectedToken(data.token)
+      setIsBorrowModalOpen(true)
     },
   }))
 
@@ -88,6 +94,16 @@ function App() {
           selectedToken={selectedToken}
           tokenId={selectedTokenData?.tokenId}
           depositedBalance={selectedTokenData?.userDeposits ?? 0}
+          onTransactionComplete={handleTransactionComplete}
+        />
+
+        {/* Borrow Modal */}
+        <BorrowForm
+          isOpen={isBorrowModalOpen}
+          onClose={() => setIsBorrowModalOpen(false)}
+          selectedToken={selectedToken}
+          tokenId={selectedTokenData?.tokenId}
+          maxBorrowable={selectedTokenData?.userDeposits ?? 0} // For now, use userDeposits as max borrowable
           onTransactionComplete={handleTransactionComplete}
         />
       </main>
