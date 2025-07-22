@@ -11,7 +11,6 @@ export interface MarketRow {
   onDeposit: () => void
   onWithdraw: () => void
   onBorrow: () => void
-  showBorrow: boolean // Add this line
 }
 
 interface MarketTableProps {
