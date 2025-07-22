@@ -120,10 +120,8 @@ contract DepositManager {
         Asset storage asset = assets[tokenId];
         if (!asset.isActive) revert TokenNotActive(tokenId);
 
-        console.log(
-            "Updating liquidity index for token:",
-            string(abi.encodePacked(tokenId))
-        );
+        console.log("Updating liquidity index for token:");
+        console.logBytes32(tokenId);
         uint256 delta = block.timestamp - asset.lastUpdateTimestamp;
 
         if (delta > 0) {
@@ -158,6 +156,38 @@ contract DepositManager {
         }
     }
 
+    // Add a private function for safe ERC20 transferFrom (handles USDT)
+    function _safeTransferFrom(
+        address token,
+        address from,
+        address to,
+        uint256 amount
+    ) private {
+        (bool success, bytes memory data) = token.call(
+            abi.encodeWithSelector(
+                IERC20.transferFrom.selector,
+                from,
+                to,
+                amount
+            )
+        );
+        require(
+            success && (data.length == 0 || abi.decode(data, (bool))),
+            "TransferFrom failed"
+        );
+    }
+
+    // Add a private function for safe ERC20 transfer (handles USDT)
+    function _safeTransfer(address token, address to, uint256 amount) private {
+        (bool success, bytes memory data) = token.call(
+            abi.encodeWithSelector(IERC20.transfer.selector, to, amount)
+        );
+        require(
+            success && (data.length == 0 || abi.decode(data, (bool))),
+            "Transfer failed"
+        );
+    }
+
     function deposit(bytes32 tokenId, uint256 amount) external payable {
         Asset storage config = assets[tokenId];
         if (!config.isActive) revert TokenNotActive(tokenId);
@@ -171,13 +201,16 @@ contract DepositManager {
         } else {
             // Handle ERC20 token deposits
             require(msg.value == 0, "ETH not accepted for ERC20 deposits");
-            bool success = IERC20(config.tokenAddress).transferFrom(
+            _safeTransferFrom(
+                config.tokenAddress,
                 msg.sender,
                 address(this),
                 amount
             );
-            if (!success) revert TransferFailed();
         }
+
+        console.log("Deposited amount:", amount);
+        console.log("Liquidity index:", config.liquidityIndex);
 
         // Mint scaled receipt tokens
         uint256 scaled = (amount * RAY) / config.liquidityIndex;
@@ -218,11 +251,7 @@ contract DepositManager {
             if (!success) revert TransferFailed();
         } else {
             // Handle ERC20 token withdrawals
-            bool success = IERC20(config.tokenAddress).transfer(
-                msg.sender,
-                amount
-            );
-            if (!success) revert TransferFailed();
+            _safeTransfer(config.tokenAddress, msg.sender, amount);
         }
 
         emit TokenWithdrawn(tokenId, msg.sender, amount);
@@ -242,11 +271,7 @@ contract DepositManager {
             if (!success) revert TransferFailed();
         } else {
             // Handle ERC20 token borrows
-            bool success = IERC20(config.tokenAddress).transfer(
-                msg.sender,
-                amount
-            );
-            if (!success) revert TransferFailed();
+            _safeTransfer(config.tokenAddress, msg.sender, amount);
         }
 
         emit TokenBorrowed(tokenId, msg.sender, amount);
@@ -318,8 +343,7 @@ contract DepositManager {
             if (!success) revert TransferFailed();
         } else {
             balance = IERC20(config.tokenAddress).balanceOf(address(this));
-            bool success = IERC20(config.tokenAddress).transfer(to, balance);
-            if (!success) revert TransferFailed();
+            _safeTransfer(config.tokenAddress, to, balance);
         }
     }
 }

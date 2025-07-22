@@ -177,10 +177,10 @@ export const useTokenData = (tokens: Token[], userAddress: string) => {
 
       // Convert bigint values to numbers for display
       const deposits = asset
-        ? Number(asset.totalDeposits) / Math.pow(10, asset.decimals)
+        ? Number(asset.totalDeposits) / Math.pow(10, token.decimals)
         : 0
       const borrows = asset
-        ? Number(asset.totalBorrows) / Math.pow(10, asset.decimals)
+        ? Number(asset.totalBorrows) / Math.pow(10, token.decimals)
         : 0
       const userDepositsValue = userDeposits
         ? Number(userDeposits) / Math.pow(10, token.decimals)
