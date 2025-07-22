@@ -76,7 +76,7 @@ export function DepositForm({
   // Handle approval completion
   useEffect(() => {
     if (isApprovalConfirmed) {
-      // Trigger data refresh after approval
+      // Optionally trigger data refresh in parent
       onTransactionComplete?.()
     }
   }, [isApprovalConfirmed, onTransactionComplete])
@@ -87,7 +87,7 @@ export function DepositForm({
       // Clear the input after successful deposit
       setDepositAmount('')
       onClose()
-      // Trigger data refresh
+      // Optionally trigger data refresh in parent
       onTransactionComplete?.()
     }
   }, [isDepositConfirmed, onTransactionComplete, onClose])

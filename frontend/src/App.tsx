@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAccount } from 'wagmi'
+import { useQueryClient } from '@tanstack/react-query'
 import { DepositForm } from './components/DepositForm'
 import { WithdrawForm } from './components/WithdrawForm'
 import { MarketTable } from './components/MarketTable'
@@ -17,6 +18,7 @@ function App() {
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false)
 
   const { address, isConnected } = useAccount()
+  const queryClient = useQueryClient()
 
   // Get all token data using the custom hook
   const tokenData = useTokenData(
@@ -25,9 +27,8 @@ function App() {
   )
 
   // Function to refresh all data after transaction completion
-  const handleTransactionComplete = async () => {
-    // The useTokenData hook will automatically refetch when dependencies change
-    // For now, we'll rely on the automatic refetching
+  const handleTransactionComplete = () => {
+    queryClient.invalidateQueries()
   }
 
   // Create market rows with real data for each token
@@ -70,6 +71,7 @@ function App() {
 
         {/* Deposit Modal */}
         <DepositForm
+          key={selectedToken.symbol + isDepositModalOpen}
           isOpen={isDepositModalOpen}
           onClose={() => setIsDepositModalOpen(false)}
           selectedToken={selectedToken}
