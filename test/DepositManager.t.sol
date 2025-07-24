@@ -535,7 +535,7 @@ contract DepositManagerTest is Test {
         );
         uint8 decimals = 18;
 
-        vm.prank(alice);
+        vm.prank(address(this));
         depositManager.addToken(
             symbol,
             daiAddress,
@@ -558,7 +558,7 @@ contract DepositManagerTest is Test {
     }
 
     function test_SetTokenActive() public {
-        vm.prank(alice);
+        vm.prank(address(this));
         depositManager.setTokenActive(USDC_TOKEN_ID, false);
 
         DepositManager.Asset memory config = depositManager.getAsset(

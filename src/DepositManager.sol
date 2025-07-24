@@ -140,24 +140,16 @@ contract DepositManager {
         Asset storage asset = assets[tokenId];
         if (!asset.isActive) revert TokenNotActive(tokenId);
 
-        console.log("Updating liquidity index for token:");
-        console.logBytes32(tokenId);
         uint256 delta = block.timestamp - asset.lastUpdateTimestamp;
 
         if (delta > 0) {
-            console.log("Delta is greater than 0");
-            console.log("Total deposits:", asset.totalDeposits);
-            console.log("Total borrows:", asset.totalBorrows);
-
             if (asset.totalDeposits == 0) {
                 asset.liquidityIndex = RAY;
                 asset.lastUpdateTimestamp = block.timestamp;
                 return;
             }
 
-            console.log("About to calculate U");
             uint256 U = (asset.totalBorrows * 1e18) / asset.totalDeposits;
-            console.log("U is", U);
             uint256 supplyRate = _calculateSupplyRate(
                 U,
                 asset.baseRate,
@@ -166,9 +158,7 @@ contract DepositManager {
                 asset.kink,
                 asset.reserveFactor
             );
-            console.log("Supply rate is", supplyRate);
             uint256 accrued = (supplyRate * delta) / (365 days);
-            console.log("Accrued is", accrued);
             asset.liquidityIndex =
                 (asset.liquidityIndex * (RAY + accrued)) /
                 RAY;
@@ -277,26 +267,6 @@ contract DepositManager {
         emit TokenWithdrawn(tokenId, msg.sender, amount);
     }
 
-    // function borrow(bytes32 tokenId, uint256 amount) external {
-    //     Asset storage config = assets[tokenId];
-    //     if (!config.isActive) revert TokenNotActive(tokenId);
-
-    //     _updateLiquidityIndex(tokenId);
-    //     config.totalBorrows += amount;
-
-    //     // Transfer tokens to user
-    //     if (config.tokenAddress == address(0)) {
-    //         // Handle ETH borrows
-    //         (bool success, ) = payable(msg.sender).call{value: amount}("");
-    //         if (!success) revert TransferFailed();
-    //     } else {
-    //         // Handle ERC20 token borrows
-    //         _safeTransfer(config.tokenAddress, msg.sender, amount);
-    //     }
-
-    //     emit TokenBorrowed(tokenId, msg.sender, amount);
-    // }
-
     function balanceOf(
         bytes32 tokenId,
         address user
@@ -344,12 +314,6 @@ contract DepositManager {
         }
         uint256 netRate = (borrowRate * (RAY - reserveFactor)) / RAY;
         return (netRate * U) / RAY;
-    }
-
-    // TODO: implement
-    // Loan-to-Value ratio (LTV), scaled by 1e18 (e.g., 0.75e18 = 75%)
-    function getLtv() public pure returns (uint256) {
-        return 0.75e18;
     }
 
     function transferOut(

@@ -15,6 +15,14 @@ contract BorrowManager {
     mapping(bytes32 => uint256) public borrowIndex; // scale: RAY
     mapping(bytes32 => uint256) public lastPythUpdateTime;
 
+    address public owner;
+    uint256 public ltv;
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
     event Borrowed(
         bytes32 indexed tokenId,
         address indexed user,
@@ -29,6 +37,17 @@ contract BorrowManager {
     constructor(address _depositMgr, address _pyth) {
         depositMgr = DepositManager(payable(_depositMgr));
         pyth = IPyth(_pyth);
+        owner = msg.sender;
+        ltv = 0.50e18;
+    }
+
+    function setLtv(uint256 _ltv) external onlyOwner {
+        require(_ltv <= 1e18, "LTV must be <= 100%");
+        ltv = _ltv;
+    }
+
+    function getLtv() public view returns (uint256) {
+        return ltv;
     }
 
     // Called when a user borrows; updates Pyth only for this asset
@@ -78,8 +97,8 @@ contract BorrowManager {
             totalBorrowUsd += (userBorrowAmount * priceUint) / 1e8;
         }
         require(totalCollateralUsd > 0, "No collateral");
-        uint256 ltv = (totalBorrowUsd * 1e18) / totalCollateralUsd;
-        require(ltv <= depositMgr.getLtv(), "Insufficient collateral");
+        uint256 userLtv = (totalBorrowUsd * 1e18) / totalCollateralUsd;
+        require(userLtv <= getLtv(), "Insufficient collateral");
 
         // Transfer borrowed tokens
         depositMgr.transferOut(tokenId, msg.sender, amount);
@@ -121,7 +140,7 @@ contract BorrowManager {
         address user,
         bytes[] calldata pythUpdateData,
         bytes32[] calldata priceIds
-    ) external returns (uint256 ltv) {
+    ) external returns (uint256 userLtv) {
         // 1. Update all prices
         uint fee = pyth.getUpdateFee(pythUpdateData);
         pyth.updatePriceFeeds{value: fee}(pythUpdateData);
