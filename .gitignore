@@ -11,3 +11,6 @@ docs/
 
 # Dotenv file
 .env
+
+# Foundry dependencies for Pyth
+node_modules/
