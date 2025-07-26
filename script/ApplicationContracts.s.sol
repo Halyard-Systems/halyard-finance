@@ -4,7 +4,7 @@ pragma solidity ^0.8.13;
 import {Script, console} from "lib/forge-std/src/Script.sol";
 import {DepositManager} from "../src/DepositManager.sol";
 import {BorrowManager} from "../src/BorrowManager.sol";
-import {MockPyth} from "@pythnetwork/pyth-sdk-solidity/MockPyth.sol";
+import {MockPyth} from "../node_modules/@pythnetwork/pyth-sdk-solidity/MockPyth.sol";
 
 contract ApplicationContractsScript is Script {
     DepositManager public depositManager;
@@ -82,12 +82,26 @@ contract ApplicationContractsScript is Script {
         );
 
         // Optional: pre-set a test feed
-        // bytes32 priceId = /* YOUR PRICE ID */;
-        // uint64 publishTime = uint64(block.timestamp);
-        // bytes memory updateData = mock.createPriceFeedUpdateData(
-        //     priceId, 123 * 1e8, 100, -8, 123 * 1e8, 100, publishTime
-        // );
-        // mock.updatePriceFeeds(new bytes );
+        // ETH/USD price id
+        bytes32 priceId = 0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace;
+        uint64 publishTime = uint64(block.timestamp);
+        bytes memory updateData = mockPyth.createPriceFeedUpdateData(
+            priceId,
+            123 * 1e8,
+            100,
+            -8,
+            123 * 1e8,
+            100,
+            publishTime,
+            publishTime - 60
+        );
+        bytes[] memory updateArray = new bytes[](1);
+        updateArray[0] = updateData;
+
+        uint fee = mockPyth.getUpdateFee(updateArray);
+        console.log("Pyth fees paid", fee);
+
+        mockPyth.updatePriceFeeds{value: fee}(updateArray);
 
         console.log("MockPyth deployed at:", address(mockPyth));
 

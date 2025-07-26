@@ -2,8 +2,8 @@
 pragma solidity ^0.8.30;
 
 import "./DepositManager.sol";
-import {IPyth} from "@pythnetwork/pyth-sdk-solidity/IPyth.sol";
-import {PythStructs} from "@pythnetwork/pyth-sdk-solidity/PythStructs.sol";
+import {IPyth} from "../node_modules/@pythnetwork/pyth-sdk-solidity/IPyth.sol";
+import {PythStructs} from "../node_modules/@pythnetwork/pyth-sdk-solidity/PythStructs.sol";
 
 contract BorrowManager {
     DepositManager public immutable depositMgr;
@@ -56,7 +56,7 @@ contract BorrowManager {
         uint256 amount,
         bytes[] calldata pythUpdateData,
         bytes32[] calldata priceIds
-    ) external {
+    ) external payable {
         // Pull latest price updates for all relevant assets
         uint fee = pyth.getUpdateFee(pythUpdateData);
         pyth.updatePriceFeeds{value: fee}(pythUpdateData);

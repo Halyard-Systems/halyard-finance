@@ -22,7 +22,7 @@
       { "name": "priceIds", "type": "bytes32[]", "internalType": "bytes32[]" }
     ],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "payable"
   },
   {
     "type": "function",
