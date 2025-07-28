@@ -303,6 +303,12 @@ contract DepositManager {
         uint256 kink,
         uint256 reserveFactor
     ) internal pure returns (uint256) {
+        console.log("Base rate", baseRate);
+        console.log("Slope1", slope1);
+        console.log("Slope2", slope2);
+        console.log("Kink", kink);
+        console.log("Reserve factor", reserveFactor);
+        console.log("U", U);
         uint256 borrowRate;
         if (U <= kink) {
             borrowRate = baseRate + ((slope1 * U) / kink);
@@ -313,7 +319,35 @@ contract DepositManager {
                 ((slope2 * (U - kink)) / (1e18 - kink));
         }
         uint256 netRate = (borrowRate * (RAY - reserveFactor)) / RAY;
+        // When U = 0, return 0 (no supply rate when no utilization)
+        // When U > 0, return the supply rate based on utilization
         return (netRate * U) / RAY;
+    }
+
+    function _calculateBorrowRate(
+        uint256 U,
+        uint256 baseRate,
+        uint256 slope1,
+        uint256 slope2,
+        uint256 kink
+    ) internal pure returns (uint256) {
+        console.log("Borrow rate calculation - Base rate", baseRate);
+        console.log("Borrow rate calculation - Slope1", slope1);
+        console.log("Borrow rate calculation - Slope2", slope2);
+        console.log("Borrow rate calculation - Kink", kink);
+        console.log("Borrow rate calculation - U", U);
+
+        uint256 borrowRate;
+        if (U <= kink) {
+            borrowRate = baseRate + ((slope1 * U) / kink);
+        } else {
+            borrowRate =
+                baseRate +
+                slope1 +
+                ((slope2 * (U - kink)) / (1e18 - kink));
+        }
+        console.log("Borrow rate calculation - Final borrow rate", borrowRate);
+        return borrowRate;
     }
 
     function transferOut(
@@ -354,13 +388,12 @@ contract DepositManager {
     ) external view returns (uint256) {
         Asset storage config = assets[tokenId];
         return
-            _calculateSupplyRate(
+            _calculateBorrowRate(
                 U,
                 config.baseRate,
                 config.slope1,
                 config.slope2,
-                config.kink,
-                config.reserveFactor
+                config.kink
             );
     }
 

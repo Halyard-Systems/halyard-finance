@@ -95,8 +95,37 @@ contract ApplicationContractsScript is Script {
             publishTime,
             publishTime - 60
         );
-        bytes[] memory updateArray = new bytes[](1);
+
+        // USDC/USD price id
+        bytes32 usdcPriceId = 0xeaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a;
+        bytes memory usdcUpdateData = mockPyth.createPriceFeedUpdateData(
+            usdcPriceId,
+            1,
+            100,
+            -8,
+            1,
+            100,
+            publishTime,
+            publishTime - 60
+        );
+
+        // USDT/USD price id
+        bytes32 usdtPriceId = 0x2b89b9dc8fdf9f34709a5b106b472f0f39bb6ca9ce04b0fd7f2e971688e2e53b;
+        bytes memory usdtUpdateData = mockPyth.createPriceFeedUpdateData(
+            usdtPriceId,
+            1,
+            100,
+            -8,
+            1,
+            100,
+            publishTime,
+            publishTime - 60
+        );
+
+        bytes[] memory updateArray = new bytes[](3);
         updateArray[0] = updateData;
+        updateArray[1] = usdcUpdateData;
+        updateArray[2] = usdtUpdateData;
 
         uint fee = mockPyth.getUpdateFee(updateArray);
         console.log("Pyth fees paid", fee);
