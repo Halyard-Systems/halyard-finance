@@ -77,7 +77,7 @@ function App() {
 
         {/* Deposit Modal */}
         <DepositForm
-          key={selectedToken.symbol + isDepositModalOpen}
+          key={`deposit-${selectedToken.symbol}-${isDepositModalOpen}`}
           isOpen={isDepositModalOpen}
           onClose={() => setIsDepositModalOpen(false)}
           selectedToken={selectedToken}
@@ -89,7 +89,7 @@ function App() {
 
         {/* Withdraw Modal */}
         <WithdrawForm
-          key={selectedToken.symbol + isWithdrawModalOpen}
+          key={`withdraw-${selectedToken.symbol}-${isWithdrawModalOpen}`}
           isOpen={isWithdrawModalOpen}
           onClose={() => setIsWithdrawModalOpen(false)}
           selectedToken={selectedToken}
@@ -100,7 +100,7 @@ function App() {
 
         {/* Borrow Modal */}
         <BorrowForm
-          key={selectedToken.symbol + isBorrowModalOpen}
+          key={`borrow-${selectedToken.symbol}-${isBorrowModalOpen}`}
           isOpen={isBorrowModalOpen}
           onClose={() => setIsBorrowModalOpen(false)}
           selectedToken={selectedToken}
