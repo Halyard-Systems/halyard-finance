@@ -6,6 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from './ui/dialog'
 import {
   useAccount,
@@ -189,6 +190,10 @@ export function BorrowForm({
       <DialogContent className='sm:max-w-md'>
         <DialogHeader>
           <DialogTitle>Borrow {selectedToken.symbol}</DialogTitle>
+          <DialogDescription>
+            Enter the amount of {selectedToken.symbol} you want to borrow. Make
+            sure you have sufficient collateral.
+          </DialogDescription>
         </DialogHeader>
 
         <div className='space-y-4'>
