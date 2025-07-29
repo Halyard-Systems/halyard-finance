@@ -89,6 +89,7 @@ function App() {
 
         {/* Withdraw Modal */}
         <WithdrawForm
+          key={selectedToken.symbol + isWithdrawModalOpen}
           isOpen={isWithdrawModalOpen}
           onClose={() => setIsWithdrawModalOpen(false)}
           selectedToken={selectedToken}
@@ -99,6 +100,7 @@ function App() {
 
         {/* Borrow Modal */}
         <BorrowForm
+          key={selectedToken.symbol + isBorrowModalOpen}
           isOpen={isBorrowModalOpen}
           onClose={() => setIsBorrowModalOpen(false)}
           selectedToken={selectedToken}
