@@ -105,7 +105,7 @@ function App() {
           onClose={() => setIsBorrowModalOpen(false)}
           selectedToken={selectedToken}
           tokenId={selectedTokenData?.tokenId}
-          maxBorrowable={selectedTokenData?.userDeposits ?? 0} // For now, use userDeposits as max borrowable
+          //maxBorrowable={selectedTokenData?.userDeposits ?? 0} // For now, use userDeposits as max borrowable
           onTransactionComplete={handleTransactionComplete}
         />
       </main>

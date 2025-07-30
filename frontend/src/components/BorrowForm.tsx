@@ -21,10 +21,17 @@ import type { Token } from '../lib/types'
 import TOKENS from '../tokens.json'
 import PYTH_ABI from '../abis/IPyth.json'
 import MOCK_PYTH_ABI from '../abis/MockPyth.json'
+import { getPrices } from '../lib/prices'
 
 const USE_MOCK_PYTH = import.meta.env.VITE_USE_MOCK_PYTH === 'true'
 const MOCK_PYTH_ADDRESS = import.meta.env
   .VITE_MOCK_PYTH_ADDRESS as `0x${string}`
+
+const ETH_USDC_USDT_PRICE_IDS = [
+  '0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace', // ETH/USD
+  '0xeaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a', // USDC/USD
+  '0x2b89b9dc8fdf9f34709a5b106b472f0f39bb6ca9ce04b0fd7f2e971688e2e53b', // USDT/USD
+]
 
 // Helper to fetch Pyth update data for a given priceId using Hermes API
 async function fetchPythUpdateDataFromHermes(
@@ -91,7 +98,7 @@ interface BorrowFormProps {
   onClose: () => void
   selectedToken: Token
   tokenId?: `0x${string}`
-  maxBorrowable: number
+  //maxBorrowable: number
   onTransactionComplete?: () => void
 }
 
@@ -100,11 +107,12 @@ export function BorrowForm({
   onClose,
   selectedToken,
   tokenId,
-  maxBorrowable,
+  //maxBorrowable,
   onTransactionComplete,
 }: BorrowFormProps) {
   const [borrowAmount, setBorrowAmount] = useState('')
-  const { address } = useAccount()
+  const [maxBorrowable, setMaxBorrowable] = useState<number>(0)
+
   const publicClient = usePublicClient()
 
   const {
@@ -120,6 +128,13 @@ export function BorrowForm({
       hash: borrowData,
     })
 
+  const calcMaxBorrowable = async (priceIds: string[]) => {
+    const prices = await getPrices(priceIds)
+    console.log('prices', prices)
+    setMaxBorrowable(1)
+    //return prices
+  }
+
   // Handle transaction completion
   useEffect(() => {
     if (isConfirmed) {
@@ -128,6 +143,9 @@ export function BorrowForm({
       onClose()
       // Trigger data refresh
       onTransactionComplete?.()
+    }
+    if (maxBorrowable === 0) {
+      calcMaxBorrowable(ETH_USDC_USDT_PRICE_IDS)
     }
   }, [isConfirmed, onTransactionComplete, onClose])
 
@@ -138,18 +156,16 @@ export function BorrowForm({
       }
 
       const amountInWei = toWei(Number(borrowAmount), selectedToken.decimals)
-      const priceIds = [
-        '0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace',
-        '0xeaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a',
-        '0x2b89b9dc8fdf9f34709a5b106b472f0f39bb6ca9ce04b0fd7f2e971688e2e53b',
-      ]
+
       let pythUpdateData: string[]
       if (USE_MOCK_PYTH) {
         console.log('Using mock Pyth')
         // Use empty arrays since price feeds are already set up in deployment
         pythUpdateData = []
       } else {
-        pythUpdateData = await fetchPythUpdateDataFromHermes(priceIds)
+        pythUpdateData = await fetchPythUpdateDataFromHermes(
+          ETH_USDC_USDT_PRICE_IDS
+        )
       }
 
       // Calculate the required fee for Pyth update
@@ -167,7 +183,7 @@ export function BorrowForm({
       }
 
       console.log('pythUpdateData', pythUpdateData)
-      console.log('priceIds', priceIds)
+      console.log('priceIds', ETH_USDC_USDT_PRICE_IDS)
       console.log('tokenId', tokenId)
       console.log('selectedToken.symbol', selectedToken.symbol)
       console.log('amountInWei', amountInWei)
@@ -177,7 +193,7 @@ export function BorrowForm({
         address: import.meta.env.VITE_BORROW_MANAGER_ADDRESS as `0x${string}`,
         abi: BORROW_MANAGER_ABI,
         functionName: 'borrow',
-        args: [tokenId, amountInWei, pythUpdateData, priceIds],
+        args: [tokenId, amountInWei, pythUpdateData, ETH_USDC_USDT_PRICE_IDS],
         value: fee, // Send the required fee
       })
     } catch (error) {
