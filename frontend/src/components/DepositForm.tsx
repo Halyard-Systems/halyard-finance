@@ -6,6 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from './ui/dialog'
 
 import ERC20_ABI from '../abis/ERC20.json'
@@ -157,6 +158,10 @@ export function DepositForm({
       <DialogContent className='sm:max-w-xl w-[95vw] max-w-[600px]'>
         <DialogHeader>
           <DialogTitle>Deposit {selectedToken.symbol}</DialogTitle>
+          <DialogDescription>
+            Enter the amount of {selectedToken.symbol} you want to deposit as
+            collateral.
+          </DialogDescription>
         </DialogHeader>
 
         <div className='space-y-4 w-full'>

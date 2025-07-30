@@ -189,10 +189,20 @@ export const useTokenData = (tokens: Token[], userAddress: string) => {
       // Handle wallet balance conversion based on token type
       let walletBalanceValue = 0
       if (isNativeETH(token)) {
-        // For native ETH, use the formatted value from useBalance
-        walletBalanceValue = walletBalance
-          ? Number(walletBalance) / Math.pow(10, token.decimals)
-          : 0
+        // For native ETH, use the formatted value from useBalance if available
+        if (
+          walletBalance &&
+          typeof walletBalance === 'object' &&
+          'formatted' in walletBalance &&
+          walletBalance.formatted !== undefined
+        ) {
+          walletBalanceValue = Number(walletBalance.formatted)
+        } else if (walletBalance) {
+          walletBalanceValue =
+            Number(walletBalance) / Math.pow(10, token.decimals)
+        } else {
+          walletBalanceValue = 0
+        }
       } else {
         // For ERC20 tokens, use the data property from useReadERC20Balance
         walletBalanceValue = walletBalance

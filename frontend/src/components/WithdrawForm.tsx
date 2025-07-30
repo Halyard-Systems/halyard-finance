@@ -6,6 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from './ui/dialog'
 import {
   useAccount,
@@ -89,6 +90,10 @@ export function WithdrawForm({
       <DialogContent className='sm:max-w-md'>
         <DialogHeader>
           <DialogTitle>Withdraw {selectedToken.symbol}</DialogTitle>
+          <DialogDescription>
+            Enter the amount of {selectedToken.symbol} you want to withdraw from
+            your deposited collateral.
+          </DialogDescription>
         </DialogHeader>
 
         <div className='space-y-4'>
