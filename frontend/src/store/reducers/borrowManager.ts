@@ -1,10 +1,16 @@
 import { createSlice } from '@reduxjs/toolkit'
 
+interface BorrowState {
+  maxBorrow: number | undefined
+}
+
+const initialState: BorrowState = {
+  maxBorrow: undefined,
+}
+
 const borrowManager = createSlice({
   name: 'borrowManager',
-  initialState: {
-    maxBorrow: undefined,
-  },
+  initialState,
   reducers: {
     setMaxBorrow: (state, action) => {
       state.maxBorrow = action.payload
