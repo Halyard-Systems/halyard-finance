@@ -14,6 +14,7 @@
     "@pythnetwork/pyth-sdk-solidity": "^4.2.0",
     "@radix-ui/react-dialog": "^1.1.14",
     "@radix-ui/react-slot": "^1.2.3",
+    "@reduxjs/toolkit": "^2.8.2",
     "@tailwindcss/vite": "^4.1.11",
     "@tanstack/react-query": "^5.83.0",
     "@wagmi/connectors": "^5.8.5",
@@ -23,6 +24,7 @@
     "lucide-react": "^0.525.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-redux": "^9.2.0",
     "tailwind-merge": "^3.3.1",
     "viem": "^2.31.7",
     "wagmi": "^2.15.6"

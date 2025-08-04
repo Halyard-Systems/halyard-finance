@@ -17,9 +17,47 @@ const connection = new HermesClient('https://hermes.pyth.network', {})
 // const priceUpdates = await connection.getLatestPriceUpdates(priceIds)
 // console.log(priceUpdates)
 
-export const getPrices = async (priceIds: string[]) => {
+export type PriceUpdate = {
+  binary: PriceUpdateBinary
+  parsed: PriceUpdateParsed[]
+}
+
+export type PriceUpdateBinary = {
+  data: string[]
+  encoding: string
+}
+
+export type PriceUpdateParsed = {
+  ema_price: Price
+  id: string
+  metadata: {
+    prev_publish_time?: number | null
+    proof_available_time?: number | null
+    slot?: number | null
+  }
+  price: Price
+}
+
+export type Price = {
+  conf: string
+  expo: number
+  price: string
+  publish_time: number
+}
+
+export const getPrices = async (priceIds: string[]): Promise<PriceUpdate> => {
   // Latest price updates
-  const priceUpdates = await connection.getLatestPriceUpdates(priceIds)
-  console.log(priceUpdates)
-  return priceUpdates
+  return (await connection.getLatestPriceUpdates(priceIds)) as PriceUpdate
+}
+
+export const getLowestPrice = (price: Price) => {
+  // Calculate the lowest acceptable price based on confidence interval
+  const priceValue = parseFloat(price.price)
+  const confidence = parseFloat(price.conf)
+
+  // The lowest price is the current price minus the confidence interval
+  // This accounts for the uncertainty in the price feed
+  const lowestPrice = priceValue - confidence
+
+  return Math.max(lowestPrice, 0) // Ensure price doesn't go negative
 }

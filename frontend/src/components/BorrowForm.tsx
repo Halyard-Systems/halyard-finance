@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSelector, useDispatch } from 'react-redux'
 import { Button } from './ui/button'
 import {
   Dialog,
@@ -22,6 +23,9 @@ import TOKENS from '../tokens.json'
 import PYTH_ABI from '../abis/IPyth.json'
 import MOCK_PYTH_ABI from '../abis/MockPyth.json'
 import { getPrices } from '../lib/prices'
+import { setMaxBorrow } from '../store/reducers/borrowManager'
+import type { RootState } from '../store/store'
+import { maxBorrow } from '@/store/interactions'
 
 const USE_MOCK_PYTH = import.meta.env.VITE_USE_MOCK_PYTH === 'true'
 const MOCK_PYTH_ADDRESS = import.meta.env
@@ -111,7 +115,10 @@ export function BorrowForm({
   onTransactionComplete,
 }: BorrowFormProps) {
   const [borrowAmount, setBorrowAmount] = useState('')
-  const [maxBorrowable, setMaxBorrowable] = useState<number>(0)
+  const dispatch = useDispatch()
+  const maxBorrowable = useSelector(
+    (state: RootState) => state.borrowManager.maxBorrow
+  )
 
   const publicClient = usePublicClient()
 
@@ -128,12 +135,19 @@ export function BorrowForm({
       hash: borrowData,
     })
 
-  const calcMaxBorrowable = async (priceIds: string[]) => {
-    const prices = await getPrices(priceIds)
-    console.log('prices', prices)
-    setMaxBorrowable(1)
-    //return prices
-  }
+  // const calcMaxBorrowable = async (priceIds: string[]) => {
+  //   const prices = await getPrices(priceIds)
+  //   console.log('prices', prices)
+  //   dispatch(setMaxBorrow(1))
+  //   //return prices
+  // }
+
+  // Calculate max borrowable when component mounts or when maxBorrowable is 0
+  useEffect(() => {
+    if (maxBorrowable === undefined) {
+      maxBorrow(ETH_USDC_USDT_PRICE_IDS, dispatch)
+    }
+  }, [maxBorrowable, dispatch])
 
   // Handle transaction completion
   useEffect(() => {
@@ -143,9 +157,6 @@ export function BorrowForm({
       onClose()
       // Trigger data refresh
       onTransactionComplete?.()
-    }
-    if (maxBorrowable === 0) {
-      calcMaxBorrowable(ETH_USDC_USDT_PRICE_IDS)
     }
   }, [isConfirmed, onTransactionComplete, onClose])
 
@@ -237,9 +248,11 @@ export function BorrowForm({
             </label>
             <p className='text-sm text-muted-foreground mb-2'>
               Max borrowable:{' '}
-              {maxBorrowable.toLocaleString(undefined, {
-                maximumFractionDigits: 6,
-              })}
+              {maxBorrowable !== undefined
+                ? (maxBorrowable as number).toLocaleString(undefined, {
+                    maximumFractionDigits: 6,
+                  })
+                : 'Loading...'}
             </p>
             <input
               type='number'
@@ -271,8 +284,9 @@ export function BorrowForm({
               !tokenId ||
               isBorrowing ||
               isConfirming ||
-              Number(borrowAmount) > maxBorrowable ||
-              Number(borrowAmount) <= 0
+              Number(borrowAmount) > Number(maxBorrowable) ||
+              Number(borrowAmount) <= 0 ||
+              maxBorrowable === undefined
             }
             className='flex-1'
           >

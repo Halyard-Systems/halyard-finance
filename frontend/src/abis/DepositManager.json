@@ -41,6 +41,7 @@
     "inputs": [{ "name": "", "type": "bytes32", "internalType": "bytes32" }],
     "outputs": [
       { "name": "tokenAddress", "type": "address", "internalType": "address" },
+      { "name": "symbol", "type": "string", "internalType": "string" },
       { "name": "decimals", "type": "uint8", "internalType": "uint8" },
       { "name": "isActive", "type": "bool", "internalType": "bool" },
       {
@@ -142,6 +143,7 @@
             "type": "address",
             "internalType": "address"
           },
+          { "name": "symbol", "type": "string", "internalType": "string" },
           { "name": "decimals", "type": "uint8", "internalType": "uint8" },
           { "name": "isActive", "type": "bool", "internalType": "bool" },
           {

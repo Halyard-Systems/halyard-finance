@@ -3,11 +3,11 @@ import type { Token } from '../lib/types'
 
 export interface MarketRow {
   token: Token
-  deposits: number
-  borrows: number
+  deposits: bigint
+  borrows: bigint
   depositApy: number
   borrowApy: number
-  userDeposits: number
+  userDeposit: bigint
   onDeposit: () => void
   onWithdraw: () => void
   onBorrow: () => void
@@ -17,9 +17,15 @@ interface MarketTableProps {
   rows: MarketRow[]
 }
 
+const tokenValueDisplay = (value: bigint | number, decimals: number) => {
+  return (Number(value) / Math.pow(10, decimals)).toLocaleString(undefined, {
+    maximumFractionDigits: 6,
+  })
+}
+
 export function MarketTable({ rows }: MarketTableProps) {
   // Determine if the user has any deposits in any asset
-  const anyDeposits = rows.some((row) => row.userDeposits > 0)
+  const anyDeposits = rows.some((row) => row.userDeposit > 0)
   return (
     <div className='bg-card rounded-lg shadow-sm border border-border p-6'>
       <div className='overflow-x-auto'>
@@ -74,9 +80,7 @@ export function MarketTable({ rows }: MarketTableProps) {
                 {/* Deposits */}
                 <td className='py-4 px-4'>
                   <div className='font-mono text-card-foreground'>
-                    {row.deposits.toLocaleString(undefined, {
-                      maximumFractionDigits: 6,
-                    })}{' '}
+                    {tokenValueDisplay(row.deposits, row.token.decimals)}{' '}
                     {row.token.symbol}
                   </div>
                 </td>
@@ -84,9 +88,7 @@ export function MarketTable({ rows }: MarketTableProps) {
                 {/* Borrows */}
                 <td className='py-4 px-4'>
                   <div className='font-mono text-card-foreground'>
-                    {row.borrows.toLocaleString(undefined, {
-                      maximumFractionDigits: 6,
-                    })}{' '}
+                    {tokenValueDisplay(row.borrows, row.token.decimals)}{' '}
                     {row.token.symbol}
                   </div>
                 </td>
@@ -108,9 +110,7 @@ export function MarketTable({ rows }: MarketTableProps) {
                 {/* Your Deposits */}
                 <td className='py-4 px-4'>
                   <div className='font-mono text-card-foreground'>
-                    {row.userDeposits.toLocaleString(undefined, {
-                      maximumFractionDigits: 6,
-                    })}{' '}
+                    {tokenValueDisplay(row.userDeposit, row.token.decimals)}{' '}
                     {row.token.symbol}
                   </div>
                 </td>
@@ -130,7 +130,7 @@ export function MarketTable({ rows }: MarketTableProps) {
                         Borrow
                       </Button>
                     )}
-                    {row.userDeposits > 0 && (
+                    {row.userDeposit > 0 && (
                       <Button
                         variant='outline'
                         size='sm'

@@ -9,6 +9,7 @@ export interface Token {
 
 // Market asset
 export interface Asset {
+  symbol: string
   tokenAddress: string
   decimals: number
   isActive: boolean

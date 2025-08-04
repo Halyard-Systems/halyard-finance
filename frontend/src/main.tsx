@@ -6,6 +6,8 @@ import { config } from './lib/wagmi.ts'
 import App from './App.tsx'
 
 import './index.css'
+import { Provider } from 'react-redux'
+import store from './store/store.ts'
 
 const queryClient = new QueryClient()
 
@@ -13,7 +15,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        <App />
+        <Provider store={store}>
+          <App />
+        </Provider>
       </QueryClientProvider>
     </WagmiProvider>
   </React.StrictMode>
