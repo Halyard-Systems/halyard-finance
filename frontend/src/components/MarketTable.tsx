@@ -1,5 +1,6 @@
 import { Button } from './ui/button'
 import type { Token } from '../lib/types'
+import { fromWei } from '@/lib/utils'
 
 export interface MarketRow {
   token: Token
@@ -15,12 +16,6 @@ export interface MarketRow {
 
 interface MarketTableProps {
   rows: MarketRow[]
-}
-
-const tokenValueDisplay = (value: bigint | number, decimals: number) => {
-  return (Number(value) / Math.pow(10, decimals)).toLocaleString(undefined, {
-    maximumFractionDigits: 6,
-  })
 }
 
 export function MarketTable({ rows }: MarketTableProps) {
@@ -80,7 +75,12 @@ export function MarketTable({ rows }: MarketTableProps) {
                 {/* Deposits */}
                 <td className='py-4 px-4'>
                   <div className='font-mono text-card-foreground'>
-                    {tokenValueDisplay(row.deposits, row.token.decimals)}{' '}
+                    {fromWei(row.deposits, row.token.decimals).toLocaleString(
+                      undefined,
+                      {
+                        maximumFractionDigits: 6,
+                      }
+                    )}{' '}
                     {row.token.symbol}
                   </div>
                 </td>
@@ -88,7 +88,12 @@ export function MarketTable({ rows }: MarketTableProps) {
                 {/* Borrows */}
                 <td className='py-4 px-4'>
                   <div className='font-mono text-card-foreground'>
-                    {tokenValueDisplay(row.borrows, row.token.decimals)}{' '}
+                    {fromWei(row.borrows, row.token.decimals).toLocaleString(
+                      undefined,
+                      {
+                        maximumFractionDigits: 6,
+                      }
+                    )}{' '}
                     {row.token.symbol}
                   </div>
                 </td>
@@ -110,7 +115,12 @@ export function MarketTable({ rows }: MarketTableProps) {
                 {/* Your Deposits */}
                 <td className='py-4 px-4'>
                   <div className='font-mono text-card-foreground'>
-                    {tokenValueDisplay(row.userDeposit, row.token.decimals)}{' '}
+                    {fromWei(
+                      row.userDeposit,
+                      row.token.decimals
+                    ).toLocaleString(undefined, {
+                      maximumFractionDigits: 6,
+                    })}{' '}
                     {row.token.symbol}
                   </div>
                 </td>

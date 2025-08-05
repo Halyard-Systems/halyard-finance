@@ -11,7 +11,6 @@ import {
   useReadAssets,
   useReadDepositManagerBalances,
   useReadSupportedTokens,
-  useTokenData,
 } from './lib/hooks'
 import type { Asset, Token } from './lib/types'
 
