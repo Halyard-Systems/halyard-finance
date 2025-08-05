@@ -10,7 +10,6 @@ import {
   DialogDescription,
 } from './ui/dialog'
 import {
-  useAccount,
   useWriteContract,
   useWaitForTransactionReceipt,
   usePublicClient,
@@ -19,18 +18,11 @@ import {
 import BORROW_MANAGER_ABI from '../abis/BorrowManager.json'
 import { toWei } from '../lib/utils'
 import type { Token } from '../lib/types'
-import TOKENS from '../tokens.json'
-import PYTH_ABI from '../abis/IPyth.json'
 import MOCK_PYTH_ABI from '../abis/MockPyth.json'
-import { getPrices } from '../lib/prices'
-import { setMaxBorrow } from '../store/reducers/borrowManager'
 import type { RootState } from '../store/store'
 import { maxBorrow } from '@/store/interactions'
 
 const USE_MOCK_PYTH = import.meta.env.VITE_USE_MOCK_PYTH === 'true'
-const MOCK_PYTH_ADDRESS = import.meta.env
-  .VITE_MOCK_PYTH_ADDRESS as `0x${string}`
-
 const ETH_USDC_USDT_PRICE_IDS = [
   '0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace', // ETH/USD
   '0xeaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a', // USDC/USD
@@ -56,46 +48,46 @@ async function fetchPythUpdateDataFromHermes(
 }
 
 // Helper to create MockPyth update data - simplified approach
-async function createMockPythUpdateData(
-  publicClient: any,
-  priceId: string
-): Promise<string> {
-  // Example arguments for the mock; adjust as needed
-  const price = 123 * 1e8 // Price in fixed-point format (123 USD with 8 decimals)
-  const conf = 100 // Confidence interval
-  const expo = -8 // Exponent for fixed-point representation
-  const emaPrice = 123 * 1e8 // EMA price in fixed-point format
-  const emaConf = 100 // EMA confidence interval
-  const publishTime = Math.floor(Date.now() / 1000)
-  const prevPublishTime = publishTime - 60
+// async function createMockPythUpdateData(
+//   publicClient: any,
+//   priceId: string
+// ): Promise<string> {
+//   // Example arguments for the mock; adjust as needed
+//   const price = 123 * 1e8 // Price in fixed-point format (123 USD with 8 decimals)
+//   const conf = 100 // Confidence interval
+//   const expo = -8 // Exponent for fixed-point representation
+//   const emaPrice = 123 * 1e8 // EMA price in fixed-point format
+//   const emaConf = 100 // EMA confidence interval
+//   const publishTime = Math.floor(Date.now() / 1000)
+//   const prevPublishTime = publishTime - 60
 
-  // Create the price feed data manually to match what updatePriceFeeds expects
-  // MockPyth.updatePriceFeeds expects just the PriceFeed struct, not (PriceFeed, prevPublishTime)
-  const priceFeed = {
-    id: priceId,
-    price: {
-      price: price,
-      conf: conf,
-      expo: expo,
-      publishTime: publishTime,
-    },
-    emaPrice: {
-      price: emaPrice,
-      conf: emaConf,
-      expo: expo,
-      publishTime: publishTime,
-    },
-  }
+//   // Create the price feed data manually to match what updatePriceFeeds expects
+//   // MockPyth.updatePriceFeeds expects just the PriceFeed struct, not (PriceFeed, prevPublishTime)
+//   const priceFeed = {
+//     id: priceId,
+//     price: {
+//       price: price,
+//       conf: conf,
+//       expo: expo,
+//       publishTime: publishTime,
+//     },
+//     emaPrice: {
+//       price: emaPrice,
+//       conf: emaConf,
+//       expo: expo,
+//       publishTime: publishTime,
+//     },
+//   }
 
-  // For now, let's use a simpler approach - just return empty data
-  // and rely on the price feeds that are already set up in deployment
-  console.log('Creating mock price feed data for:', priceId)
-  console.log('Price feed:', priceFeed)
+//   // For now, let's use a simpler approach - just return empty data
+//   // and rely on the price feeds that are already set up in deployment
+//   console.log('Creating mock price feed data for:', priceId)
+//   console.log('Price feed:', priceFeed)
 
-  // Return empty data to avoid the encoding issue
-  // The price feeds should already be set up in the deployment script
-  return '0x'
-}
+//   // Return empty data to avoid the encoding issue
+//   // The price feeds should already be set up in the deployment script
+//   return '0x'
+// }
 
 interface BorrowFormProps {
   isOpen: boolean
@@ -192,13 +184,6 @@ export function BorrowForm({
           args: [pythUpdateData],
         })) as bigint
       }
-
-      console.log('pythUpdateData', pythUpdateData)
-      console.log('priceIds', ETH_USDC_USDT_PRICE_IDS)
-      console.log('tokenId', tokenId)
-      console.log('selectedToken.symbol', selectedToken.symbol)
-      console.log('amountInWei', amountInWei)
-      console.log('Pyth fee required:', fee.toString())
 
       await writeBorrow({
         address: import.meta.env.VITE_BORROW_MANAGER_ADDRESS as `0x${string}`,

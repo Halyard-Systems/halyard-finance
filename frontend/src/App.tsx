@@ -119,9 +119,6 @@ function App() {
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false)
   const [isBorrowModalOpen, setIsBorrowModalOpen] = useState(false)
 
-  // Get all token data using the custom hook
-  const tokenData = useTokenData(TOKENS, address!)
-
   // Function to refresh all data after transaction completion
   const handleTransactionComplete = () => {
     queryClient.invalidateQueries()
@@ -141,7 +138,7 @@ function App() {
   )
 
   // Get selected token data for modals
-  const selectedTokenData = tokenData.find(
+  const selectedTokenData = marketRows.find(
     (data) => data.token.symbol === selectedToken.symbol
   )
 
@@ -164,8 +161,6 @@ function App() {
               onClose={() => setIsDepositModalOpen(false)}
               selectedToken={selectedToken}
               tokenId={selectedTokenData?.tokenId}
-              walletBalance={selectedTokenData?.walletBalance ?? 0}
-              allowance={selectedTokenData?.allowance ?? 0}
               onTransactionComplete={handleTransactionComplete}
             />
 
@@ -176,7 +171,7 @@ function App() {
               onClose={() => setIsWithdrawModalOpen(false)}
               selectedToken={selectedToken}
               tokenId={selectedTokenData?.tokenId}
-              depositedBalance={selectedTokenData?.userDeposits ?? 0}
+              depositedBalance={0}
               onTransactionComplete={handleTransactionComplete}
             />
 

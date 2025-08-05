@@ -12,21 +12,24 @@ import {
 import ERC20_ABI from '../abis/ERC20.json'
 import DEPOSIT_MANAGER_ABI from '../abis/DepositManager.json'
 import type { Token } from '../lib/types'
-import { toWei } from '../lib/utils'
+import { toWei, fromWei } from '../lib/utils'
 
 import {
   useAccount,
   useWriteContract,
   useWaitForTransactionReceipt,
+  useBalance,
 } from 'wagmi'
+import {
+  useReadDepositManagerAllowance,
+  useReadERC20Balance,
+} from '@/lib/hooks'
 
 interface DepositFormProps {
   isOpen: boolean
   onClose: () => void
   selectedToken: Token
   tokenId?: `0x${string}`
-  walletBalance: number
-  allowance: number
   onTransactionComplete?: () => void
 }
 
@@ -35,19 +38,46 @@ export function DepositForm({
   onClose,
   selectedToken,
   tokenId,
-  walletBalance,
-  allowance,
   onTransactionComplete,
 }: DepositFormProps) {
-  const [depositAmount, setDepositAmount] = useState('')
-
   const { address } = useAccount()
+
+  let walletBalance = 0
+
+  if (selectedToken.symbol === 'ETH') {
+    const { data: walletBalanceData } = useBalance({
+      address: address! as `0x${string}`,
+    })
+    walletBalance = fromWei(
+      walletBalanceData?.value || BigInt(0),
+      selectedToken.decimals
+    )
+  } else {
+    const { data: walletBalanceData } = useReadERC20Balance(
+      selectedToken,
+      address! as `0x${string}`
+    )
+    walletBalance = fromWei(
+      (walletBalanceData as bigint) || BigInt(0),
+      selectedToken.decimals
+    )
+  }
+
+  const { data: allowance } = useReadDepositManagerAllowance(
+    address! as `0x${string}`,
+    selectedToken
+  )
+
+  const [depositAmount, setDepositAmount] = useState('')
 
   // Check if approval is needed (only for ERC20 tokens, not ETH)
   const depositAmountNumber = Number(depositAmount) || 0
   const isETH =
     selectedToken.address === '0x0000000000000000000000000000000000000000'
-  const needsApproval = !isETH && depositAmountNumber > allowance
+  const needsApproval =
+    !isETH &&
+    depositAmountNumber >
+      fromWei((allowance as bigint) || BigInt(0), selectedToken.decimals)
 
   const {
     writeContract: writeApproval,
@@ -220,7 +250,10 @@ export function DepositForm({
                     DepositManager allowance:
                   </span>
                   <span className='font-mono text-right flex-shrink-0'>
-                    {allowance.toLocaleString(undefined, {
+                    {fromWei(
+                      allowance as bigint,
+                      selectedToken.decimals
+                    ).toLocaleString(undefined, {
                       maximumFractionDigits: 6,
                     })}{' '}
                     {selectedToken.symbol}
