@@ -15,7 +15,8 @@ import {
 } from 'wagmi'
 
 import DEPOSIT_MANAGER_ABI from '../abis/DepositManager.json'
-import { toWei } from '../lib/utils'
+import { fromWei, toWei } from '../lib/utils'
+import { useReadDepositManagerBalance } from '../lib/hooks'
 import type { Token } from '../lib/types'
 
 interface WithdrawFormProps {
@@ -23,7 +24,6 @@ interface WithdrawFormProps {
   onClose: () => void
   selectedToken: Token
   tokenId?: `0x${string}`
-  depositedBalance: number
   onTransactionComplete?: () => void
 }
 
@@ -32,12 +32,21 @@ export function WithdrawForm({
   onClose,
   selectedToken,
   tokenId,
-  depositedBalance,
   onTransactionComplete,
 }: WithdrawFormProps) {
-  const [withdrawAmount, setWithdrawAmount] = useState('')
-
   const { address } = useAccount()
+
+  const { data: depositedBalanceData } = useReadDepositManagerBalance(
+    address! as `0x${string}`,
+    tokenId!
+  )
+
+  const depositedBalance = fromWei(
+    (depositedBalanceData as bigint) || BigInt(0),
+    selectedToken.decimals
+  )
+
+  const [withdrawAmount, setWithdrawAmount] = useState('')
 
   const {
     writeContract: writeWithdraw,

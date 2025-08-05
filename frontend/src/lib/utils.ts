@@ -12,6 +12,7 @@ export const toWei = (amount: number, decimals: number) => {
 }
 
 export const fromWei = (amount: bigint, decimals: number) => {
+  if (!amount) return 0
   // For better precision, we can multiply by a precision factor first
   // This preserves more decimal places during the conversion
   const precisionFactor = 10 ** 6 // 6 decimal places of precision

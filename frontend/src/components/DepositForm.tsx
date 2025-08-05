@@ -58,7 +58,7 @@ export function DepositForm({
       address! as `0x${string}`
     )
     walletBalance = fromWei(
-      (walletBalanceData as bigint) || BigInt(0),
+      (walletBalanceData as any)?.data,
       selectedToken.decimals
     )
   }
@@ -77,7 +77,7 @@ export function DepositForm({
   const needsApproval =
     !isETH &&
     depositAmountNumber >
-      fromWei((allowance as bigint) || BigInt(0), selectedToken.decimals)
+      fromWei((allowance as any)?.data, selectedToken.decimals)
 
   const {
     writeContract: writeApproval,
@@ -251,7 +251,7 @@ export function DepositForm({
                   </span>
                   <span className='font-mono text-right flex-shrink-0'>
                     {fromWei(
-                      allowance as bigint,
+                      (allowance as any)?.data,
                       selectedToken.decimals
                     ).toLocaleString(undefined, {
                       maximumFractionDigits: 6,

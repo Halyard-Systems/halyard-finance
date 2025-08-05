@@ -171,7 +171,6 @@ function App() {
               onClose={() => setIsWithdrawModalOpen(false)}
               selectedToken={selectedToken}
               tokenId={selectedTokenData?.tokenId}
-              depositedBalance={0}
               onTransactionComplete={handleTransactionComplete}
             />
 
