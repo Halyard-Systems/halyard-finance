@@ -9,6 +9,7 @@ export interface MarketRow {
   depositApy: number
   borrowApy: number
   userDeposit: bigint
+  userBorrow: bigint
   onDeposit: () => void
   onWithdraw: () => void
   onBorrow: () => void
@@ -21,6 +22,7 @@ interface MarketTableProps {
 export function MarketTable({ rows }: MarketTableProps) {
   // Determine if the user has any deposits in any asset
   const anyDeposits = rows.some((row) => row.userDeposit > 0)
+
   return (
     <div className='bg-card rounded-lg shadow-sm border border-border p-6'>
       <div className='overflow-x-auto'>
@@ -44,6 +46,9 @@ export function MarketTable({ rows }: MarketTableProps) {
               </th>
               <th className='text-left py-3 px-4 font-medium text-card-foreground'>
                 Your Deposits
+              </th>
+              <th className='text-left py-3 px-4 font-medium text-card-foreground'>
+                Your Borrows
               </th>
               <th className='text-left py-3 px-4 font-medium text-card-foreground'>
                 Actions
@@ -121,6 +126,19 @@ export function MarketTable({ rows }: MarketTableProps) {
                     ).toLocaleString(undefined, {
                       maximumFractionDigits: 6,
                     })}{' '}
+                    {row.token.symbol}
+                  </div>
+                </td>
+
+                {/* Your Borrows */}
+                <td className='py-4 px-4'>
+                  <div className='font-mono text-card-foreground'>
+                    {fromWei(row.userBorrow, row.token.decimals).toLocaleString(
+                      undefined,
+                      {
+                        maximumFractionDigits: 6,
+                      }
+                    )}{' '}
                     {row.token.symbol}
                   </div>
                 </td>
