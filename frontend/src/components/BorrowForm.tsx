@@ -13,6 +13,7 @@ import {
   useWriteContract,
   useWaitForTransactionReceipt,
   usePublicClient,
+  useAccount,
 } from 'wagmi'
 
 import BORROW_MANAGER_ABI from '../abis/BorrowManager.json'
@@ -21,6 +22,7 @@ import type { Token } from '../lib/types'
 import MOCK_PYTH_ABI from '../abis/MockPyth.json'
 import type { RootState } from '../store/store'
 import { maxBorrow } from '@/store/interactions'
+import { useReadDepositManagerBalances } from '@/lib/hooks'
 
 const USE_MOCK_PYTH = import.meta.env.VITE_USE_MOCK_PYTH === 'true'
 const ETH_USDC_USDT_PRICE_IDS = [
@@ -94,7 +96,7 @@ interface BorrowFormProps {
   onClose: () => void
   selectedToken: Token
   tokenId?: `0x${string}`
-  //maxBorrowable: number
+  tokenIds?: `0x${string}`[]
   onTransactionComplete?: () => void
 }
 
@@ -103,10 +105,15 @@ export function BorrowForm({
   onClose,
   selectedToken,
   tokenId,
-  //maxBorrowable,
+  tokenIds,
   onTransactionComplete,
 }: BorrowFormProps) {
-  const [borrowAmount, setBorrowAmount] = useState('')
+  const { address } = useAccount()
+  const { data: deposits } = useReadDepositManagerBalances(
+    address! as `0x${string}`,
+    tokenIds!
+  )
+  console.log('deposits', deposits)
   const dispatch = useDispatch()
   const maxBorrowable = useSelector(
     (state: RootState) => state.borrowManager.maxBorrow
@@ -127,18 +134,21 @@ export function BorrowForm({
       hash: borrowData,
     })
 
-  // const calcMaxBorrowable = async (priceIds: string[]) => {
-  //   const prices = await getPrices(priceIds)
-  //   console.log('prices', prices)
-  //   dispatch(setMaxBorrow(1))
-  //   //return prices
-  // }
+  const [borrowAmount, setBorrowAmount] = useState('')
 
   // Calculate max borrowable when component mounts or when maxBorrowable is 0
   useEffect(() => {
-    if (maxBorrowable === undefined) {
-      maxBorrow(ETH_USDC_USDT_PRICE_IDS, dispatch)
-    }
+    //if (maxBorrowable === undefined) {
+    maxBorrow(
+      ETH_USDC_USDT_PRICE_IDS,
+      {
+        eth: deposits?.[0].result as bigint,
+        usdc: deposits?.[1].result as bigint,
+        usdt: deposits?.[2].result as bigint,
+      },
+      dispatch
+    )
+    //}
   }, [maxBorrowable, dispatch])
 
   // Handle transaction completion
