@@ -1,11 +1,23 @@
 import { fromWei } from '@/lib/utils'
-import { getLowestPrice, getPrices, type PriceUpdate } from '../lib/prices'
+import {
+  getHighestPrice,
+  getLowestPrice,
+  getPrices,
+  type PriceUpdate,
+} from '../lib/prices'
 import { setMaxBorrow } from './reducers/borrowManager'
 import type { AppDispatch } from './store'
 
+interface TokenBalances {
+  eth: bigint
+  usdc: bigint
+  usdt: bigint
+}
+
 export const maxBorrow = async (
   priceIds: string[],
-  deposits: { eth: bigint; usdc: bigint; usdt: bigint },
+  deposits: TokenBalances,
+  borrows: TokenBalances,
   dispatch: AppDispatch
 ) => {
   const priceUpdates: PriceUpdate = await getPrices(priceIds)
@@ -33,6 +45,18 @@ export const maxBorrow = async (
   const maxBorrow = (ethMaxBorrow + usdcMaxBorrow + usdtMaxBorrow) * 0.8
   console.log('maxBorrow', maxBorrow)
 
+  const ethHighestPrice = getHighestPrice(ethPrice)
+  const usdcHighestPrice = getHighestPrice(usdcPrice)
+  const usdtHighestPrice = getHighestPrice(usdtPrice)
+
+  const ethBorrowUsed = fromWei(borrows.eth, 18) * ethHighestPrice
+  const usdcBorrowUsed = fromWei(borrows.usdc, 6) * usdcHighestPrice
+  const usdtBorrowUsed = fromWei(borrows.usdt, 6) * usdtHighestPrice
+
+  const usedBorrow = ethBorrowUsed + usdcBorrowUsed + usdtBorrowUsed
+
+  const availableBorrow = maxBorrow - usedBorrow
+
   // TODO: maxBorrow should be in terms of the token being borrowed
-  dispatch(setMaxBorrow(maxBorrow))
+  dispatch(setMaxBorrow(availableBorrow))
 }

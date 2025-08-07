@@ -252,6 +252,7 @@ function App() {
               selectedToken={selectedToken}
               tokenId={selectedTokenData?.tokenId}
               tokenIds={tokenIds as `0x${string}`[]}
+              borrows={actualBorrows}
               onTransactionComplete={handleTransactionComplete}
             />
           </>

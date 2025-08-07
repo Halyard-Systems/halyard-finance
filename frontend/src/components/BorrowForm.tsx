@@ -97,6 +97,7 @@ interface BorrowFormProps {
   selectedToken: Token
   tokenId?: `0x${string}`
   tokenIds?: `0x${string}`[]
+  borrows?: bigint[]
   onTransactionComplete?: () => void
 }
 
@@ -106,6 +107,7 @@ export function BorrowForm({
   selectedToken,
   tokenId,
   tokenIds,
+  borrows,
   onTransactionComplete,
 }: BorrowFormProps) {
   const { address } = useAccount()
@@ -145,6 +147,11 @@ export function BorrowForm({
         eth: deposits?.[0].result as bigint,
         usdc: deposits?.[1].result as bigint,
         usdt: deposits?.[2].result as bigint,
+      },
+      {
+        eth: borrows?.[0] as bigint,
+        usdc: borrows?.[1] as bigint,
+        usdt: borrows?.[2] as bigint,
       },
       dispatch
     )
