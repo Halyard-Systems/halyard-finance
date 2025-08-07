@@ -11,6 +11,7 @@ contract DepositManager {
     // Asset configuration
     struct Asset {
         address tokenAddress;
+        string symbol;
         uint8 decimals;
         bool isActive;
         uint256 liquidityIndex;
@@ -118,6 +119,7 @@ contract DepositManager {
 
         assets[tokenId] = Asset({
             tokenAddress: tokenAddress,
+            symbol: symbol,
             decimals: decimals,
             isActive: true,
             liquidityIndex: RAY,

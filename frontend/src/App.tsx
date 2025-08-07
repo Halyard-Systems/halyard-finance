@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useAccount } from 'wagmi'
 import { useQueryClient } from '@tanstack/react-query'
 import { DepositForm } from './components/DepositForm'
@@ -7,56 +7,137 @@ import { MarketTable } from './components/MarketTable'
 import { Header } from './components/Header'
 import { Connect } from './components/Connect'
 import { BorrowForm } from './components/BorrowForm'
+import {
+  useReadAssets,
+  useReadDepositManagerBalances,
+  useReadSupportedTokens,
+} from './lib/hooks'
+import type { Asset, Token } from './lib/types'
 
 import TOKENS from './tokens.json'
 
-import { useTokenData } from './lib/queries'
-import type { Token } from './lib/types'
+const buildMarketRows = (
+  assets: Asset[],
+  tokens: Token[],
+  tokenIdMap: Map<string, `0x${string}`>,
+  userDeposits: bigint[],
+  setSelectedToken: (token: Token) => void,
+  setIsDepositModalOpen: (isOpen: boolean) => void,
+  setIsWithdrawModalOpen: (isOpen: boolean) => void,
+  setIsBorrowModalOpen: (isOpen: boolean) => void
+) => {
+  if (!assets) return []
+
+  return assets.map((asset, index) => {
+    const token = tokens.find((token) => token.symbol === asset.symbol)
+    const tokenId = tokenIdMap.get(token!.symbol)
+    const userDeposit = userDeposits[index]
+
+    const { depositApy, borrowApy } = calculateAPY(asset)
+
+    return {
+      token: token!,
+      tokenId,
+      deposits: asset.totalDeposits,
+      borrows: asset.totalBorrows,
+      depositApy,
+      borrowApy,
+      userDeposit,
+      onDeposit: () => {
+        setSelectedToken(token!)
+        setIsDepositModalOpen(true)
+      },
+      onWithdraw: () => {
+        setSelectedToken(token!)
+        setIsWithdrawModalOpen(true)
+      },
+      onBorrow: () => {
+        setSelectedToken(token!)
+        setIsBorrowModalOpen(true)
+      },
+    }
+  })
+}
+
+// TODO: Replace with contract interest rate model
+// Calculate APY from asset data
+const calculateAPY = (
+  asset: Asset | undefined
+): { depositApy: number; borrowApy: number } => {
+  if (!asset || asset.totalDeposits === 0n) {
+    return { depositApy: 0, borrowApy: 0 }
+  }
+
+  // Calculate utilization rate
+  const utilization =
+    Number((asset.totalBorrows * 10000n) / asset.totalDeposits) / 10000
+
+  // Simple APY calculation based on utilization
+  // In a real implementation, you'd use the contract's interest rate model
+  const baseRate = 0.025 // 2.5% base rate
+  const utilizationMultiplier = 1 + utilization * 2 // Higher utilization = higher rates
+
+  const depositApy = baseRate * utilizationMultiplier * 100
+  const borrowApy = depositApy * 1.5 // Borrow rate is typically higher than deposit rate
+
+  return { depositApy, borrowApy }
+}
 
 function App() {
+  const queryClient = useQueryClient()
+  const { address, isConnected } = useAccount()
+
+  // Supported tokens
+  const { data: tokenIds } = useReadSupportedTokens()
+
+  // Map the token symbols to their IDs
+  const tokenIdMap = useMemo(() => {
+    const tokenMap = new Map<string, `0x${string}`>()
+    if (!tokenIds || !Array.isArray(tokenIds)) return tokenMap
+
+    TOKENS.forEach((token, index) => {
+      const tokenId = tokenIds[index]
+      if (tokenId) {
+        tokenMap.set(token.symbol, tokenId as `0x${string}`)
+      }
+    })
+    return tokenMap
+  }, [tokenIds, TOKENS])
+
+  // Asset data
+  const { data: assets } = useReadAssets(tokenIds as `0x${string}`[])
+
+  // Deposits
+  const { data: depositManagerBalances } = useReadDepositManagerBalances(
+    address! as `0x${string}`,
+    tokenIds as `0x${string}`[]
+  )
+
   const [selectedToken, setSelectedToken] = useState<Token>(TOKENS[0])
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false)
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false)
   const [isBorrowModalOpen, setIsBorrowModalOpen] = useState(false)
-
-  const { address, isConnected } = useAccount()
-  const queryClient = useQueryClient()
-
-  // Get all token data using the custom hook
-  const tokenData = useTokenData(
-    TOKENS,
-    address ?? '0x0000000000000000000000000000000000000000'
-  )
 
   // Function to refresh all data after transaction completion
   const handleTransactionComplete = () => {
     queryClient.invalidateQueries()
   }
 
-  // Create market rows with real data for each token
-  const marketRows = tokenData.map((data) => ({
-    token: data.token,
-    deposits: data.deposits,
-    borrows: data.borrows,
-    depositApy: data.depositApy,
-    borrowApy: data.borrowApy,
-    userDeposits: data.userDeposits,
-    onDeposit: () => {
-      setSelectedToken(data.token)
-      setIsDepositModalOpen(true)
-    },
-    onWithdraw: () => {
-      setSelectedToken(data.token)
-      setIsWithdrawModalOpen(true)
-    },
-    onBorrow: () => {
-      setSelectedToken(data.token)
-      setIsBorrowModalOpen(true)
-    },
-  }))
+  const marketRows = buildMarketRows(
+    assets ? assets!.map((asset) => asset.result as Asset) : [],
+    TOKENS,
+    tokenIdMap,
+    depositManagerBalances
+      ? depositManagerBalances!.map((balance) => balance.result as bigint)
+      : [],
+    setSelectedToken,
+    setIsDepositModalOpen,
+    setIsWithdrawModalOpen,
+    setIsBorrowModalOpen
+  )
 
   // Get selected token data for modals
-  const selectedTokenData = tokenData.find(
+  const selectedTokenData = marketRows.find(
     (data) => data.token.symbol === selectedToken.symbol
   )
 
@@ -71,43 +152,40 @@ function App() {
           <>
             {/* Deposit & Borrow Section */}
             <MarketTable rows={marketRows} />
+
+            {/* Deposit Modal */}
+            <DepositForm
+              key={`deposit-${selectedToken.symbol}-${isDepositModalOpen}`}
+              isOpen={isDepositModalOpen}
+              onClose={() => setIsDepositModalOpen(false)}
+              selectedToken={selectedToken}
+              tokenId={selectedTokenData?.tokenId}
+              onTransactionComplete={handleTransactionComplete}
+            />
+
+            {/* Withdraw Modal */}
+            <WithdrawForm
+              key={`withdraw-${selectedToken.symbol}-${isWithdrawModalOpen}`}
+              isOpen={isWithdrawModalOpen}
+              onClose={() => setIsWithdrawModalOpen(false)}
+              selectedToken={selectedToken}
+              tokenId={selectedTokenData?.tokenId}
+              onTransactionComplete={handleTransactionComplete}
+            />
+
+            {/* Borrow Modal */}
+            <BorrowForm
+              key={`borrow-${selectedToken.symbol}-${isBorrowModalOpen}`}
+              isOpen={isBorrowModalOpen}
+              onClose={() => setIsBorrowModalOpen(false)}
+              selectedToken={selectedToken}
+              tokenId={selectedTokenData?.tokenId}
+              //maxBorrowable={selectedTokenData?.userDeposits ?? 0} // For now, use userDeposits as max borrowable
+              onTransactionComplete={handleTransactionComplete}
+            />
           </>
         )}
         {!isConnected && <Connect />}
-
-        {/* Deposit Modal */}
-        <DepositForm
-          key={`deposit-${selectedToken.symbol}-${isDepositModalOpen}`}
-          isOpen={isDepositModalOpen}
-          onClose={() => setIsDepositModalOpen(false)}
-          selectedToken={selectedToken}
-          tokenId={selectedTokenData?.tokenId}
-          walletBalance={selectedTokenData?.walletBalance ?? 0}
-          allowance={selectedTokenData?.allowance ?? 0}
-          onTransactionComplete={handleTransactionComplete}
-        />
-
-        {/* Withdraw Modal */}
-        <WithdrawForm
-          key={`withdraw-${selectedToken.symbol}-${isWithdrawModalOpen}`}
-          isOpen={isWithdrawModalOpen}
-          onClose={() => setIsWithdrawModalOpen(false)}
-          selectedToken={selectedToken}
-          tokenId={selectedTokenData?.tokenId}
-          depositedBalance={selectedTokenData?.userDeposits ?? 0}
-          onTransactionComplete={handleTransactionComplete}
-        />
-
-        {/* Borrow Modal */}
-        <BorrowForm
-          key={`borrow-${selectedToken.symbol}-${isBorrowModalOpen}`}
-          isOpen={isBorrowModalOpen}
-          onClose={() => setIsBorrowModalOpen(false)}
-          selectedToken={selectedToken}
-          tokenId={selectedTokenData?.tokenId}
-          //maxBorrowable={selectedTokenData?.userDeposits ?? 0} // For now, use userDeposits as max borrowable
-          onTransactionComplete={handleTransactionComplete}
-        />
       </main>
     </div>
   )
