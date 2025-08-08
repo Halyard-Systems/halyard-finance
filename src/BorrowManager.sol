@@ -23,12 +23,7 @@ contract BorrowManager {
         _;
     }
 
-    event Borrowed(
-        bytes32 indexed tokenId,
-        address indexed user,
-        uint256 amount,
-        uint256 collateralValueUsd
-    );
+    event Borrowed(bytes32 indexed tokenId, address indexed user, uint256 amount, uint256 collateralValueUsd);
     event Repaid(bytes32 indexed tokenId, address indexed user, uint256 amount);
 
     error PriceStale();
@@ -38,7 +33,7 @@ contract BorrowManager {
         depositMgr = DepositManager(payable(_depositMgr));
         pyth = IPyth(_pyth);
         owner = msg.sender;
-        ltv = 0.50e18;
+        ltv = 0.5e18;
     }
 
     function setLtv(uint256 _ltv) external onlyOwner {
@@ -51,14 +46,12 @@ contract BorrowManager {
     }
 
     // Called when a user borrows; updates Pyth only for this asset
-    function borrow(
-        bytes32 tokenId,
-        uint256 amount,
-        bytes[] calldata pythUpdateData,
-        bytes32[] calldata priceIds
-    ) external payable {
+    function borrow(bytes32 tokenId, uint256 amount, bytes[] calldata pythUpdateData, bytes32[] calldata priceIds)
+        external
+        payable
+    {
         // Pull latest price updates for all relevant assets
-        uint fee = pyth.getUpdateFee(pythUpdateData);
+        uint256 fee = pyth.getUpdateFee(pythUpdateData);
         pyth.updatePriceFeeds{value: fee}(pythUpdateData);
 
         bytes32[] memory tokens = depositMgr.getSupportedTokens();
@@ -70,8 +63,7 @@ contract BorrowManager {
         _updateBorrowIndex(tokenId);
 
         // Scale new borrow
-        uint256 scaledDelta = (amount * depositMgr.RAY()) /
-            borrowIndex[tokenId];
+        uint256 scaledDelta = (amount * depositMgr.RAY()) / borrowIndex[tokenId];
         console.log("Scaled delta", scaledDelta);
         userBorrowScaled[tokenId][msg.sender] += scaledDelta;
         totalBorrowScaled[tokenId] += scaledDelta;
@@ -81,7 +73,7 @@ contract BorrowManager {
         // Calculate new LTV after this borrow
         uint256 totalCollateralUsd = 0;
         uint256 totalBorrowUsd = 0;
-        for (uint i = 0; i < tokens.length; i++) {
+        for (uint256 i = 0; i < tokens.length; i++) {
             console.log("Token id");
             console.logBytes32(tokens[i]);
             bytes32 tid = tokens[i];
@@ -102,8 +94,7 @@ contract BorrowManager {
             // Borrow
             uint256 scaledBorrow = userBorrowScaled[tid][msg.sender];
             console.log("Scaled borrow", scaledBorrow);
-            uint256 userBorrowAmount = (scaledBorrow * borrowIndex[tid]) /
-                depositMgr.RAY();
+            uint256 userBorrowAmount = (scaledBorrow * borrowIndex[tid]) / depositMgr.RAY();
             console.log("User borrow amount", userBorrowAmount);
             totalBorrowUsd += (userBorrowAmount * priceUint) / 1e8;
         }
@@ -124,8 +115,7 @@ contract BorrowManager {
         // Accrue interest
         _updateBorrowIndex(tokenId);
         // Calculate scaled repayment
-        uint256 scaledRepay = (amount * depositMgr.RAY()) /
-            borrowIndex[tokenId];
+        uint256 scaledRepay = (amount * depositMgr.RAY()) / borrowIndex[tokenId];
         uint256 userScaled = userBorrowScaled[tokenId][msg.sender];
         require(scaledRepay <= userScaled, "Repay exceeds borrow");
         userBorrowScaled[tokenId][msg.sender] -= scaledRepay;
@@ -163,9 +153,7 @@ contract BorrowManager {
         }
 
         borrowIndex[tokenId] =
-            (borrowIndex[tokenId] *
-                (depositMgr.RAY() + (borrowRate * delta) / 365 days)) /
-            depositMgr.RAY();
+            (borrowIndex[tokenId] * (depositMgr.RAY() + (borrowRate * delta) / 365 days)) / depositMgr.RAY();
         console.log("Borrow index", borrowIndex[tokenId]);
         depositMgr.setLastBorrowTime(tokenId, block.timestamp);
     }

@@ -21,10 +21,8 @@ contract TransferTokens is Script {
     address constant USDT_WHALE = 0xF977814e90dA44bFA03b6295A0616a897441aceC;
 
     // Local contracts will be deployed to these addresses
-    address constant BORROW_MANAGER =
-        0x74ef79CFC735A10436eF9D4808547df0Ce38f788;
-    address payable constant DEPOSIT_MANAGER =
-        payable(0x2e590d65Dd357a7565EfB5ffB329F8465F18c494);
+    address constant BORROW_MANAGER = 0x74ef79CFC735A10436eF9D4808547df0Ce38f788;
+    address payable constant DEPOSIT_MANAGER = payable(0x2e590d65Dd357a7565EfB5ffB329F8465F18c494);
 
     address recipient = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
 
@@ -45,19 +43,10 @@ contract TransferTokens is Script {
         uint256 amountUSDT = 1_000_000e6; // 1000000 USDT, 6 decimals
 
         // Transfer USDT using low-level call (USDT doesn't return bool) USDT is not a standard ERC20 token
-        (bool successUSDT, ) = USDT.call(
-            abi.encodeWithSelector(
-                IERC20.transfer.selector,
-                recipient,
-                amountUSDT
-            )
-        );
+        (bool successUSDT,) = USDT.call(abi.encodeWithSelector(IERC20.transfer.selector, recipient, amountUSDT));
         require(successUSDT, "USDT Transfer failed");
 
-        console.log(
-            "Recipient USDT Balance",
-            IERC20(USDT).balanceOf(recipient)
-        );
+        console.log("Recipient USDT Balance", IERC20(USDT).balanceOf(recipient));
 
         vm.stopBroadcast();
 
@@ -68,10 +57,7 @@ contract TransferTokens is Script {
 
         // Deposit ETH in the DepositManager contract
         bytes32 ETH_TOKEN_ID = keccak256(abi.encodePacked("ETH"));
-        DepositManager(DEPOSIT_MANAGER).deposit{value: 10e18}(
-            ETH_TOKEN_ID,
-            10e18
-        );
+        DepositManager(DEPOSIT_MANAGER).deposit{value: 10e18}(ETH_TOKEN_ID, 10e18);
 
         console.log("Deposited 10 ETH in the DepositManager contract");
 

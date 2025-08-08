@@ -47,38 +47,17 @@ contract DepositManager {
     address public borrowManager;
 
     // Events
-    event TokenAdded(
-        bytes32 indexed tokenId,
-        address tokenAddress,
-        uint8 decimals
-    );
-    event TokenDeposited(
-        bytes32 indexed tokenId,
-        address indexed user,
-        uint256 amount
-    );
-    event TokenWithdrawn(
-        bytes32 indexed tokenId,
-        address indexed user,
-        uint256 amount
-    );
-    event TokenBorrowed(
-        bytes32 indexed tokenId,
-        address indexed user,
-        uint256 amount
-    );
+    event TokenAdded(bytes32 indexed tokenId, address tokenAddress, uint8 decimals);
+    event TokenDeposited(bytes32 indexed tokenId, address indexed user, uint256 amount);
+    event TokenWithdrawn(bytes32 indexed tokenId, address indexed user, uint256 amount);
+    event TokenBorrowed(bytes32 indexed tokenId, address indexed user, uint256 amount);
     event TotalBorrowsIncreased(bytes32 indexed tokenId, uint256 newTotal);
     event TotalBorrowsDecreased(bytes32 indexed tokenId, uint256 newTotal);
 
     // Custom errors
     error TokenNotSupported(bytes32 tokenId);
     error TokenNotActive(bytes32 tokenId);
-    error InsufficientBalance(
-        bytes32 tokenId,
-        address user,
-        uint256 requested,
-        uint256 available
-    );
+    error InsufficientBalance(bytes32 tokenId, address user, uint256 requested, uint256 available);
     error TransferFailed();
 
     constructor(address _stargateRouter, uint256 _poolId) {
@@ -112,10 +91,7 @@ contract DepositManager {
         uint256 reserveFactor
     ) external onlyOwner {
         bytes32 tokenId = keccak256(abi.encodePacked(symbol));
-        require(
-            assets[tokenId].tokenAddress == address(0),
-            "Token already exists"
-        );
+        require(assets[tokenId].tokenAddress == address(0), "Token already exists");
 
         assets[tokenId] = Asset({
             tokenAddress: tokenAddress,
@@ -152,52 +128,25 @@ contract DepositManager {
             }
 
             uint256 U = (asset.totalBorrows * 1e18) / asset.totalDeposits;
-            uint256 supplyRate = _calculateSupplyRate(
-                U,
-                asset.baseRate,
-                asset.slope1,
-                asset.slope2,
-                asset.kink,
-                asset.reserveFactor
-            );
+            uint256 supplyRate =
+                _calculateSupplyRate(U, asset.baseRate, asset.slope1, asset.slope2, asset.kink, asset.reserveFactor);
             uint256 accrued = (supplyRate * delta) / (365 days);
-            asset.liquidityIndex =
-                (asset.liquidityIndex * (RAY + accrued)) /
-                RAY;
+            asset.liquidityIndex = (asset.liquidityIndex * (RAY + accrued)) / RAY;
             asset.lastUpdateTimestamp = block.timestamp;
         }
     }
 
     // Add a private function for safe ERC20 transferFrom (handles USDT)
-    function _safeTransferFrom(
-        address token,
-        address from,
-        address to,
-        uint256 amount
-    ) private {
-        (bool success, bytes memory data) = token.call(
-            abi.encodeWithSelector(
-                IERC20.transferFrom.selector,
-                from,
-                to,
-                amount
-            )
-        );
-        require(
-            success && (data.length == 0 || abi.decode(data, (bool))),
-            "TransferFrom failed"
-        );
+    function _safeTransferFrom(address token, address from, address to, uint256 amount) private {
+        (bool success, bytes memory data) =
+            token.call(abi.encodeWithSelector(IERC20.transferFrom.selector, from, to, amount));
+        require(success && (data.length == 0 || abi.decode(data, (bool))), "TransferFrom failed");
     }
 
     // Add a private function for safe ERC20 transfer (handles USDT)
     function _safeTransfer(address token, address to, uint256 amount) private {
-        (bool success, bytes memory data) = token.call(
-            abi.encodeWithSelector(IERC20.transfer.selector, to, amount)
-        );
-        require(
-            success && (data.length == 0 || abi.decode(data, (bool))),
-            "Transfer failed"
-        );
+        (bool success, bytes memory data) = token.call(abi.encodeWithSelector(IERC20.transfer.selector, to, amount));
+        require(success && (data.length == 0 || abi.decode(data, (bool))), "Transfer failed");
     }
 
     function deposit(bytes32 tokenId, uint256 amount) external payable {
@@ -213,12 +162,7 @@ contract DepositManager {
         } else {
             // Handle ERC20 token deposits
             require(msg.value == 0, "ETH not accepted for ERC20 deposits");
-            _safeTransferFrom(
-                config.tokenAddress,
-                msg.sender,
-                address(this),
-                amount
-            );
+            _safeTransferFrom(config.tokenAddress, msg.sender, address(this), amount);
         }
 
         console.log("Deposited amount:", amount);
@@ -240,16 +184,10 @@ contract DepositManager {
         _updateLiquidityIndex(tokenId);
 
         uint256 scaled = (amount * RAY) / config.liquidityIndex;
-        uint256 userScaledBalance = userBalances[tokenId][msg.sender]
-            .scaledBalance;
+        uint256 userScaledBalance = userBalances[tokenId][msg.sender].scaledBalance;
 
         if (scaled > userScaledBalance) {
-            revert InsufficientBalance(
-                tokenId,
-                msg.sender,
-                amount,
-                balanceOf(tokenId, msg.sender)
-            );
+            revert InsufficientBalance(tokenId, msg.sender, amount, balanceOf(tokenId, msg.sender));
         }
 
         userBalances[tokenId][msg.sender].scaledBalance -= scaled;
@@ -259,7 +197,7 @@ contract DepositManager {
         // Transfer tokens to user
         if (config.tokenAddress == address(0)) {
             // Handle ETH withdrawals
-            (bool success, ) = payable(msg.sender).call{value: amount}("");
+            (bool success,) = payable(msg.sender).call{value: amount}("");
             if (!success) revert TransferFailed();
         } else {
             // Handle ERC20 token withdrawals
@@ -269,16 +207,11 @@ contract DepositManager {
         emit TokenWithdrawn(tokenId, msg.sender, amount);
     }
 
-    function balanceOf(
-        bytes32 tokenId,
-        address user
-    ) public view returns (uint256) {
+    function balanceOf(bytes32 tokenId, address user) public view returns (uint256) {
         Asset storage config = assets[tokenId];
         if (!config.isActive) revert TokenNotActive(tokenId);
 
-        return
-            (userBalances[tokenId][user].scaledBalance *
-                config.liquidityIndex) / RAY;
+        return (userBalances[tokenId][user].scaledBalance * config.liquidityIndex) / RAY;
     }
 
     function getAsset(bytes32 tokenId) external view returns (Asset memory) {
@@ -315,10 +248,7 @@ contract DepositManager {
         if (U <= kink) {
             borrowRate = baseRate + ((slope1 * U) / kink);
         } else {
-            borrowRate =
-                baseRate +
-                slope1 +
-                ((slope2 * (U - kink)) / (1e18 - kink));
+            borrowRate = baseRate + slope1 + ((slope2 * (U - kink)) / (1e18 - kink));
         }
         uint256 netRate = (borrowRate * (RAY - reserveFactor)) / RAY;
         // When U = 0, return 0 (no supply rate when no utilization)
@@ -326,13 +256,11 @@ contract DepositManager {
         return (netRate * U) / RAY;
     }
 
-    function _calculateBorrowRate(
-        uint256 U,
-        uint256 baseRate,
-        uint256 slope1,
-        uint256 slope2,
-        uint256 kink
-    ) internal pure returns (uint256) {
+    function _calculateBorrowRate(uint256 U, uint256 baseRate, uint256 slope1, uint256 slope2, uint256 kink)
+        internal
+        pure
+        returns (uint256)
+    {
         console.log("Borrow rate calculation - Base rate", baseRate);
         console.log("Borrow rate calculation - Slope1", slope1);
         console.log("Borrow rate calculation - Slope2", slope2);
@@ -343,24 +271,17 @@ contract DepositManager {
         if (U <= kink) {
             borrowRate = baseRate + ((slope1 * U) / kink);
         } else {
-            borrowRate =
-                baseRate +
-                slope1 +
-                ((slope2 * (U - kink)) / (1e18 - kink));
+            borrowRate = baseRate + slope1 + ((slope2 * (U - kink)) / (1e18 - kink));
         }
         console.log("Borrow rate calculation - Final borrow rate", borrowRate);
         return borrowRate;
     }
 
-    function transferOut(
-        bytes32 tokenId,
-        address to,
-        uint256 amount
-    ) external onlyBorrowManager {
+    function transferOut(bytes32 tokenId, address to, uint256 amount) external onlyBorrowManager {
         Asset storage config = assets[tokenId];
         if (!config.isActive) revert TokenNotActive(tokenId);
         if (config.tokenAddress == address(0)) {
-            (bool success, ) = payable(to).call{value: amount}("");
+            (bool success,) = payable(to).call{value: amount}("");
             if (!success) revert TransferFailed();
         } else {
             _safeTransfer(config.tokenAddress, to, amount);
@@ -368,11 +289,7 @@ contract DepositManager {
     }
 
     // Allow BorrowManager to transfer tokens/ETH from user to protocol for repay
-    function transferIn(
-        bytes32 tokenId,
-        address from,
-        uint256 amount
-    ) external payable onlyBorrowManager {
+    function transferIn(bytes32 tokenId, address from, uint256 amount) external payable onlyBorrowManager {
         Asset storage config = assets[tokenId];
         if (!config.isActive) revert TokenNotActive(tokenId);
         if (config.tokenAddress == address(0)) {
@@ -384,43 +301,24 @@ contract DepositManager {
         }
     }
 
-    function calculateBorrowRate(
-        bytes32 tokenId,
-        uint256 U
-    ) external view returns (uint256) {
+    function calculateBorrowRate(bytes32 tokenId, uint256 U) external view returns (uint256) {
         Asset storage config = assets[tokenId];
-        return
-            _calculateBorrowRate(
-                U,
-                config.baseRate,
-                config.slope1,
-                config.slope2,
-                config.kink
-            );
+        return _calculateBorrowRate(U, config.baseRate, config.slope1, config.slope2, config.kink);
     }
 
-    function setLastBorrowTime(
-        bytes32 tokenId,
-        uint256 timestamp
-    ) external onlyBorrowManager {
+    function setLastBorrowTime(bytes32 tokenId, uint256 timestamp) external onlyBorrowManager {
         Asset storage config = assets[tokenId];
         config.lastUpdateTimestamp = timestamp;
     }
 
-    function incrementTotalBorrows(
-        bytes32 tokenId,
-        uint256 amount
-    ) external onlyBorrowManager {
+    function incrementTotalBorrows(bytes32 tokenId, uint256 amount) external onlyBorrowManager {
         Asset storage config = assets[tokenId];
         if (!config.isActive) revert TokenNotActive(tokenId);
         config.totalBorrows += amount;
         emit TotalBorrowsIncreased(tokenId, config.totalBorrows);
     }
 
-    function decrementTotalBorrows(
-        bytes32 tokenId,
-        uint256 amount
-    ) external onlyBorrowManager {
+    function decrementTotalBorrows(bytes32 tokenId, uint256 amount) external onlyBorrowManager {
         Asset storage config = assets[tokenId];
         if (!config.isActive) revert TokenNotActive(tokenId);
         require(config.totalBorrows >= amount, "totalBorrows underflow");
@@ -436,7 +334,7 @@ contract DepositManager {
         uint256 balance;
         if (config.tokenAddress == address(0)) {
             balance = address(this).balance;
-            (bool success, ) = payable(to).call{value: balance}("");
+            (bool success,) = payable(to).call{value: balance}("");
             if (!success) revert TransferFailed();
         } else {
             balance = IERC20(config.tokenAddress).balanceOf(address(this));
