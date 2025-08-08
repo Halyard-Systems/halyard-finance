@@ -15,7 +15,7 @@ import {
 } from 'wagmi'
 
 import DEPOSIT_MANAGER_ABI from '../abis/DepositManager.json'
-import { fromWei, toWei } from '../lib/utils'
+import { fromWei, toWei, formatTransactionError } from '../lib/utils'
 import { useReadDepositManagerBalance } from '../lib/hooks'
 import type { Token } from '../lib/types'
 
@@ -25,6 +25,7 @@ interface WithdrawFormProps {
   selectedToken: Token
   tokenId?: `0x${string}`
   onTransactionComplete?: () => void
+  onTransactionError?: (error: string) => void
 }
 
 export function WithdrawForm({
@@ -33,6 +34,7 @@ export function WithdrawForm({
   selectedToken,
   tokenId,
   onTransactionComplete,
+  onTransactionError,
 }: WithdrawFormProps) {
   const { address } = useAccount()
 
@@ -56,10 +58,14 @@ export function WithdrawForm({
   } = useWriteContract()
 
   // Wait for transaction receipt and handle completion
-  const { isLoading: isConfirming, isSuccess: isConfirmed } =
-    useWaitForTransactionReceipt({
-      hash: withdrawData,
-    })
+  const {
+    isLoading: isConfirming,
+    isSuccess: isConfirmed,
+    isError: isTransactionError,
+    error: transactionError,
+  } = useWaitForTransactionReceipt({
+    hash: withdrawData,
+  })
 
   // Handle transaction completion
   useEffect(() => {
@@ -71,6 +77,14 @@ export function WithdrawForm({
       onTransactionComplete?.()
     }
   }, [isConfirmed, onTransactionComplete, onClose])
+
+  // Handle transaction errors
+  useEffect(() => {
+    if (isTransactionError && transactionError) {
+      const formattedError = formatTransactionError(transactionError.message)
+      onTransactionError?.(formattedError)
+    }
+  }, [isTransactionError, transactionError, onTransactionError])
 
   const handleWithdraw = async () => {
     if (!withdrawAmount || !address || !tokenId) {
@@ -96,7 +110,7 @@ export function WithdrawForm({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className='sm:max-w-md'>
+      <DialogContent className='sm:max-w-md max-h-[90vh] overflow-y-auto'>
         <DialogHeader>
           <DialogTitle>Withdraw {selectedToken.symbol}</DialogTitle>
           <DialogDescription>
@@ -105,30 +119,30 @@ export function WithdrawForm({
           </DialogDescription>
         </DialogHeader>
 
-        <div className='space-y-4'>
+        <div className='space-y-4 min-w-0'>
           {/* Token Info */}
-          <div className='flex items-center space-x-2 p-3 bg-muted rounded-md'>
+          <div className='flex items-center space-x-2 p-3 bg-muted rounded-md min-w-0'>
             <img
               src={selectedToken.icon}
               alt={`${selectedToken.symbol} icon`}
-              className='w-6 h-6'
+              className='w-6 h-6 flex-shrink-0'
             />
-            <div>
-              <div className='font-medium text-card-foreground'>
+            <div className='min-w-0 flex-1'>
+              <div className='font-medium text-card-foreground truncate'>
                 {selectedToken.symbol}
               </div>
-              <div className='text-sm text-muted-foreground'>
+              <div className='text-sm text-muted-foreground truncate'>
                 {selectedToken.name}
               </div>
             </div>
           </div>
 
           {/* Amount Input */}
-          <div>
+          <div className='min-w-0'>
             <label className='block text-sm font-medium text-card-foreground mb-2'>
               Amount ({selectedToken.symbol})
             </label>
-            <p className='text-sm text-muted-foreground mb-2'>
+            <p className='text-sm text-muted-foreground mb-2 break-words'>
               Available to withdraw:{' '}
               {depositedBalance.toLocaleString(undefined, {
                 maximumFractionDigits: 6,
@@ -147,8 +161,25 @@ export function WithdrawForm({
 
           {/* Error Display */}
           {withdrawError && (
-            <div className='text-sm text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded-md'>
-              Error: {withdrawError?.message}
+            <div className='text-sm text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded-md min-w-0'>
+              <div className='flex items-start space-x-2'>
+                <div className='flex-shrink-0 mt-0.5'>
+                  <svg
+                    className='w-4 h-4'
+                    fill='currentColor'
+                    viewBox='0 0 20 20'
+                  >
+                    <path
+                      fillRule='evenodd'
+                      d='M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z'
+                      clipRule='evenodd'
+                    />
+                  </svg>
+                </div>
+                <div className='flex-1 break-words leading-relaxed'>
+                  {formatTransactionError(withdrawError?.message || '')}
+                </div>
+              </div>
             </div>
           )}
         </div>
