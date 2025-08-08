@@ -20,6 +20,15 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
 
+      - name: Install pnpm
+        run: |
+          npm install -g pnpm
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          pnpm install
+
       - name: Show Forge version
         run: |
           forge --version
