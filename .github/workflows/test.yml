@@ -26,7 +26,6 @@ jobs:
 
       - name: Install dependencies
         run: |
-          cd frontend
           pnpm install
 
       - name: Show Forge version
