@@ -10,6 +10,9 @@ import { BorrowForm } from './components/BorrowForm'
 import {
   useReadAssets,
   useReadDepositManagerBalances,
+  useReadBorrowManagerBalances,
+  useReadBorrowIndices,
+  useReadRay,
   useReadSupportedTokens,
 } from './lib/hooks'
 import type { Asset, Token } from './lib/types'
@@ -21,6 +24,7 @@ const buildMarketRows = (
   tokens: Token[],
   tokenIdMap: Map<string, `0x${string}`>,
   userDeposits: bigint[],
+  userBorrows: bigint[],
   setSelectedToken: (token: Token) => void,
   setIsDepositModalOpen: (isOpen: boolean) => void,
   setIsWithdrawModalOpen: (isOpen: boolean) => void,
@@ -32,6 +36,7 @@ const buildMarketRows = (
     const token = tokens.find((token) => token.symbol === asset.symbol)
     const tokenId = tokenIdMap.get(token!.symbol)
     const userDeposit = userDeposits[index]
+    const userBorrow = userBorrows[index]
 
     const { depositApy, borrowApy } = calculateAPY(asset)
 
@@ -43,6 +48,7 @@ const buildMarketRows = (
       depositApy,
       borrowApy,
       userDeposit,
+      userBorrow,
       onDeposit: () => {
         setSelectedToken(token!)
         setIsDepositModalOpen(true)
@@ -113,6 +119,70 @@ function App() {
     tokenIds as `0x${string}`[]
   )
 
+  // Borrows (scaled)
+  const { data: borrowManagerBalances } = useReadBorrowManagerBalances(
+    address! as `0x${string}`,
+    tokenIds as `0x${string}`[]
+  )
+
+  // Borrow indices
+  const { data: borrowIndices } = useReadBorrowIndices(
+    tokenIds as `0x${string}`[]
+  )
+
+  // RAY constant
+  const { data: ray } = useReadRay()
+
+  // Calculate actual borrowed amounts
+  const actualBorrows = useMemo(() => {
+    if (
+      !borrowManagerBalances ||
+      !borrowIndices ||
+      !ray ||
+      !tokenIds ||
+      !Array.isArray(tokenIds)
+    ) {
+      return new Array(0).fill(0n)
+    }
+
+    return borrowManagerBalances.map((balance, index) => {
+      console.log('=== Token', index, 'Borrow Calculation ===')
+      console.log('balance', balance)
+      console.log('borrowIndices', borrowIndices)
+      console.log('ray', ray)
+
+      const scaledBorrow = BigInt((balance as any).result || 0)
+      const borrowIndex = BigInt((borrowIndices[index] as any).result || 0)
+      const rayValue = BigInt((ray as any) || 0)
+
+      console.log('scaledBorrow (raw):', scaledBorrow.toString())
+      console.log('borrowIndex (raw):', borrowIndex.toString())
+      console.log('rayValue (raw):', rayValue.toString())
+
+      // If no borrows, return 0
+      if (scaledBorrow === 0n) {
+        console.log('No borrows found, returning 0')
+        return 0n
+      }
+
+      // If borrow index is 0, it means no borrows have happened yet
+      // In this case, use RAY as the borrow index (matches contract initialization)
+      const effectiveBorrowIndex = borrowIndex === 0n ? rayValue : borrowIndex
+      console.log('effectiveBorrowIndex:', effectiveBorrowIndex.toString())
+
+      // Calculate actual borrow: (scaledBorrow * effectiveBorrowIndex) / RAY
+      const result = (scaledBorrow * effectiveBorrowIndex) / rayValue
+      console.log('Final calculated result:', result.toString())
+      console.log(
+        'Result in human readable:',
+        Number(result) / Math.pow(10, 18)
+      )
+      console.log('=====================================')
+
+      return result
+    })
+  }, [borrowManagerBalances, borrowIndices, ray, tokenIds])
+
   const [selectedToken, setSelectedToken] = useState<Token>(TOKENS[0])
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false)
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false)
@@ -130,6 +200,7 @@ function App() {
     depositManagerBalances
       ? depositManagerBalances!.map((balance) => balance.result as bigint)
       : [],
+    actualBorrows,
     setSelectedToken,
     setIsDepositModalOpen,
     setIsWithdrawModalOpen,
@@ -180,7 +251,8 @@ function App() {
               onClose={() => setIsBorrowModalOpen(false)}
               selectedToken={selectedToken}
               tokenId={selectedTokenData?.tokenId}
-              //maxBorrowable={selectedTokenData?.userDeposits ?? 0} // For now, use userDeposits as max borrowable
+              tokenIds={tokenIds as `0x${string}`[]}
+              borrows={actualBorrows}
               onTransactionComplete={handleTransactionComplete}
             />
           </>

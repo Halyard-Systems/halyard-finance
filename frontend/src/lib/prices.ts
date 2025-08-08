@@ -50,10 +50,20 @@ export const getPrices = async (priceIds: string[]): Promise<PriceUpdate> => {
   return (await connection.getLatestPriceUpdates(priceIds)) as PriceUpdate
 }
 
+export const getHighestPrice = (price: Price) => {
+  const priceValue = parseFloat(price.price) * Math.pow(10, price.expo)
+  const confidence = parseFloat(price.conf) * Math.pow(10, price.expo)
+
+  const highestPrice = priceValue + confidence
+
+  return highestPrice
+}
+
 export const getLowestPrice = (price: Price) => {
   // Calculate the lowest acceptable price based on confidence interval
-  const priceValue = parseFloat(price.price)
-  const confidence = parseFloat(price.conf)
+  // Use the exponent to properly scale the values
+  const priceValue = parseFloat(price.price) * Math.pow(10, price.expo)
+  const confidence = parseFloat(price.conf) * Math.pow(10, price.expo)
 
   // The lowest price is the current price minus the confidence interval
   // This accounts for the uncertainty in the price feed

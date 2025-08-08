@@ -12,7 +12,7 @@ import {
 import ERC20_ABI from '../abis/ERC20.json'
 import DEPOSIT_MANAGER_ABI from '../abis/DepositManager.json'
 import type { Token } from '../lib/types'
-import { toWei, fromWei } from '../lib/utils'
+import { toWei, fromWei, formatTransactionError } from '../lib/utils'
 
 import {
   useAccount,
@@ -31,6 +31,7 @@ interface DepositFormProps {
   selectedToken: Token
   tokenId?: `0x${string}`
   onTransactionComplete?: () => void
+  onTransactionError?: (error: string) => void
 }
 
 export function DepositForm({
@@ -39,6 +40,7 @@ export function DepositForm({
   selectedToken,
   tokenId,
   onTransactionComplete,
+  onTransactionError,
 }: DepositFormProps) {
   const { address } = useAccount()
 
@@ -94,15 +96,23 @@ export function DepositForm({
   } = useWriteContract()
 
   // Wait for transaction receipts and handle completion
-  const { isLoading: isApprovalConfirming, isSuccess: isApprovalConfirmed } =
-    useWaitForTransactionReceipt({
-      hash: approvalData,
-    })
+  const {
+    isLoading: isApprovalConfirming,
+    isSuccess: isApprovalConfirmed,
+    isError: isApprovalError,
+    error: approvalTransactionError,
+  } = useWaitForTransactionReceipt({
+    hash: approvalData,
+  })
 
-  const { isLoading: isDepositConfirming, isSuccess: isDepositConfirmed } =
-    useWaitForTransactionReceipt({
-      hash: depositData,
-    })
+  const {
+    isLoading: isDepositConfirming,
+    isSuccess: isDepositConfirmed,
+    isError: isDepositError,
+    error: depositTransactionError,
+  } = useWaitForTransactionReceipt({
+    hash: depositData,
+  })
 
   // Handle approval completion
   useEffect(() => {
@@ -122,6 +132,25 @@ export function DepositForm({
       onTransactionComplete?.()
     }
   }, [isDepositConfirmed, onTransactionComplete, onClose])
+
+  // Handle transaction errors
+  useEffect(() => {
+    if (isApprovalError && approvalTransactionError) {
+      const formattedError = formatTransactionError(
+        approvalTransactionError.message
+      )
+      onTransactionError?.(formattedError)
+    }
+  }, [isApprovalError, approvalTransactionError, onTransactionError])
+
+  useEffect(() => {
+    if (isDepositError && depositTransactionError) {
+      const formattedError = formatTransactionError(
+        depositTransactionError.message
+      )
+      onTransactionError?.(formattedError)
+    }
+  }, [isDepositError, depositTransactionError, onTransactionError])
 
   const handleApproval = async () => {
     if (!depositAmount || !address || isETH) {
@@ -185,7 +214,7 @@ export function DepositForm({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className='sm:max-w-xl w-[95vw] max-w-[600px]'>
+      <DialogContent className='sm:max-w-xl w-[95vw] max-w-[600px] max-h-[90vh] overflow-y-auto'>
         <DialogHeader>
           <DialogTitle>Deposit {selectedToken.symbol}</DialogTitle>
           <DialogDescription>
@@ -194,9 +223,9 @@ export function DepositForm({
           </DialogDescription>
         </DialogHeader>
 
-        <div className='space-y-4 w-full'>
+        <div className='space-y-4 w-full min-w-0'>
           {/* Token Display */}
-          <div className='w-full'>
+          <div className='w-full min-w-0'>
             <label className='block text-sm font-medium text-card-foreground mb-2'>
               Token
             </label>
@@ -216,11 +245,11 @@ export function DepositForm({
           </div>
 
           {/* Amount Input */}
-          <div>
+          <div className='min-w-0'>
             <label className='block text-sm font-medium text-card-foreground mb-2'>
               Amount ({selectedToken.symbol})
             </label>
-            <p className='text-sm text-muted-foreground mb-2'>
+            <p className='text-sm text-muted-foreground mb-2 break-words'>
               Available:{' '}
               {walletBalance.toLocaleString(undefined, {
                 maximumFractionDigits: 6,
@@ -243,8 +272,8 @@ export function DepositForm({
 
           {/* Approval Status */}
           {depositAmount && !isETH && (
-            <div className='text-sm text-muted-foreground p-3 bg-muted rounded-md w-full'>
-              <div className='space-y-2 w-full'>
+            <div className='text-sm text-muted-foreground p-3 bg-muted rounded-md w-full min-w-0'>
+              <div className='space-y-2 w-full min-w-0'>
                 <div className='flex justify-between items-center w-full min-w-0'>
                   <span className='truncate mr-2'>
                     DepositManager allowance:
@@ -270,8 +299,27 @@ export function DepositForm({
 
           {/* Error Display */}
           {(approvalError || depositError) && (
-            <div className='text-sm text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded-md'>
-              Error: {(approvalError || depositError)?.message}
+            <div className='text-sm text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded-md min-w-0'>
+              <div className='flex items-start space-x-2'>
+                <div className='flex-shrink-0 mt-0.5'>
+                  <svg
+                    className='w-4 h-4'
+                    fill='currentColor'
+                    viewBox='0 0 20 20'
+                  >
+                    <path
+                      fillRule='evenodd'
+                      d='M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z'
+                      clipRule='evenodd'
+                    />
+                  </svg>
+                </div>
+                <div className='flex-1 break-words leading-relaxed'>
+                  {formatTransactionError(
+                    (approvalError || depositError)?.message || ''
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </div>

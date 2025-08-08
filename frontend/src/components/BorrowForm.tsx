@@ -13,14 +13,16 @@ import {
   useWriteContract,
   useWaitForTransactionReceipt,
   usePublicClient,
+  useAccount,
 } from 'wagmi'
 
 import BORROW_MANAGER_ABI from '../abis/BorrowManager.json'
-import { toWei } from '../lib/utils'
+import { toWei, formatTransactionError } from '../lib/utils'
 import type { Token } from '../lib/types'
 import MOCK_PYTH_ABI from '../abis/MockPyth.json'
 import type { RootState } from '../store/store'
 import { maxBorrow } from '@/store/interactions'
+import { useReadDepositManagerBalances } from '@/lib/hooks'
 
 const USE_MOCK_PYTH = import.meta.env.VITE_USE_MOCK_PYTH === 'true'
 const ETH_USDC_USDT_PRICE_IDS = [
@@ -47,55 +49,15 @@ async function fetchPythUpdateDataFromHermes(
   return [hex]
 }
 
-// Helper to create MockPyth update data - simplified approach
-// async function createMockPythUpdateData(
-//   publicClient: any,
-//   priceId: string
-// ): Promise<string> {
-//   // Example arguments for the mock; adjust as needed
-//   const price = 123 * 1e8 // Price in fixed-point format (123 USD with 8 decimals)
-//   const conf = 100 // Confidence interval
-//   const expo = -8 // Exponent for fixed-point representation
-//   const emaPrice = 123 * 1e8 // EMA price in fixed-point format
-//   const emaConf = 100 // EMA confidence interval
-//   const publishTime = Math.floor(Date.now() / 1000)
-//   const prevPublishTime = publishTime - 60
-
-//   // Create the price feed data manually to match what updatePriceFeeds expects
-//   // MockPyth.updatePriceFeeds expects just the PriceFeed struct, not (PriceFeed, prevPublishTime)
-//   const priceFeed = {
-//     id: priceId,
-//     price: {
-//       price: price,
-//       conf: conf,
-//       expo: expo,
-//       publishTime: publishTime,
-//     },
-//     emaPrice: {
-//       price: emaPrice,
-//       conf: emaConf,
-//       expo: expo,
-//       publishTime: publishTime,
-//     },
-//   }
-
-//   // For now, let's use a simpler approach - just return empty data
-//   // and rely on the price feeds that are already set up in deployment
-//   console.log('Creating mock price feed data for:', priceId)
-//   console.log('Price feed:', priceFeed)
-
-//   // Return empty data to avoid the encoding issue
-//   // The price feeds should already be set up in the deployment script
-//   return '0x'
-// }
-
 interface BorrowFormProps {
   isOpen: boolean
   onClose: () => void
   selectedToken: Token
   tokenId?: `0x${string}`
-  //maxBorrowable: number
+  tokenIds?: `0x${string}`[]
+  borrows?: bigint[]
   onTransactionComplete?: () => void
+  onTransactionError?: (error: string) => void
 }
 
 export function BorrowForm({
@@ -103,10 +65,17 @@ export function BorrowForm({
   onClose,
   selectedToken,
   tokenId,
-  //maxBorrowable,
+  tokenIds,
+  borrows,
   onTransactionComplete,
+  onTransactionError,
 }: BorrowFormProps) {
-  const [borrowAmount, setBorrowAmount] = useState('')
+  const { address } = useAccount()
+  const { data: deposits } = useReadDepositManagerBalances(
+    address! as `0x${string}`,
+    tokenIds!
+  )
+  console.log('deposits', deposits)
   const dispatch = useDispatch()
   const maxBorrowable = useSelector(
     (state: RootState) => state.borrowManager.maxBorrow
@@ -122,38 +91,71 @@ export function BorrowForm({
   } = useWriteContract()
 
   // Wait for transaction receipt and handle completion
-  const { isLoading: isConfirming, isSuccess: isConfirmed } =
-    useWaitForTransactionReceipt({
-      hash: borrowData,
-    })
+  const {
+    isLoading: isConfirming,
+    isSuccess: isConfirmed,
+    isError: isTransactionError,
+    error: transactionError,
+  } = useWaitForTransactionReceipt({
+    hash: borrowData,
+  })
 
-  // const calcMaxBorrowable = async (priceIds: string[]) => {
-  //   const prices = await getPrices(priceIds)
-  //   console.log('prices', prices)
-  //   dispatch(setMaxBorrow(1))
-  //   //return prices
-  // }
+  const [borrowAmount, setBorrowAmount] = useState('')
+  const [customError, setCustomError] = useState<string | null>(null)
 
   // Calculate max borrowable when component mounts or when maxBorrowable is 0
   useEffect(() => {
-    if (maxBorrowable === undefined) {
-      maxBorrow(ETH_USDC_USDT_PRICE_IDS, dispatch)
-    }
+    //if (maxBorrowable === undefined) {
+    maxBorrow(
+      ETH_USDC_USDT_PRICE_IDS,
+      {
+        eth: deposits?.[0].result as bigint,
+        usdc: deposits?.[1].result as bigint,
+        usdt: deposits?.[2].result as bigint,
+      },
+      {
+        eth: borrows?.[0] as bigint,
+        usdc: borrows?.[1] as bigint,
+        usdt: borrows?.[2] as bigint,
+      },
+      dispatch
+    )
+    //}
   }, [maxBorrowable, dispatch])
 
   // Handle transaction completion
   useEffect(() => {
     if (isConfirmed) {
-      // Clear the input after successful borrow
+      // Clear the input and errors after successful borrow
       setBorrowAmount('')
+      setCustomError(null)
       onClose()
       // Trigger data refresh
       onTransactionComplete?.()
     }
   }, [isConfirmed, onTransactionComplete, onClose])
 
+  // Handle transaction errors
+  useEffect(() => {
+    if (isTransactionError && transactionError) {
+      const formattedError = formatTransactionError(transactionError.message)
+      setCustomError(formattedError)
+      onTransactionError?.(formattedError)
+    }
+  }, [isTransactionError, transactionError, onTransactionError])
+
+  // Clear errors when modal opens/closes
+  useEffect(() => {
+    if (isOpen) {
+      setCustomError(null)
+    }
+  }, [isOpen])
+
   const handleBorrow = async () => {
     try {
+      // Clear any previous errors
+      setCustomError(null)
+
       if (!publicClient) {
         throw new Error('Public client not available')
       }
@@ -166,9 +168,17 @@ export function BorrowForm({
         // Use empty arrays since price feeds are already set up in deployment
         pythUpdateData = []
       } else {
-        pythUpdateData = await fetchPythUpdateDataFromHermes(
-          ETH_USDC_USDT_PRICE_IDS
-        )
+        try {
+          pythUpdateData = await fetchPythUpdateDataFromHermes(
+            ETH_USDC_USDT_PRICE_IDS
+          )
+        } catch (error) {
+          throw new Error(
+            `Failed to fetch price data: ${
+              error instanceof Error ? error.message : 'Unknown error'
+            }`
+          )
+        }
       }
 
       // Calculate the required fee for Pyth update
@@ -177,12 +187,20 @@ export function BorrowForm({
         // For MockPyth with empty update data, fee is 0
         fee = 0n
       } else {
-        fee = (await publicClient.readContract({
-          address: import.meta.env.VITE_MOCK_PYTH_ADDRESS as `0x${string}`,
-          abi: MOCK_PYTH_ABI,
-          functionName: 'getUpdateFee',
-          args: [pythUpdateData],
-        })) as bigint
+        try {
+          fee = (await publicClient.readContract({
+            address: import.meta.env.VITE_MOCK_PYTH_ADDRESS as `0x${string}`,
+            abi: MOCK_PYTH_ABI,
+            functionName: 'getUpdateFee',
+            args: [pythUpdateData],
+          })) as bigint
+        } catch (error) {
+          throw new Error(
+            `Failed to calculate fee: ${
+              error instanceof Error ? error.message : 'Unknown error'
+            }`
+          )
+        }
       }
 
       await writeBorrow({
@@ -194,12 +212,27 @@ export function BorrowForm({
       })
     } catch (error) {
       console.error('Borrow failed:', error)
+      const rawErrorMessage =
+        error instanceof Error ? error.message : 'Unknown error'
+      const formattedError = formatTransactionError(rawErrorMessage)
+      setCustomError(formattedError)
+      onTransactionError?.(formattedError)
     }
+  }
+
+  // Combine all error sources (prefer formatted customError; otherwise format raw messages)
+  let displayError: string | null = null
+  if (customError) {
+    displayError = customError
+  } else if (borrowError?.message) {
+    displayError = formatTransactionError(borrowError.message)
+  } else if (transactionError?.message) {
+    displayError = formatTransactionError(transactionError.message)
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className='sm:max-w-md'>
+      <DialogContent className='sm:max-w-md max-h-[90vh] overflow-y-auto overflow-x-hidden'>
         <DialogHeader>
           <DialogTitle>Borrow {selectedToken.symbol}</DialogTitle>
           <DialogDescription>
@@ -208,30 +241,30 @@ export function BorrowForm({
           </DialogDescription>
         </DialogHeader>
 
-        <div className='space-y-4'>
+        <div className='space-y-4 min-w-0'>
           {/* Token Info */}
-          <div className='flex items-center space-x-2 p-3 bg-muted rounded-md'>
+          <div className='flex items-center space-x-2 p-3 bg-muted rounded-md min-w-0'>
             <img
               src={selectedToken.icon}
               alt={`${selectedToken.symbol} icon`}
-              className='w-6 h-6'
+              className='w-6 h-6 flex-shrink-0'
             />
-            <div>
-              <div className='font-medium text-card-foreground'>
+            <div className='min-w-0 flex-1'>
+              <div className='font-medium text-card-foreground truncate'>
                 {selectedToken.symbol}
               </div>
-              <div className='text-sm text-muted-foreground'>
+              <div className='text-sm text-muted-foreground truncate'>
                 {selectedToken.name}
               </div>
             </div>
           </div>
 
           {/* Amount Input */}
-          <div>
+          <div className='min-w-0'>
             <label className='block text-sm font-medium text-card-foreground mb-2'>
               Amount ({selectedToken.symbol})
             </label>
-            <p className='text-sm text-muted-foreground mb-2'>
+            <p className='text-sm text-muted-foreground mb-2 break-words'>
               Max borrowable:{' '}
               {maxBorrowable !== undefined
                 ? (maxBorrowable as number).toLocaleString(undefined, {
@@ -251,9 +284,26 @@ export function BorrowForm({
           </div>
 
           {/* Error Display */}
-          {borrowError && (
-            <div className='text-sm text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded-md'>
-              Error: {borrowError?.message}
+          {displayError && (
+            <div className='text-sm text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded-md min-w-0 overflow-x-hidden'>
+              <div className='flex items-start space-x-2'>
+                <div className='flex-shrink-0 mt-0.5'>
+                  <svg
+                    className='w-4 h-4'
+                    fill='currentColor'
+                    viewBox='0 0 20 20'
+                  >
+                    <path
+                      fillRule='evenodd'
+                      d='M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z'
+                      clipRule='evenodd'
+                    />
+                  </svg>
+                </div>
+                <div className='flex-1 break-words break-all whitespace-pre-wrap leading-relaxed'>
+                  {displayError}
+                </div>
+              </div>
             </div>
           )}
         </div>
