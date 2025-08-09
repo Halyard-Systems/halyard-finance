@@ -25,11 +25,7 @@ contract MockERC20 {
         return true;
     }
 
-    function transferFrom(
-        address from,
-        address to,
-        uint256 amount
-    ) external returns (bool) {
+    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
         require(balanceOf[from] >= amount, "USDT transfer failed");
         require(allowance[from][msg.sender] >= amount, "USDT transfer failed");
         balanceOf[from] -= amount;

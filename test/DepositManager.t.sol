@@ -74,11 +74,7 @@ contract DepositManagerTest is Test {
         );
 
         // Mock the Stargate router addLiquidity call to always succeed
-        vm.mockCall(
-            mockStargateRouter,
-            abi.encodeWithSelector(IStargateRouter.addLiquidity.selector),
-            abi.encode()
-        );
+        vm.mockCall(mockStargateRouter, abi.encodeWithSelector(IStargateRouter.addLiquidity.selector), abi.encode());
 
         // Give users some tokens
         mockUSDC.mint(alice, 10000 * USDC_DECIMALS);
@@ -123,9 +119,7 @@ contract DepositManagerTest is Test {
         assertEq(supportedTokens[2], USDT_TOKEN_ID);
 
         // Check token configs
-        DepositManager.Asset memory ethConfig = depositManager.getAsset(
-            ETH_TOKEN_ID
-        );
+        DepositManager.Asset memory ethConfig = depositManager.getAsset(ETH_TOKEN_ID);
         assertEq(ethConfig.tokenAddress, address(0));
         assertEq(ethConfig.decimals, 18);
         assertTrue(ethConfig.isActive);
@@ -138,9 +132,7 @@ contract DepositManagerTest is Test {
         assertEq(ethConfig.kink, 0.8e18);
         assertEq(ethConfig.reserveFactor, 0.1e27);
 
-        DepositManager.Asset memory usdcConfig = depositManager.getAsset(
-            USDC_TOKEN_ID
-        );
+        DepositManager.Asset memory usdcConfig = depositManager.getAsset(USDC_TOKEN_ID);
         assertEq(usdcConfig.tokenAddress, address(mockUSDC));
         assertEq(usdcConfig.decimals, 6);
         assertTrue(usdcConfig.isActive);
@@ -156,17 +148,12 @@ contract DepositManagerTest is Test {
         uint256 aliceBalanceBefore = alice.balance;
 
         vm.prank(alice);
-        depositManager.deposit{value: depositAmount}(
-            ETH_TOKEN_ID,
-            depositAmount
-        );
+        depositManager.deposit{value: depositAmount}(ETH_TOKEN_ID, depositAmount);
 
         assertEq(depositManager.balanceOf(ETH_TOKEN_ID, alice), depositAmount);
         assertEq(alice.balance, aliceBalanceBefore - depositAmount);
 
-        DepositManager.Asset memory config = depositManager.getAsset(
-            ETH_TOKEN_ID
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(ETH_TOKEN_ID);
         assertEq(config.totalDeposits, depositAmount);
     }
 
@@ -178,9 +165,7 @@ contract DepositManagerTest is Test {
 
         assertEq(depositManager.balanceOf(USDC_TOKEN_ID, alice), depositAmount);
 
-        DepositManager.Asset memory config = depositManager.getAsset(
-            USDC_TOKEN_ID
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(USDC_TOKEN_ID);
         assertEq(config.totalDeposits, depositAmount);
     }
 
@@ -192,9 +177,7 @@ contract DepositManagerTest is Test {
 
         assertEq(depositManager.balanceOf(USDT_TOKEN_ID, alice), depositAmount);
 
-        DepositManager.Asset memory config = depositManager.getAsset(
-            USDT_TOKEN_ID
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(USDT_TOKEN_ID);
         assertEq(config.totalDeposits, depositAmount);
     }
 
@@ -204,9 +187,7 @@ contract DepositManagerTest is Test {
 
         assertEq(depositManager.balanceOf(USDC_TOKEN_ID, alice), 0);
 
-        DepositManager.Asset memory config = depositManager.getAsset(
-            USDC_TOKEN_ID
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(USDC_TOKEN_ID);
         assertEq(config.totalDeposits, 0);
     }
 
@@ -266,9 +247,7 @@ contract DepositManagerTest is Test {
         assertEq(depositManager.balanceOf(USDC_TOKEN_ID, alice), aliceDeposit);
         assertEq(depositManager.balanceOf(USDC_TOKEN_ID, bob), bobDeposit);
 
-        DepositManager.Asset memory config = depositManager.getAsset(
-            USDC_TOKEN_ID
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(USDC_TOKEN_ID);
         assertEq(config.totalDeposits, aliceDeposit + bobDeposit);
     }
 
@@ -278,26 +257,15 @@ contract DepositManagerTest is Test {
         uint256 aliceBalanceBefore = alice.balance;
 
         vm.prank(alice);
-        depositManager.deposit{value: depositAmount}(
-            ETH_TOKEN_ID,
-            depositAmount
-        );
+        depositManager.deposit{value: depositAmount}(ETH_TOKEN_ID, depositAmount);
 
         vm.prank(alice);
         depositManager.withdraw(ETH_TOKEN_ID, withdrawAmount);
 
-        assertEq(
-            depositManager.balanceOf(ETH_TOKEN_ID, alice),
-            depositAmount - withdrawAmount
-        );
-        assertEq(
-            alice.balance,
-            aliceBalanceBefore - depositAmount + withdrawAmount
-        );
+        assertEq(depositManager.balanceOf(ETH_TOKEN_ID, alice), depositAmount - withdrawAmount);
+        assertEq(alice.balance, aliceBalanceBefore - depositAmount + withdrawAmount);
 
-        DepositManager.Asset memory config = depositManager.getAsset(
-            ETH_TOKEN_ID
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(ETH_TOKEN_ID);
         assertEq(config.totalDeposits, depositAmount - withdrawAmount);
     }
 
@@ -311,14 +279,9 @@ contract DepositManagerTest is Test {
         vm.prank(alice);
         depositManager.withdraw(USDC_TOKEN_ID, withdrawAmount);
 
-        assertEq(
-            depositManager.balanceOf(USDC_TOKEN_ID, alice),
-            depositAmount - withdrawAmount
-        );
+        assertEq(depositManager.balanceOf(USDC_TOKEN_ID, alice), depositAmount - withdrawAmount);
 
-        DepositManager.Asset memory config = depositManager.getAsset(
-            USDC_TOKEN_ID
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(USDC_TOKEN_ID);
         assertEq(config.totalDeposits, depositAmount - withdrawAmount);
     }
 
@@ -333,9 +296,7 @@ contract DepositManagerTest is Test {
 
         assertEq(depositManager.balanceOf(USDC_TOKEN_ID, alice), depositAmount);
 
-        DepositManager.Asset memory config = depositManager.getAsset(
-            USDC_TOKEN_ID
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(USDC_TOKEN_ID);
         assertEq(config.totalDeposits, depositAmount);
     }
 
@@ -368,9 +329,7 @@ contract DepositManagerTest is Test {
 
         assertEq(depositManager.balanceOf(USDC_TOKEN_ID, alice), 0);
 
-        DepositManager.Asset memory config = depositManager.getAsset(
-            USDC_TOKEN_ID
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(USDC_TOKEN_ID);
         assertEq(config.totalDeposits, 0);
     }
 
@@ -387,25 +346,13 @@ contract DepositManagerTest is Test {
 
         // Check balances
         assertEq(depositManager.balanceOf(ETH_TOKEN_ID, alice), 1 ether);
-        assertEq(
-            depositManager.balanceOf(USDC_TOKEN_ID, alice),
-            1000 * USDC_DECIMALS
-        );
-        assertEq(
-            depositManager.balanceOf(USDT_TOKEN_ID, alice),
-            1000 * USDC_DECIMALS
-        );
+        assertEq(depositManager.balanceOf(USDC_TOKEN_ID, alice), 1000 * USDC_DECIMALS);
+        assertEq(depositManager.balanceOf(USDT_TOKEN_ID, alice), 1000 * USDC_DECIMALS);
 
         // Check total deposits for each token
-        DepositManager.Asset memory ethConfig = depositManager.getAsset(
-            ETH_TOKEN_ID
-        );
-        DepositManager.Asset memory usdcConfig = depositManager.getAsset(
-            USDC_TOKEN_ID
-        );
-        DepositManager.Asset memory usdtConfig = depositManager.getAsset(
-            USDT_TOKEN_ID
-        );
+        DepositManager.Asset memory ethConfig = depositManager.getAsset(ETH_TOKEN_ID);
+        DepositManager.Asset memory usdcConfig = depositManager.getAsset(USDC_TOKEN_ID);
+        DepositManager.Asset memory usdtConfig = depositManager.getAsset(USDT_TOKEN_ID);
 
         assertEq(ethConfig.totalDeposits, 1 ether);
         assertEq(usdcConfig.totalDeposits, 1000 * USDC_DECIMALS);
@@ -422,9 +369,7 @@ contract DepositManagerTest is Test {
 
     function test_AddNewToken() public {
         string memory symbol = "DAI";
-        address daiAddress = address(
-            0x6B175474E89094C44Da98b954EedeAC495271d0F
-        );
+        address daiAddress = address(0x6B175474E89094C44Da98b954EedeAC495271d0F);
         uint8 decimals = 18;
 
         vm.prank(address(this));
@@ -440,9 +385,7 @@ contract DepositManagerTest is Test {
         );
 
         bytes32 daiTokenId = keccak256(abi.encodePacked(symbol));
-        DepositManager.Asset memory config = depositManager.getAsset(
-            daiTokenId
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(daiTokenId);
 
         assertEq(config.tokenAddress, daiAddress);
         assertEq(config.decimals, decimals);
@@ -453,9 +396,7 @@ contract DepositManagerTest is Test {
         vm.prank(address(this));
         depositManager.setTokenActive(USDC_TOKEN_ID, false);
 
-        DepositManager.Asset memory config = depositManager.getAsset(
-            USDC_TOKEN_ID
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(USDC_TOKEN_ID);
         assertFalse(config.isActive);
 
         vm.prank(alice);
@@ -472,31 +413,20 @@ contract DepositManagerTest is Test {
         vm.prank(alice);
         depositManager.deposit(USDC_TOKEN_ID, depositAmount);
 
-        uint256 initialIndex = depositManager
-            .getAsset(USDC_TOKEN_ID)
-            .liquidityIndex;
+        uint256 initialIndex = depositManager.getAsset(USDC_TOKEN_ID).liquidityIndex;
 
         // Simulate time passing and borrows to trigger index update
         vm.warp(block.timestamp + 365 days);
 
         // Add some borrows to create utilization
-        depositManager.incrementTotalBorrows(
-            USDC_TOKEN_ID,
-            500 * USDC_DECIMALS
-        );
+        depositManager.incrementTotalBorrows(USDC_TOKEN_ID, 500 * USDC_DECIMALS);
 
         // Trigger index update with another deposit
         vm.prank(bob);
         depositManager.deposit(USDC_TOKEN_ID, 100 * USDC_DECIMALS);
 
-        uint256 newIndex = depositManager
-            .getAsset(USDC_TOKEN_ID)
-            .liquidityIndex;
-        assertGt(
-            newIndex,
-            initialIndex,
-            "Liquidity index should increase with time and utilization"
-        );
+        uint256 newIndex = depositManager.getAsset(USDC_TOKEN_ID).liquidityIndex;
+        assertGt(newIndex, initialIndex, "Liquidity index should increase with time and utilization");
     }
 
     // function test_InterestAccrualOnDeposits() public {
@@ -567,20 +497,10 @@ contract DepositManagerTest is Test {
         uint256 lowUtilization = 0.4e18; // 40%
         uint256 highUtilization = 0.9e18; // 90%
 
-        uint256 lowRate = depositManager.calculateBorrowRate(
-            USDC_TOKEN_ID,
-            lowUtilization
-        );
-        uint256 highRate = depositManager.calculateBorrowRate(
-            USDC_TOKEN_ID,
-            highUtilization
-        );
+        uint256 lowRate = depositManager.calculateBorrowRate(USDC_TOKEN_ID, lowUtilization);
+        uint256 highRate = depositManager.calculateBorrowRate(USDC_TOKEN_ID, highUtilization);
 
-        assertGt(
-            highRate,
-            lowRate,
-            "Higher utilization should result in higher borrow rate"
-        );
+        assertGt(highRate, lowRate, "Higher utilization should result in higher borrow rate");
     }
 
     function test_InterestRateModelEdgeCases() public {
@@ -588,21 +508,11 @@ contract DepositManagerTest is Test {
         uint256 zeroUtilization = 0;
         uint256 maxUtilization = 1e18; // 100%
 
-        uint256 zeroRate = depositManager.calculateBorrowRate(
-            USDC_TOKEN_ID,
-            zeroUtilization
-        );
-        uint256 maxRate = depositManager.calculateBorrowRate(
-            USDC_TOKEN_ID,
-            maxUtilization
-        );
+        uint256 zeroRate = depositManager.calculateBorrowRate(USDC_TOKEN_ID, zeroUtilization);
+        uint256 maxRate = depositManager.calculateBorrowRate(USDC_TOKEN_ID, maxUtilization);
 
         assertEq(zeroRate, 0.2e27, "Zero utilization should return base rate");
-        assertGt(
-            maxRate,
-            0.2e27,
-            "Max utilization should return rate above base"
-        );
+        assertGt(maxRate, 0.2e27, "Max utilization should return rate above base");
     }
 
     function test_IncrementAndDecrementTotalBorrows() public {
@@ -610,9 +520,7 @@ contract DepositManagerTest is Test {
 
         depositManager.incrementTotalBorrows(USDC_TOKEN_ID, borrowAmount);
 
-        DepositManager.Asset memory config = depositManager.getAsset(
-            USDC_TOKEN_ID
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(USDC_TOKEN_ID);
         assertEq(config.totalBorrows, borrowAmount);
 
         depositManager.decrementTotalBorrows(USDC_TOKEN_ID, borrowAmount);
@@ -627,10 +535,7 @@ contract DepositManagerTest is Test {
 
         // Now try to decrement more than what we have
         vm.expectRevert("totalBorrows underflow");
-        depositManager.decrementTotalBorrows(
-            USDC_TOKEN_ID,
-            100 * USDC_DECIMALS
-        );
+        depositManager.decrementTotalBorrows(USDC_TOKEN_ID, 100 * USDC_DECIMALS);
     }
 
     function test_EmergencyWithdraw() public {
@@ -639,28 +544,16 @@ contract DepositManagerTest is Test {
         vm.prank(alice);
         depositManager.deposit(USDC_TOKEN_ID, depositAmount);
 
-        uint256 contractBalanceBefore = mockUSDC.balanceOf(
-            address(depositManager)
-        );
+        uint256 contractBalanceBefore = mockUSDC.balanceOf(address(depositManager));
         uint256 ownerBalanceBefore = mockUSDC.balanceOf(address(this));
 
         depositManager.emergencyWithdraw(USDC_TOKEN_ID, address(this));
 
-        uint256 contractBalanceAfter = mockUSDC.balanceOf(
-            address(depositManager)
-        );
+        uint256 contractBalanceAfter = mockUSDC.balanceOf(address(depositManager));
         uint256 ownerBalanceAfter = mockUSDC.balanceOf(address(this));
 
-        assertEq(
-            contractBalanceAfter,
-            0,
-            "Contract should be empty after emergency withdraw"
-        );
-        assertEq(
-            ownerBalanceAfter,
-            ownerBalanceBefore + contractBalanceBefore,
-            "Owner should receive all tokens"
-        );
+        assertEq(contractBalanceAfter, 0, "Contract should be empty after emergency withdraw");
+        assertEq(ownerBalanceAfter, ownerBalanceBefore + contractBalanceBefore, "Owner should receive all tokens");
     }
 
     function test_EmergencyWithdrawOnlyOwner() public {
@@ -673,10 +566,7 @@ contract DepositManagerTest is Test {
         uint256 depositAmount = 1 ether;
 
         vm.prank(alice);
-        depositManager.deposit{value: depositAmount}(
-            ETH_TOKEN_ID,
-            depositAmount
-        );
+        depositManager.deposit{value: depositAmount}(ETH_TOKEN_ID, depositAmount);
 
         uint256 contractBalanceBefore = address(depositManager).balance;
         uint256 aliceBalanceBefore = alice.balance;
@@ -687,31 +577,14 @@ contract DepositManagerTest is Test {
         uint256 contractBalanceAfter = address(depositManager).balance;
         uint256 aliceBalanceAfter = alice.balance;
 
-        assertEq(
-            contractBalanceAfter,
-            0,
-            "Contract should be empty after emergency withdraw"
-        );
-        assertEq(
-            aliceBalanceAfter,
-            aliceBalanceBefore + contractBalanceBefore,
-            "Alice should receive all ETH"
-        );
+        assertEq(contractBalanceAfter, 0, "Contract should be empty after emergency withdraw");
+        assertEq(aliceBalanceAfter, aliceBalanceBefore + contractBalanceBefore, "Alice should receive all ETH");
     }
 
     function test_AddTokenOnlyOwner() public {
         vm.prank(alice);
         vm.expectRevert("Must be owner");
-        depositManager.addToken(
-            "TEST",
-            address(0x123),
-            18,
-            0.1e27,
-            0.5e27,
-            5.0e27,
-            0.8e18,
-            0.1e27
-        );
+        depositManager.addToken("TEST", address(0x123), 18, 0.1e27, 0.5e27, 5.0e27, 0.8e18, 0.1e27);
     }
 
     function test_SetBorrowManagerOnlyOwner() public {
@@ -729,16 +602,7 @@ contract DepositManagerTest is Test {
     function test_AddTokenAlreadyExists() public {
         vm.prank(address(this));
         vm.expectRevert("Token already exists");
-        depositManager.addToken(
-            "USDC",
-            address(0x123),
-            18,
-            0.1e27,
-            0.5e27,
-            5.0e27,
-            0.8e18,
-            0.1e27
-        );
+        depositManager.addToken("USDC", address(0x123), 18, 0.1e27, 0.5e27, 5.0e27, 0.8e18, 0.1e27);
     }
 
     function test_SetTokenActiveForETH() public {
@@ -773,14 +637,9 @@ contract DepositManagerTest is Test {
         vm.prank(alice);
         depositManager.withdraw(USDC_TOKEN_ID, actualBalance);
 
-        uint256 remainingBalance = depositManager.balanceOf(
-            USDC_TOKEN_ID,
-            alice
-        );
+        uint256 remainingBalance = depositManager.balanceOf(USDC_TOKEN_ID, alice);
         assertLe(
-            remainingBalance,
-            1,
-            "Balance should be zero or have minimal rounding error (<= 1 unit) after withdrawal"
+            remainingBalance, 1, "Balance should be zero or have minimal rounding error (<= 1 unit) after withdrawal"
         );
     }
 
@@ -792,21 +651,11 @@ contract DepositManagerTest is Test {
         vm.prank(alice);
         depositManager.deposit(USDC_TOKEN_ID, depositAmount);
 
-        assertEq(
-            depositManager.balanceOf(USDC_TOKEN_ID, alice),
-            depositAmount,
-            "Deposit should work"
-        );
+        assertEq(depositManager.balanceOf(USDC_TOKEN_ID, alice), depositAmount, "Deposit should work");
 
         // Check that the deposit was recorded
-        DepositManager.Asset memory config = depositManager.getAsset(
-            USDC_TOKEN_ID
-        );
-        assertEq(
-            config.totalDeposits,
-            depositAmount,
-            "Total deposits should be updated"
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(USDC_TOKEN_ID);
+        assertEq(config.totalDeposits, depositAmount, "Total deposits should be updated");
     }
 
     function test_WithdrawEventEmission() public {
@@ -819,16 +668,10 @@ contract DepositManagerTest is Test {
         vm.prank(alice);
         depositManager.withdraw(USDC_TOKEN_ID, depositAmount);
 
-        assertEq(
-            depositManager.balanceOf(USDC_TOKEN_ID, alice),
-            0,
-            "Withdraw should work"
-        );
+        assertEq(depositManager.balanceOf(USDC_TOKEN_ID, alice), 0, "Withdraw should work");
 
         // Check that the withdrawal was recorded
-        DepositManager.Asset memory config = depositManager.getAsset(
-            USDC_TOKEN_ID
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(USDC_TOKEN_ID);
         assertEq(config.totalDeposits, 0, "Total deposits should be updated");
     }
 
@@ -838,14 +681,8 @@ contract DepositManagerTest is Test {
         // Test that borrow events are emitted by checking the function executes without reverting
         depositManager.incrementTotalBorrows(USDC_TOKEN_ID, borrowAmount);
 
-        DepositManager.Asset memory config = depositManager.getAsset(
-            USDC_TOKEN_ID
-        );
-        assertEq(
-            config.totalBorrows,
-            borrowAmount,
-            "Total borrows should be incremented"
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(USDC_TOKEN_ID);
+        assertEq(config.totalBorrows, borrowAmount, "Total borrows should be incremented");
 
         depositManager.decrementTotalBorrows(USDC_TOKEN_ID, borrowAmount);
 
@@ -855,30 +692,19 @@ contract DepositManagerTest is Test {
 
     function test_LiquidityIndexWithZeroDeposits() public {
         // Test that liquidity index doesn't change when there are no deposits
-        uint256 initialIndex = depositManager
-            .getAsset(USDC_TOKEN_ID)
-            .liquidityIndex;
+        uint256 initialIndex = depositManager.getAsset(USDC_TOKEN_ID).liquidityIndex;
 
         vm.warp(block.timestamp + 365 days);
 
         // Add borrows but no deposits
-        depositManager.incrementTotalBorrows(
-            USDC_TOKEN_ID,
-            500 * USDC_DECIMALS
-        );
+        depositManager.incrementTotalBorrows(USDC_TOKEN_ID, 500 * USDC_DECIMALS);
 
         // Try to deposit to trigger index update
         vm.prank(alice);
         depositManager.deposit(USDC_TOKEN_ID, 100 * USDC_DECIMALS);
 
-        uint256 newIndex = depositManager
-            .getAsset(USDC_TOKEN_ID)
-            .liquidityIndex;
-        assertEq(
-            newIndex,
-            RAY,
-            "Liquidity index should remain RAY when no deposits exist"
-        );
+        uint256 newIndex = depositManager.getAsset(USDC_TOKEN_ID).liquidityIndex;
+        assertEq(newIndex, RAY, "Liquidity index should remain RAY when no deposits exist");
     }
 
     // function test_MultipleUsersInterestAccrual() public {
@@ -949,9 +775,7 @@ contract DepositManagerTest is Test {
 
         depositManager.setLastBorrowTime(USDC_TOKEN_ID, newTimestamp);
 
-        DepositManager.Asset memory config = depositManager.getAsset(
-            USDC_TOKEN_ID
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(USDC_TOKEN_ID);
         assertEq(config.lastUpdateTimestamp, newTimestamp);
     }
 
@@ -964,27 +788,18 @@ contract DepositManagerTest is Test {
     function test_IncrementTotalBorrowsOnlyBorrowManager() public {
         vm.prank(alice);
         vm.expectRevert("Must be BorrowManager");
-        depositManager.incrementTotalBorrows(
-            USDC_TOKEN_ID,
-            100 * USDC_DECIMALS
-        );
+        depositManager.incrementTotalBorrows(USDC_TOKEN_ID, 100 * USDC_DECIMALS);
     }
 
     function test_DecrementTotalBorrowsOnlyBorrowManager() public {
         vm.prank(alice);
         vm.expectRevert("Must be BorrowManager");
-        depositManager.decrementTotalBorrows(
-            USDC_TOKEN_ID,
-            100 * USDC_DECIMALS
-        );
+        depositManager.decrementTotalBorrows(USDC_TOKEN_ID, 100 * USDC_DECIMALS);
     }
 
     function test_CalculateBorrowRateOnlyBorrowManager() public {
         // This function should be callable by anyone (it's view)
-        uint256 rate = depositManager.calculateBorrowRate(
-            USDC_TOKEN_ID,
-            0.5e18
-        );
+        uint256 rate = depositManager.calculateBorrowRate(USDC_TOKEN_ID, 0.5e18);
         assertGt(rate, 0, "Should return a valid borrow rate");
     }
 
@@ -1014,12 +829,8 @@ contract DepositManagerTest is Test {
         // Test that the contract can receive ETH
         uint256 ethAmount = 1 ether;
 
-        (bool success, ) = address(depositManager).call{value: ethAmount}("");
+        (bool success,) = address(depositManager).call{value: ethAmount}("");
         assertTrue(success, "Contract should be able to receive ETH");
-        assertEq(
-            address(depositManager).balance,
-            ethAmount,
-            "Contract should have received the ETH"
-        );
+        assertEq(address(depositManager).balance, ethAmount, "Contract should have received the ETH");
     }
 }

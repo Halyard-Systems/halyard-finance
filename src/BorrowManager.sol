@@ -62,6 +62,11 @@ contract BorrowManager {
         // Update borrow index and accrue interest for this asset
         _updateBorrowIndex(tokenId);
 
+        // Initialize borrow index to RAY if it's 0 (first borrow)
+        if (borrowIndex[tokenId] == 0) {
+            borrowIndex[tokenId] = depositMgr.RAY();
+        }
+
         // Scale new borrow
         uint256 scaledDelta = (amount * depositMgr.RAY()) / borrowIndex[tokenId];
         console.log("Scaled delta", scaledDelta);
@@ -86,17 +91,22 @@ contract BorrowManager {
             require(price.price >= 0, "Negative price");
             uint256 priceUint = uint256(uint64(price.price));
 
-            // Collateral
+            // Get token config to access decimals
+            DepositManager.Asset memory tokenConfig = depositMgr.getAsset(tid);
+
+            // Collateral - normalize to 18 decimals before applying price
             uint256 deposit = depositMgr.balanceOf(tid, msg.sender);
             console.log("Deposit", deposit);
-            totalCollateralUsd += (deposit * priceUint) / 1e8;
+            uint256 normalizedDeposit = deposit * (10 ** (18 - tokenConfig.decimals));
+            totalCollateralUsd += (normalizedDeposit * priceUint) / 1e8;
 
-            // Borrow
+            // Borrow - normalize to 18 decimals before applying price
             uint256 scaledBorrow = userBorrowScaled[tid][msg.sender];
             console.log("Scaled borrow", scaledBorrow);
             uint256 userBorrowAmount = (scaledBorrow * borrowIndex[tid]) / depositMgr.RAY();
             console.log("User borrow amount", userBorrowAmount);
-            totalBorrowUsd += (userBorrowAmount * priceUint) / 1e8;
+            uint256 normalizedBorrow = userBorrowAmount * (10 ** (18 - tokenConfig.decimals));
+            totalBorrowUsd += (normalizedBorrow * priceUint) / 1e8;
         }
         console.log("Total collateral usd", totalCollateralUsd);
         console.log("Total borrow usd", totalBorrowUsd);
