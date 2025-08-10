@@ -52,7 +52,7 @@ contract AdminTest is BaseTest {
         uint256 initialBalance = address(borrowManager).balance;
 
         // Send ETH to BorrowManager via receive function
-        (bool success, ) = address(borrowManager).call{value: sendAmount}("");
+        (bool success,) = address(borrowManager).call{value: sendAmount}("");
         assertTrue(success, "ETH transfer should succeed");
 
         // Check that BorrowManager received the ETH

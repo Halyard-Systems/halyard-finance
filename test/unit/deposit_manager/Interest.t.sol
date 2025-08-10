@@ -12,32 +12,21 @@ contract InterestTest is BaseTest {
         vm.prank(alice);
         depositManager.deposit(USDC_TOKEN_ID, depositAmount);
 
-        uint256 initialIndex = depositManager
-            .getAsset(USDC_TOKEN_ID)
-            .liquidityIndex;
+        uint256 initialIndex = depositManager.getAsset(USDC_TOKEN_ID).liquidityIndex;
 
         // Simulate time passing and borrows to trigger index update
         vm.warp(block.timestamp + 365 days);
 
         // Add some borrows to create utilization
         vm.prank(address(borrowManager));
-        depositManager.incrementTotalBorrows(
-            USDC_TOKEN_ID,
-            500 * USDC_DECIMALS
-        );
+        depositManager.incrementTotalBorrows(USDC_TOKEN_ID, 500 * USDC_DECIMALS);
 
         // Trigger index update with another deposit
         vm.prank(bob);
         depositManager.deposit(USDC_TOKEN_ID, 100 * USDC_DECIMALS);
 
-        uint256 newIndex = depositManager
-            .getAsset(USDC_TOKEN_ID)
-            .liquidityIndex;
-        assertGt(
-            newIndex,
-            initialIndex,
-            "Liquidity index should increase with time and utilization"
-        );
+        uint256 newIndex = depositManager.getAsset(USDC_TOKEN_ID).liquidityIndex;
+        assertGt(newIndex, initialIndex, "Liquidity index should increase with time and utilization");
     }
 
     // function test_InterestAccrualOnDeposits() public {
@@ -108,20 +97,10 @@ contract InterestTest is BaseTest {
         uint256 lowUtilization = 0.4e18; // 40%
         uint256 highUtilization = 0.9e18; // 90%
 
-        uint256 lowRate = depositManager.calculateBorrowRate(
-            USDC_TOKEN_ID,
-            lowUtilization
-        );
-        uint256 highRate = depositManager.calculateBorrowRate(
-            USDC_TOKEN_ID,
-            highUtilization
-        );
+        uint256 lowRate = depositManager.calculateBorrowRate(USDC_TOKEN_ID, lowUtilization);
+        uint256 highRate = depositManager.calculateBorrowRate(USDC_TOKEN_ID, highUtilization);
 
-        assertGt(
-            highRate,
-            lowRate,
-            "Higher utilization should result in higher borrow rate"
-        );
+        assertGt(highRate, lowRate, "Higher utilization should result in higher borrow rate");
     }
 
     function test_InterestRateModelEdgeCases() public view {
@@ -129,21 +108,11 @@ contract InterestTest is BaseTest {
         uint256 zeroUtilization = 0;
         uint256 maxUtilization = 1e18; // 100%
 
-        uint256 zeroRate = depositManager.calculateBorrowRate(
-            USDC_TOKEN_ID,
-            zeroUtilization
-        );
-        uint256 maxRate = depositManager.calculateBorrowRate(
-            USDC_TOKEN_ID,
-            maxUtilization
-        );
+        uint256 zeroRate = depositManager.calculateBorrowRate(USDC_TOKEN_ID, zeroUtilization);
+        uint256 maxRate = depositManager.calculateBorrowRate(USDC_TOKEN_ID, maxUtilization);
 
         assertEq(zeroRate, 0.2e27, "Zero utilization should return base rate");
-        assertGt(
-            maxRate,
-            0.2e27,
-            "Max utilization should return rate above base"
-        );
+        assertGt(maxRate, 0.2e27, "Max utilization should return rate above base");
     }
 
     function test_IncrementAndDecrementTotalBorrows() public {
@@ -152,9 +121,7 @@ contract InterestTest is BaseTest {
         vm.prank(address(borrowManager));
         depositManager.incrementTotalBorrows(USDC_TOKEN_ID, borrowAmount);
 
-        DepositManager.Asset memory config = depositManager.getAsset(
-            USDC_TOKEN_ID
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(USDC_TOKEN_ID);
         assertEq(config.totalBorrows, borrowAmount);
 
         vm.prank(address(borrowManager));
@@ -172,10 +139,7 @@ contract InterestTest is BaseTest {
         // Now try to decrement more than what we have
         vm.prank(address(borrowManager));
         vm.expectRevert("totalBorrows underflow");
-        depositManager.decrementTotalBorrows(
-            USDC_TOKEN_ID,
-            100 * USDC_DECIMALS
-        );
+        depositManager.decrementTotalBorrows(USDC_TOKEN_ID, 100 * USDC_DECIMALS);
     }
 
     function test_ScaledBalanceConsistency() public {
@@ -205,14 +169,9 @@ contract InterestTest is BaseTest {
         vm.prank(alice);
         depositManager.withdraw(USDC_TOKEN_ID, actualBalance);
 
-        uint256 remainingBalance = depositManager.balanceOf(
-            USDC_TOKEN_ID,
-            alice
-        );
+        uint256 remainingBalance = depositManager.balanceOf(USDC_TOKEN_ID, alice);
         assertLe(
-            remainingBalance,
-            1,
-            "Balance should be zero or have minimal rounding error (<= 1 unit) after withdrawal"
+            remainingBalance, 1, "Balance should be zero or have minimal rounding error (<= 1 unit) after withdrawal"
         );
     }
 
@@ -278,9 +237,7 @@ contract InterestTest is BaseTest {
         vm.prank(address(borrowManager));
         depositManager.setLastBorrowTime(USDC_TOKEN_ID, newTimestamp);
 
-        DepositManager.Asset memory config = depositManager.getAsset(
-            USDC_TOKEN_ID
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(USDC_TOKEN_ID);
         assertEq(config.lastUpdateTimestamp, newTimestamp);
     }
 
@@ -293,27 +250,18 @@ contract InterestTest is BaseTest {
     function test_IncrementTotalBorrowsOnlyBorrowManager() public {
         vm.prank(alice);
         vm.expectRevert("Must be BorrowManager");
-        depositManager.incrementTotalBorrows(
-            USDC_TOKEN_ID,
-            100 * USDC_DECIMALS
-        );
+        depositManager.incrementTotalBorrows(USDC_TOKEN_ID, 100 * USDC_DECIMALS);
     }
 
     function test_DecrementTotalBorrowsOnlyBorrowManager() public {
         vm.prank(alice);
         vm.expectRevert("Must be BorrowManager");
-        depositManager.decrementTotalBorrows(
-            USDC_TOKEN_ID,
-            100 * USDC_DECIMALS
-        );
+        depositManager.decrementTotalBorrows(USDC_TOKEN_ID, 100 * USDC_DECIMALS);
     }
 
     function test_CalculateBorrowRateOnlyBorrowManager() public view {
         // This function should be callable by anyone (it's view)
-        uint256 rate = depositManager.calculateBorrowRate(
-            USDC_TOKEN_ID,
-            0.5e18
-        );
+        uint256 rate = depositManager.calculateBorrowRate(USDC_TOKEN_ID, 0.5e18);
         assertGt(rate, 0, "Should return a valid borrow rate");
     }
 }

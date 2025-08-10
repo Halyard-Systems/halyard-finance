@@ -11,17 +11,12 @@ contract DepositTest is BaseTest {
         uint256 aliceBalanceBefore = alice.balance;
 
         vm.prank(alice);
-        depositManager.deposit{value: depositAmount}(
-            ETH_TOKEN_ID,
-            depositAmount
-        );
+        depositManager.deposit{value: depositAmount}(ETH_TOKEN_ID, depositAmount);
 
         assertEq(depositManager.balanceOf(ETH_TOKEN_ID, alice), depositAmount);
         assertEq(alice.balance, aliceBalanceBefore - depositAmount);
 
-        DepositManager.Asset memory config = depositManager.getAsset(
-            ETH_TOKEN_ID
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(ETH_TOKEN_ID);
         assertEq(config.totalDeposits, depositAmount);
     }
 
@@ -33,9 +28,7 @@ contract DepositTest is BaseTest {
 
         assertEq(depositManager.balanceOf(USDC_TOKEN_ID, alice), depositAmount);
 
-        DepositManager.Asset memory config = depositManager.getAsset(
-            USDC_TOKEN_ID
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(USDC_TOKEN_ID);
         assertEq(config.totalDeposits, depositAmount);
     }
 
@@ -47,9 +40,7 @@ contract DepositTest is BaseTest {
 
         assertEq(depositManager.balanceOf(USDT_TOKEN_ID, alice), depositAmount);
 
-        DepositManager.Asset memory config = depositManager.getAsset(
-            USDT_TOKEN_ID
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(USDT_TOKEN_ID);
         assertEq(config.totalDeposits, depositAmount);
     }
 
@@ -59,9 +50,7 @@ contract DepositTest is BaseTest {
 
         assertEq(depositManager.balanceOf(USDC_TOKEN_ID, alice), 0);
 
-        DepositManager.Asset memory config = depositManager.getAsset(
-            USDC_TOKEN_ID
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(USDC_TOKEN_ID);
         assertEq(config.totalDeposits, 0);
     }
 
@@ -121,9 +110,7 @@ contract DepositTest is BaseTest {
         assertEq(depositManager.balanceOf(USDC_TOKEN_ID, alice), aliceDeposit);
         assertEq(depositManager.balanceOf(USDC_TOKEN_ID, bob), bobDeposit);
 
-        DepositManager.Asset memory config = depositManager.getAsset(
-            USDC_TOKEN_ID
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(USDC_TOKEN_ID);
         assertEq(config.totalDeposits, aliceDeposit + bobDeposit);
     }
 
@@ -140,25 +127,13 @@ contract DepositTest is BaseTest {
 
         // Check balances
         assertEq(depositManager.balanceOf(ETH_TOKEN_ID, alice), 1 ether);
-        assertEq(
-            depositManager.balanceOf(USDC_TOKEN_ID, alice),
-            1000 * USDC_DECIMALS
-        );
-        assertEq(
-            depositManager.balanceOf(USDT_TOKEN_ID, alice),
-            1000 * USDC_DECIMALS
-        );
+        assertEq(depositManager.balanceOf(USDC_TOKEN_ID, alice), 1000 * USDC_DECIMALS);
+        assertEq(depositManager.balanceOf(USDT_TOKEN_ID, alice), 1000 * USDC_DECIMALS);
 
         // Check total deposits for each token
-        DepositManager.Asset memory ethConfig = depositManager.getAsset(
-            ETH_TOKEN_ID
-        );
-        DepositManager.Asset memory usdcConfig = depositManager.getAsset(
-            USDC_TOKEN_ID
-        );
-        DepositManager.Asset memory usdtConfig = depositManager.getAsset(
-            USDT_TOKEN_ID
-        );
+        DepositManager.Asset memory ethConfig = depositManager.getAsset(ETH_TOKEN_ID);
+        DepositManager.Asset memory usdcConfig = depositManager.getAsset(USDC_TOKEN_ID);
+        DepositManager.Asset memory usdtConfig = depositManager.getAsset(USDT_TOKEN_ID);
 
         assertEq(ethConfig.totalDeposits, 1 ether);
         assertEq(usdcConfig.totalDeposits, 1000 * USDC_DECIMALS);

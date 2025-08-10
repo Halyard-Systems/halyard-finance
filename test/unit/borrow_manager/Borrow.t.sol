@@ -30,18 +30,11 @@ contract BorrowManagerTest is BaseTest {
         priceIds[2] = bytes32(uint256(3)); // USDT price ID
 
         vm.prank(alice);
-        borrowManager.borrow(
-            ETH_TOKEN_ID,
-            borrowAmount,
-            emptyPythData,
-            priceIds
-        );
+        borrowManager.borrow(ETH_TOKEN_ID, borrowAmount, emptyPythData, priceIds);
 
         assertEq(alice.balance, aliceBalanceBefore + borrowAmount);
 
-        DepositManager.Asset memory config = depositManager.getAsset(
-            ETH_TOKEN_ID
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(ETH_TOKEN_ID);
         assertEq(config.totalBorrows, borrowAmount);
     }
 
@@ -64,21 +57,11 @@ contract BorrowManagerTest is BaseTest {
         priceIds[2] = bytes32(uint256(3)); // USDT price ID
 
         vm.prank(alice);
-        borrowManager.borrow(
-            USDC_TOKEN_ID,
-            borrowAmount,
-            emptyPythData,
-            priceIds
-        );
+        borrowManager.borrow(USDC_TOKEN_ID, borrowAmount, emptyPythData, priceIds);
 
-        assertEq(
-            mockUSDC.balanceOf(alice),
-            10000 * USDC_DECIMALS + borrowAmount
-        );
+        assertEq(mockUSDC.balanceOf(alice), 10000 * USDC_DECIMALS + borrowAmount);
 
-        DepositManager.Asset memory config = depositManager.getAsset(
-            USDC_TOKEN_ID
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(USDC_TOKEN_ID);
         assertEq(config.totalBorrows, borrowAmount);
     }
 
@@ -99,12 +82,7 @@ contract BorrowManagerTest is BaseTest {
         priceIds[2] = bytes32(uint256(3));
 
         vm.prank(alice);
-        borrowManager.borrow(
-            ETH_TOKEN_ID,
-            borrowAmount,
-            emptyPythData,
-            priceIds
-        );
+        borrowManager.borrow(ETH_TOKEN_ID, borrowAmount, emptyPythData, priceIds);
 
         uint256 aliceBalanceAfterBorrow = alice.balance;
         uint256 contractBalanceBeforeRepay = address(depositManager).balance;
@@ -115,17 +93,12 @@ contract BorrowManagerTest is BaseTest {
 
         // Check balances
         assertEq(alice.balance, aliceBalanceAfterBorrow - borrowAmount);
-        assertEq(
-            address(depositManager).balance,
-            contractBalanceBeforeRepay + borrowAmount
-        );
+        assertEq(address(depositManager).balance, contractBalanceBeforeRepay + borrowAmount);
 
         // Check borrow state is cleared
         assertEq(borrowManager.userBorrowScaled(ETH_TOKEN_ID, alice), 0);
 
-        DepositManager.Asset memory config = depositManager.getAsset(
-            ETH_TOKEN_ID
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(ETH_TOKEN_ID);
         assertEq(config.totalBorrows, 0);
     }
 
@@ -146,17 +119,10 @@ contract BorrowManagerTest is BaseTest {
         priceIds[2] = bytes32(uint256(3));
 
         vm.prank(alice);
-        borrowManager.borrow(
-            USDC_TOKEN_ID,
-            borrowAmount,
-            emptyPythData,
-            priceIds
-        );
+        borrowManager.borrow(USDC_TOKEN_ID, borrowAmount, emptyPythData, priceIds);
 
         uint256 aliceBalanceAfterBorrow = mockUSDC.balanceOf(alice);
-        uint256 contractBalanceBeforeRepay = mockUSDC.balanceOf(
-            address(depositManager)
-        );
+        uint256 contractBalanceBeforeRepay = mockUSDC.balanceOf(address(depositManager));
 
         // Alice approves and repays the USDC
         vm.prank(alice);
@@ -166,21 +132,13 @@ contract BorrowManagerTest is BaseTest {
         borrowManager.repay(USDC_TOKEN_ID, borrowAmount);
 
         // Check balances
-        assertEq(
-            mockUSDC.balanceOf(alice),
-            aliceBalanceAfterBorrow - borrowAmount
-        );
-        assertEq(
-            mockUSDC.balanceOf(address(depositManager)),
-            contractBalanceBeforeRepay + borrowAmount
-        );
+        assertEq(mockUSDC.balanceOf(alice), aliceBalanceAfterBorrow - borrowAmount);
+        assertEq(mockUSDC.balanceOf(address(depositManager)), contractBalanceBeforeRepay + borrowAmount);
 
         // Check borrow state is cleared
         assertEq(borrowManager.userBorrowScaled(USDC_TOKEN_ID, alice), 0);
 
-        DepositManager.Asset memory config = depositManager.getAsset(
-            USDC_TOKEN_ID
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(USDC_TOKEN_ID);
         assertEq(config.totalBorrows, 0);
     }
 
@@ -202,17 +160,9 @@ contract BorrowManagerTest is BaseTest {
         priceIds[2] = bytes32(uint256(3));
 
         vm.prank(alice);
-        borrowManager.borrow(
-            USDC_TOKEN_ID,
-            borrowAmount,
-            emptyPythData,
-            priceIds
-        );
+        borrowManager.borrow(USDC_TOKEN_ID, borrowAmount, emptyPythData, priceIds);
 
-        uint256 scaledBorrowAfterBorrow = borrowManager.userBorrowScaled(
-            USDC_TOKEN_ID,
-            alice
-        );
+        uint256 scaledBorrowAfterBorrow = borrowManager.userBorrowScaled(USDC_TOKEN_ID, alice);
 
         // Partial repay
         vm.prank(alice);
@@ -222,16 +172,11 @@ contract BorrowManagerTest is BaseTest {
         borrowManager.repay(USDC_TOKEN_ID, repayAmount);
 
         // Check that scaled borrow is reduced but not zero
-        uint256 scaledBorrowAfterRepay = borrowManager.userBorrowScaled(
-            USDC_TOKEN_ID,
-            alice
-        );
+        uint256 scaledBorrowAfterRepay = borrowManager.userBorrowScaled(USDC_TOKEN_ID, alice);
         assertGt(scaledBorrowAfterRepay, 0);
         assertLt(scaledBorrowAfterRepay, scaledBorrowAfterBorrow);
 
-        DepositManager.Asset memory config = depositManager.getAsset(
-            USDC_TOKEN_ID
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(USDC_TOKEN_ID);
         assertEq(config.totalBorrows, borrowAmount - repayAmount);
     }
 
@@ -253,12 +198,7 @@ contract BorrowManagerTest is BaseTest {
         priceIds[2] = bytes32(uint256(3));
 
         vm.prank(alice);
-        borrowManager.borrow(
-            USDC_TOKEN_ID,
-            borrowAmount,
-            emptyPythData,
-            priceIds
-        );
+        borrowManager.borrow(USDC_TOKEN_ID, borrowAmount, emptyPythData, priceIds);
 
         // Try to repay more than borrowed - should fail
         vm.prank(alice);
@@ -289,12 +229,7 @@ contract BorrowManagerTest is BaseTest {
         // Should fail due to insufficient collateral
         vm.prank(alice);
         vm.expectRevert("Insufficient collateral");
-        borrowManager.borrow(
-            USDC_TOKEN_ID,
-            borrowAmount,
-            emptyPythData,
-            priceIds
-        );
+        borrowManager.borrow(USDC_TOKEN_ID, borrowAmount, emptyPythData, priceIds);
     }
 
     function test_BorrowNoCollateral() public {
@@ -313,12 +248,7 @@ contract BorrowManagerTest is BaseTest {
         // Should fail due to no collateral
         vm.prank(alice);
         vm.expectRevert("No collateral");
-        borrowManager.borrow(
-            USDC_TOKEN_ID,
-            borrowAmount,
-            emptyPythData,
-            priceIds
-        );
+        borrowManager.borrow(USDC_TOKEN_ID, borrowAmount, emptyPythData, priceIds);
     }
 
     function test_BorrowMismatchedPriceIds() public {
@@ -339,12 +269,7 @@ contract BorrowManagerTest is BaseTest {
         // Should fail due to mismatched tokens/prices
         vm.prank(alice);
         vm.expectRevert("Mismatched tokens/prices");
-        borrowManager.borrow(
-            USDC_TOKEN_ID,
-            borrowAmount,
-            emptyPythData,
-            priceIds
-        );
+        borrowManager.borrow(USDC_TOKEN_ID, borrowAmount, emptyPythData, priceIds);
     }
 
     function test_BorrowNegativePrice() public {
@@ -365,12 +290,7 @@ contract BorrowManagerTest is BaseTest {
             uint256(block.timestamp)
         );
         vm.mockCall(
-            mockPyth,
-            abi.encodeWithSignature(
-                "getPriceUnsafe(bytes32)",
-                bytes32(uint256(1))
-            ),
-            negativePriceData
+            mockPyth, abi.encodeWithSignature("getPriceUnsafe(bytes32)", bytes32(uint256(1))), negativePriceData
         );
 
         bytes[] memory emptyPythData = new bytes[](0);
@@ -382,12 +302,7 @@ contract BorrowManagerTest is BaseTest {
         // Should fail due to negative price
         vm.prank(alice);
         vm.expectRevert("Negative price");
-        borrowManager.borrow(
-            USDC_TOKEN_ID,
-            borrowAmount,
-            emptyPythData,
-            priceIds
-        );
+        borrowManager.borrow(USDC_TOKEN_ID, borrowAmount, emptyPythData, priceIds);
     }
 
     function test_BorrowUSDTToken() public {
@@ -409,18 +324,11 @@ contract BorrowManagerTest is BaseTest {
         uint256 aliceBalanceBefore = mockUSDT.balanceOf(alice);
 
         vm.prank(alice);
-        borrowManager.borrow(
-            USDT_TOKEN_ID,
-            borrowAmount,
-            emptyPythData,
-            priceIds
-        );
+        borrowManager.borrow(USDT_TOKEN_ID, borrowAmount, emptyPythData, priceIds);
 
         assertEq(mockUSDT.balanceOf(alice), aliceBalanceBefore + borrowAmount);
 
-        DepositManager.Asset memory config = depositManager.getAsset(
-            USDT_TOKEN_ID
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(USDT_TOKEN_ID);
         assertEq(config.totalBorrows, borrowAmount);
     }
 
@@ -467,14 +375,10 @@ contract BorrowManagerTest is BaseTest {
         assertGt(borrowManager.userBorrowScaled(USDC_TOKEN_ID, alice), 0);
         assertGt(borrowManager.userBorrowScaled(USDT_TOKEN_ID, alice), 0);
 
-        DepositManager.Asset memory usdcConfig = depositManager.getAsset(
-            USDC_TOKEN_ID
-        );
+        DepositManager.Asset memory usdcConfig = depositManager.getAsset(USDC_TOKEN_ID);
         assertEq(usdcConfig.totalBorrows, 10 * USDC_DECIMALS);
 
-        DepositManager.Asset memory usdtConfig = depositManager.getAsset(
-            USDT_TOKEN_ID
-        );
+        DepositManager.Asset memory usdtConfig = depositManager.getAsset(USDT_TOKEN_ID);
         assertEq(usdtConfig.totalBorrows, 5 * USDC_DECIMALS);
     }
 
@@ -499,20 +403,10 @@ contract BorrowManagerTest is BaseTest {
 
         // Expect the Borrowed event
         vm.expectEmit(true, true, false, true);
-        emit BorrowManager.Borrowed(
-            USDC_TOKEN_ID,
-            alice,
-            borrowAmount,
-            expectedCollateralValue
-        );
+        emit BorrowManager.Borrowed(USDC_TOKEN_ID, alice, borrowAmount, expectedCollateralValue);
 
         vm.prank(alice);
-        borrowManager.borrow(
-            USDC_TOKEN_ID,
-            borrowAmount,
-            emptyPythData,
-            priceIds
-        );
+        borrowManager.borrow(USDC_TOKEN_ID, borrowAmount, emptyPythData, priceIds);
     }
 
     function test_RepayEvent() public {
@@ -532,12 +426,7 @@ contract BorrowManagerTest is BaseTest {
         priceIds[2] = bytes32(uint256(3));
 
         vm.prank(alice);
-        borrowManager.borrow(
-            USDC_TOKEN_ID,
-            borrowAmount,
-            emptyPythData,
-            priceIds
-        );
+        borrowManager.borrow(USDC_TOKEN_ID, borrowAmount, emptyPythData, priceIds);
 
         // Now test repay event
         vm.prank(alice);
@@ -571,12 +460,7 @@ contract BorrowManagerTest is BaseTest {
         assertEq(borrowManager.borrowIndex(USDC_TOKEN_ID), 0);
 
         vm.prank(alice);
-        borrowManager.borrow(
-            USDC_TOKEN_ID,
-            borrowAmount,
-            emptyPythData,
-            priceIds
-        );
+        borrowManager.borrow(USDC_TOKEN_ID, borrowAmount, emptyPythData, priceIds);
 
         // After first borrow, index should be initialized to RAY
         assertEq(borrowManager.borrowIndex(USDC_TOKEN_ID), RAY);
@@ -603,12 +487,7 @@ contract BorrowManagerTest is BaseTest {
         priceIds[2] = bytes32(uint256(3));
 
         vm.prank(alice);
-        borrowManager.borrow(
-            USDC_TOKEN_ID,
-            borrowAmount,
-            emptyPythData,
-            priceIds
-        );
+        borrowManager.borrow(USDC_TOKEN_ID, borrowAmount, emptyPythData, priceIds);
 
         uint256 initialBorrowIndex = borrowManager.borrowIndex(USDC_TOKEN_ID);
         assertEq(initialBorrowIndex, RAY);
@@ -628,18 +507,11 @@ contract BorrowManagerTest is BaseTest {
         uint256 finalBorrowIndex = borrowManager.borrowIndex(USDC_TOKEN_ID);
 
         // Borrow index should have increased due to interest accrual
-        assertGt(
-            finalBorrowIndex,
-            initialBorrowIndex,
-            "Borrow index should increase over time"
-        );
+        assertGt(finalBorrowIndex, initialBorrowIndex, "Borrow index should increase over time");
 
         console.log("Initial borrow index:", initialBorrowIndex);
         console.log("Final borrow index:", finalBorrowIndex);
-        console.log(
-            "Interest accrued factor:",
-            (finalBorrowIndex * 1e18) / initialBorrowIndex
-        );
+        console.log("Interest accrued factor:", (finalBorrowIndex * 1e18) / initialBorrowIndex);
     }
 
     function test_InterestAccrualOnRepay() public {
@@ -659,23 +531,14 @@ contract BorrowManagerTest is BaseTest {
         priceIds[2] = bytes32(uint256(3));
 
         vm.prank(alice);
-        borrowManager.borrow(
-            USDC_TOKEN_ID,
-            borrowAmount,
-            emptyPythData,
-            priceIds
-        );
-        uint256 initialScaledBorrow = borrowManager.userBorrowScaled(
-            USDC_TOKEN_ID,
-            alice
-        );
+        borrowManager.borrow(USDC_TOKEN_ID, borrowAmount, emptyPythData, priceIds);
+        uint256 initialScaledBorrow = borrowManager.userBorrowScaled(USDC_TOKEN_ID, alice);
 
         // Advance time
         vm.warp(block.timestamp + (YEAR / 4)); // 3 months
 
         // Calculate expected amount owed (should be more than initial borrow due to interest)
-        uint256 expectedAmountOwed = (initialScaledBorrow *
-            borrowManager.borrowIndex(USDC_TOKEN_ID)) / RAY;
+        uint256 expectedAmountOwed = (initialScaledBorrow * borrowManager.borrowIndex(USDC_TOKEN_ID)) / RAY;
 
         // Alice needs to approve more than the original borrow amount to cover interest
         vm.prank(alice);
@@ -686,10 +549,7 @@ contract BorrowManagerTest is BaseTest {
         borrowManager.repay(USDC_TOKEN_ID, borrowAmount); // Repay original amount
 
         // Check that scaled borrow is reduced appropriately
-        uint256 finalScaledBorrow = borrowManager.userBorrowScaled(
-            USDC_TOKEN_ID,
-            alice
-        );
+        uint256 finalScaledBorrow = borrowManager.userBorrowScaled(USDC_TOKEN_ID, alice);
         assertLt(finalScaledBorrow, initialScaledBorrow);
     }
 
@@ -710,34 +570,18 @@ contract BorrowManagerTest is BaseTest {
         priceIds[2] = bytes32(uint256(3));
 
         vm.prank(alice);
-        borrowManager.borrow(
-            USDC_TOKEN_ID,
-            borrowAmount,
-            emptyPythData,
-            priceIds
-        );
+        borrowManager.borrow(USDC_TOKEN_ID, borrowAmount, emptyPythData, priceIds);
 
         uint256 borrowIndex = borrowManager.borrowIndex(USDC_TOKEN_ID);
-        uint256 scaledBorrow = borrowManager.userBorrowScaled(
-            USDC_TOKEN_ID,
-            alice
-        );
+        uint256 scaledBorrow = borrowManager.userBorrowScaled(USDC_TOKEN_ID, alice);
 
         // Verify that scaled borrow * index = actual borrow amount
         uint256 actualBorrowAmount = (scaledBorrow * borrowIndex) / RAY;
-        assertEq(
-            actualBorrowAmount,
-            borrowAmount,
-            "Scaled borrow calculation should be correct"
-        );
+        assertEq(actualBorrowAmount, borrowAmount, "Scaled borrow calculation should be correct");
 
         // Verify expected scaled amount
         uint256 expectedScaled = (borrowAmount * RAY) / borrowIndex;
-        assertEq(
-            scaledBorrow,
-            expectedScaled,
-            "Scaled borrow should match expected calculation"
-        );
+        assertEq(scaledBorrow, expectedScaled, "Scaled borrow should match expected calculation");
     }
 
     function test_ZeroBorrowAmount() public {
@@ -761,9 +605,7 @@ contract BorrowManagerTest is BaseTest {
         // Should succeed but with no effect
         assertEq(borrowManager.userBorrowScaled(USDC_TOKEN_ID, alice), 0);
 
-        DepositManager.Asset memory config = depositManager.getAsset(
-            USDC_TOKEN_ID
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(USDC_TOKEN_ID);
         assertEq(config.totalBorrows, 0);
     }
 
@@ -784,26 +626,15 @@ contract BorrowManagerTest is BaseTest {
         priceIds[2] = bytes32(uint256(3));
 
         vm.prank(alice);
-        borrowManager.borrow(
-            USDC_TOKEN_ID,
-            borrowAmount,
-            emptyPythData,
-            priceIds
-        );
+        borrowManager.borrow(USDC_TOKEN_ID, borrowAmount, emptyPythData, priceIds);
 
-        uint256 initialScaledBorrow = borrowManager.userBorrowScaled(
-            USDC_TOKEN_ID,
-            alice
-        );
+        uint256 initialScaledBorrow = borrowManager.userBorrowScaled(USDC_TOKEN_ID, alice);
 
         // Try to repay 0 amount
         vm.prank(alice);
         borrowManager.repay(USDC_TOKEN_ID, 0);
 
         // Should succeed but with no effect
-        assertEq(
-            borrowManager.userBorrowScaled(USDC_TOKEN_ID, alice),
-            initialScaledBorrow
-        );
+        assertEq(borrowManager.userBorrowScaled(USDC_TOKEN_ID, alice), initialScaledBorrow);
     }
 }

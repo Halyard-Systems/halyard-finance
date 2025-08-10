@@ -81,26 +81,14 @@ contract BaseTest is Test {
         );
 
         // Mock the Stargate router addLiquidity call to always succeed
-        vm.mockCall(
-            mockStargateRouter,
-            abi.encodeWithSelector(IStargateRouter.addLiquidity.selector),
-            abi.encode()
-        );
+        vm.mockCall(mockStargateRouter, abi.encodeWithSelector(IStargateRouter.addLiquidity.selector), abi.encode());
 
         // Mock Pyth oracle calls
         // Mock getUpdateFee to return 0 (no fee for empty data)
-        vm.mockCall(
-            mockPyth,
-            abi.encodeWithSignature("getUpdateFee(bytes[])", new bytes[](0)),
-            abi.encode(uint256(0))
-        );
+        vm.mockCall(mockPyth, abi.encodeWithSignature("getUpdateFee(bytes[])", new bytes[](0)), abi.encode(uint256(0)));
 
         // Mock updatePriceFeeds to succeed
-        vm.mockCall(
-            mockPyth,
-            abi.encodeWithSignature("updatePriceFeeds(bytes[])"),
-            abi.encode()
-        );
+        vm.mockCall(mockPyth, abi.encodeWithSignature("updatePriceFeeds(bytes[])"), abi.encode());
 
         // Mock getPriceUnsafe for each price ID to return a valid PythStructs.Price
         // Return the struct fields directly as abi.encode does
@@ -111,30 +99,9 @@ contract BaseTest is Test {
             uint256(block.timestamp) // publish time
         );
 
-        vm.mockCall(
-            mockPyth,
-            abi.encodeWithSignature(
-                "getPriceUnsafe(bytes32)",
-                bytes32(uint256(1))
-            ),
-            mockPriceData
-        );
-        vm.mockCall(
-            mockPyth,
-            abi.encodeWithSignature(
-                "getPriceUnsafe(bytes32)",
-                bytes32(uint256(2))
-            ),
-            mockPriceData
-        );
-        vm.mockCall(
-            mockPyth,
-            abi.encodeWithSignature(
-                "getPriceUnsafe(bytes32)",
-                bytes32(uint256(3))
-            ),
-            mockPriceData
-        );
+        vm.mockCall(mockPyth, abi.encodeWithSignature("getPriceUnsafe(bytes32)", bytes32(uint256(1))), mockPriceData);
+        vm.mockCall(mockPyth, abi.encodeWithSignature("getPriceUnsafe(bytes32)", bytes32(uint256(2))), mockPriceData);
+        vm.mockCall(mockPyth, abi.encodeWithSignature("getPriceUnsafe(bytes32)", bytes32(uint256(3))), mockPriceData);
 
         // Give users some tokens
         mockUSDC.mint(alice, 10000 * USDC_DECIMALS);
