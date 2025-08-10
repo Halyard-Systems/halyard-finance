@@ -49,13 +49,20 @@ contract AdminTest is BaseTest {
 
     function test_ReceiveETH() public {
         uint256 sendAmount = 1 ether;
-        uint256 initialBalance = address(borrowManager).balance;
 
-        // Send ETH to BorrowManager via receive function
-        (bool success,) = address(borrowManager).call{value: sendAmount}("");
-        assertTrue(success, "ETH transfer should succeed");
+        // Try to send ETH to BorrowManager via receive function
+        // This should revert since ETH transfers are not accepted
+        vm.expectRevert("ETH transfers not accepted");
+        (bool success, ) = address(borrowManager).call{value: sendAmount}("");
 
-        // Check that BorrowManager received the ETH
-        assertEq(address(borrowManager).balance, initialBalance + sendAmount);
+        // The call should fail
+        assertFalse(success, "ETH transfer should fail");
+
+        // Check that BorrowManager doesn't hold any ETH
+        assertEq(
+            address(borrowManager).balance,
+            0,
+            "BorrowManager should not hold any ETH"
+        );
     }
 }
