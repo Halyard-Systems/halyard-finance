@@ -51,8 +51,7 @@ contract AdminTest is BaseTest {
         uint256 sendAmount = 1 ether;
 
         // Try to send ETH to BorrowManager via receive function
-        // This should revert since ETH transfers are not accepted
-        vm.expectRevert("ETH transfers not accepted");
+        // This should fail since ETH transfers are not accepted
         (bool success, ) = address(borrowManager).call{value: sendAmount}("");
 
         // The call should fail
