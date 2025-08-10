@@ -5,7 +5,9 @@ import "./DepositManager.sol";
 import {IPyth} from "../node_modules/@pythnetwork/pyth-sdk-solidity/IPyth.sol";
 import {PythStructs} from "../node_modules/@pythnetwork/pyth-sdk-solidity/PythStructs.sol";
 
-contract BorrowManager {
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+contract BorrowManager is ReentrancyGuard {
     DepositManager public immutable depositMgr;
     IPyth public immutable pyth;
 
@@ -23,7 +25,12 @@ contract BorrowManager {
         _;
     }
 
-    event Borrowed(bytes32 indexed tokenId, address indexed user, uint256 amount, uint256 collateralValueUsd);
+    event Borrowed(
+        bytes32 indexed tokenId,
+        address indexed user,
+        uint256 amount,
+        uint256 collateralValueUsd
+    );
     event Repaid(bytes32 indexed tokenId, address indexed user, uint256 amount);
 
     error PriceStale();
@@ -46,10 +53,12 @@ contract BorrowManager {
     }
 
     // Called when a user borrows; updates Pyth only for this asset
-    function borrow(bytes32 tokenId, uint256 amount, bytes[] calldata pythUpdateData, bytes32[] calldata priceIds)
-        external
-        payable
-    {
+    function borrow(
+        bytes32 tokenId,
+        uint256 amount,
+        bytes[] calldata pythUpdateData,
+        bytes32[] calldata priceIds
+    ) external payable nonReentrant {
         // Pull latest price updates for all relevant assets
         uint256 fee = pyth.getUpdateFee(pythUpdateData);
         pyth.updatePriceFeeds{value: fee}(pythUpdateData);
@@ -68,7 +77,8 @@ contract BorrowManager {
         }
 
         // Scale new borrow
-        uint256 scaledDelta = (amount * depositMgr.RAY()) / borrowIndex[tokenId];
+        uint256 scaledDelta = (amount * depositMgr.RAY()) /
+            borrowIndex[tokenId];
         console.log("Scaled delta", scaledDelta);
         userBorrowScaled[tokenId][msg.sender] += scaledDelta;
         totalBorrowScaled[tokenId] += scaledDelta;
@@ -97,15 +107,18 @@ contract BorrowManager {
             // Collateral - normalize to 18 decimals before applying price
             uint256 deposit = depositMgr.balanceOf(tid, msg.sender);
             console.log("Deposit", deposit);
-            uint256 normalizedDeposit = deposit * (10 ** (18 - tokenConfig.decimals));
+            uint256 normalizedDeposit = deposit *
+                (10 ** (18 - tokenConfig.decimals));
             totalCollateralUsd += (normalizedDeposit * priceUint) / 1e8;
 
             // Borrow - normalize to 18 decimals before applying price
             uint256 scaledBorrow = userBorrowScaled[tid][msg.sender];
             console.log("Scaled borrow", scaledBorrow);
-            uint256 userBorrowAmount = (scaledBorrow * borrowIndex[tid]) / depositMgr.RAY();
+            uint256 userBorrowAmount = (scaledBorrow * borrowIndex[tid]) /
+                depositMgr.RAY();
             console.log("User borrow amount", userBorrowAmount);
-            uint256 normalizedBorrow = userBorrowAmount * (10 ** (18 - tokenConfig.decimals));
+            uint256 normalizedBorrow = userBorrowAmount *
+                (10 ** (18 - tokenConfig.decimals));
             totalBorrowUsd += (normalizedBorrow * priceUint) / 1e8;
         }
         console.log("Total collateral usd", totalCollateralUsd);
@@ -121,11 +134,15 @@ contract BorrowManager {
     }
 
     // Repay borrowed tokens
-    function repay(bytes32 tokenId, uint256 amount) external payable {
+    function repay(
+        bytes32 tokenId,
+        uint256 amount
+    ) external payable nonReentrant {
         // Accrue interest
         _updateBorrowIndex(tokenId);
         // Calculate scaled repayment
-        uint256 scaledRepay = (amount * depositMgr.RAY()) / borrowIndex[tokenId];
+        uint256 scaledRepay = (amount * depositMgr.RAY()) /
+            borrowIndex[tokenId];
         uint256 userScaled = userBorrowScaled[tokenId][msg.sender];
         require(scaledRepay <= userScaled, "Repay exceeds borrow");
         userBorrowScaled[tokenId][msg.sender] -= scaledRepay;
@@ -163,7 +180,9 @@ contract BorrowManager {
         }
 
         borrowIndex[tokenId] =
-            (borrowIndex[tokenId] * (depositMgr.RAY() + (borrowRate * delta) / 365 days)) / depositMgr.RAY();
+            (borrowIndex[tokenId] *
+                (depositMgr.RAY() + (borrowRate * delta) / 365 days)) /
+            depositMgr.RAY();
         console.log("Borrow index", borrowIndex[tokenId]);
         depositMgr.setLastBorrowTime(tokenId, block.timestamp);
     }
