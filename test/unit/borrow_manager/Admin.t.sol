@@ -52,16 +52,12 @@ contract AdminTest is BaseTest {
 
         // Try to send ETH to BorrowManager via receive function
         // This should fail since ETH transfers are not accepted
-        (bool success, ) = address(borrowManager).call{value: sendAmount}("");
+        (bool success,) = address(borrowManager).call{value: sendAmount}("");
 
         // The call should fail
         assertFalse(success, "ETH transfer should fail");
 
         // Check that BorrowManager doesn't hold any ETH
-        assertEq(
-            address(borrowManager).balance,
-            0,
-            "BorrowManager should not hold any ETH"
-        );
+        assertEq(address(borrowManager).balance, 0, "BorrowManager should not hold any ETH");
     }
 }
