@@ -215,6 +215,7 @@ contract AdminTest is BaseTest {
         uint256 borrowAmount = 500 * USDC_DECIMALS;
 
         // Test that borrow events are emitted by checking the function executes without reverting
+        vm.prank(address(borrowManager));
         depositManager.incrementTotalBorrows(USDC_TOKEN_ID, borrowAmount);
 
         DepositManager.Asset memory config = depositManager.getAsset(
@@ -226,6 +227,7 @@ contract AdminTest is BaseTest {
             "Total borrows should be incremented"
         );
 
+        vm.prank(address(borrowManager));
         depositManager.decrementTotalBorrows(USDC_TOKEN_ID, borrowAmount);
 
         config = depositManager.getAsset(USDC_TOKEN_ID);

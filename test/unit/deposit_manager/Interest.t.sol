@@ -20,6 +20,7 @@ contract InterestTest is BaseTest {
         vm.warp(block.timestamp + 365 days);
 
         // Add some borrows to create utilization
+        vm.prank(address(borrowManager));
         depositManager.incrementTotalBorrows(
             USDC_TOKEN_ID,
             500 * USDC_DECIMALS
@@ -148,6 +149,7 @@ contract InterestTest is BaseTest {
     function test_IncrementAndDecrementTotalBorrows() public {
         uint256 borrowAmount = 500 * USDC_DECIMALS;
 
+        vm.prank(address(borrowManager));
         depositManager.incrementTotalBorrows(USDC_TOKEN_ID, borrowAmount);
 
         DepositManager.Asset memory config = depositManager.getAsset(
@@ -155,6 +157,7 @@ contract InterestTest is BaseTest {
         );
         assertEq(config.totalBorrows, borrowAmount);
 
+        vm.prank(address(borrowManager));
         depositManager.decrementTotalBorrows(USDC_TOKEN_ID, borrowAmount);
 
         config = depositManager.getAsset(USDC_TOKEN_ID);
@@ -163,9 +166,11 @@ contract InterestTest is BaseTest {
 
     function test_DecrementTotalBorrowsUnderflow() public {
         // First increment some borrows so we can test underflow
+        vm.prank(address(borrowManager));
         depositManager.incrementTotalBorrows(USDC_TOKEN_ID, 50 * USDC_DECIMALS);
 
         // Now try to decrement more than what we have
+        vm.prank(address(borrowManager));
         vm.expectRevert("totalBorrows underflow");
         depositManager.decrementTotalBorrows(
             USDC_TOKEN_ID,
@@ -181,6 +186,7 @@ contract InterestTest is BaseTest {
 
         // Add time and utilization to change liquidity index
         // Use smaller amounts to avoid extreme precision issues
+        vm.prank(address(borrowManager));
         depositManager.incrementTotalBorrows(
             USDC_TOKEN_ID,
             100 * USDC_DECIMALS // Lower utilization: 10% instead of 50%
@@ -269,6 +275,7 @@ contract InterestTest is BaseTest {
     function test_SetLastBorrowTime() public {
         uint256 newTimestamp = block.timestamp + 1000;
 
+        vm.prank(address(borrowManager));
         depositManager.setLastBorrowTime(USDC_TOKEN_ID, newTimestamp);
 
         DepositManager.Asset memory config = depositManager.getAsset(
