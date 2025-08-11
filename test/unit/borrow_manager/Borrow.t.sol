@@ -39,8 +39,6 @@ contract BorrowManagerTest is BaseTest {
     }
 
     function test_USDCBorrow() public {
-        uint256 borrowAmount = 1 * USDC_DECIMALS; // Borrow just 1 USDC to stay within LTV limits
-
         // First, someone needs to deposit USDC so the contract has liquidity to borrow from
         vm.prank(bob);
         depositManager.deposit(USDC_TOKEN_ID, 2000 * USDC_DECIMALS);
@@ -55,6 +53,8 @@ contract BorrowManagerTest is BaseTest {
         priceIds[0] = bytes32(uint256(1)); // ETH price ID
         priceIds[1] = bytes32(uint256(2)); // USDC price ID
         priceIds[2] = bytes32(uint256(3)); // USDT price ID
+
+        uint256 borrowAmount = 1 * USDC_DECIMALS; // Borrow just 1 USDC to stay within LTV limits
 
         vm.prank(alice);
         borrowManager.borrow(USDC_TOKEN_ID, borrowAmount, emptyPythData, priceIds);
@@ -86,6 +86,9 @@ contract BorrowManagerTest is BaseTest {
 
         uint256 aliceBalanceAfterBorrow = alice.balance;
         uint256 contractBalanceBeforeRepay = address(depositManager).balance;
+
+        // Check initial borrow amount is recorded correctly
+        assertEq(borrowManager.userBorrowScaled(ETH_TOKEN_ID, alice), borrowAmount);
 
         // Alice repays the ETH
         vm.prank(alice);
