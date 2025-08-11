@@ -18,9 +18,9 @@ contract BorrowManagerTest is BaseTest {
         depositManager.deposit{value: 2 ether}(ETH_TOKEN_ID, 2 ether);
 
         // Alice needs to deposit collateral before borrowing (deposit USDC as collateral)
-        // At $1000 per USDC (from our mock), and 50% LTV, need at least $2000 collateral to borrow $1000 ETH
+        // At $1 per USDC, and 50% LTV, need at least $200 collateral to borrow $100 ETH
         vm.prank(alice);
-        depositManager.deposit(USDC_TOKEN_ID, 3 * USDC_DECIMALS); // 3 USDC = $3000 worth at mock price
+        depositManager.deposit(USDC_TOKEN_ID, 200 * USDC_DECIMALS); // 200 USDC = $200 worth at $1 each
 
         // Mock Pyth data - need 3 price IDs to match 3 supported tokens
         bytes[] memory emptyPythData = new bytes[](0);
@@ -66,14 +66,14 @@ contract BorrowManagerTest is BaseTest {
     }
 
     function test_RepayETH() public {
-        uint256 borrowAmount = 0.1 ether;
+        uint256 borrowAmount = 0.1 ether; // $100 worth of ETH
 
         // Setup: Bob deposits ETH liquidity, Alice deposits USDC collateral and borrows ETH
         vm.prank(bob);
         depositManager.deposit{value: 2 ether}(ETH_TOKEN_ID, 2 ether);
 
         vm.prank(alice);
-        depositManager.deposit(USDC_TOKEN_ID, 3 * USDC_DECIMALS);
+        depositManager.deposit(USDC_TOKEN_ID, 200 * USDC_DECIMALS); // $200 worth of USDC collateral
 
         bytes[] memory emptyPythData = new bytes[](0);
         bytes32[] memory priceIds = new bytes32[](3);
@@ -127,6 +127,9 @@ contract BorrowManagerTest is BaseTest {
         uint256 aliceBalanceAfterBorrow = mockUSDC.balanceOf(alice);
         uint256 contractBalanceBeforeRepay = mockUSDC.balanceOf(address(depositManager));
 
+        // Check initial borrow amount is recorded correctly
+        assertEq(borrowManager.userBorrowScaled(USDC_TOKEN_ID, alice), borrowAmount);
+
         // Alice approves and repays the USDC
         vm.prank(alice);
         mockUSDC.approve(address(depositManager), borrowAmount);
@@ -146,8 +149,8 @@ contract BorrowManagerTest is BaseTest {
     }
 
     function test_PartialRepay() public {
-        uint256 borrowAmount = 1 * USDC_DECIMALS;
-        uint256 repayAmount = USDC_DECIMALS / 2; // Partial repay (0.5 USDC)
+        uint256 borrowAmount = 100 * USDC_DECIMALS;
+        uint256 repayAmount = 50 * USDC_DECIMALS; // Partial repay (50 USDC)
 
         // Setup borrow
         vm.prank(bob);
@@ -386,7 +389,7 @@ contract BorrowManagerTest is BaseTest {
     }
 
     function test_BorrowEvent() public {
-        uint256 borrowAmount = 1 * USDC_DECIMALS;
+        uint256 borrowAmount = 100 * USDC_DECIMALS;
 
         // Setup
         vm.prank(bob);
@@ -401,8 +404,8 @@ contract BorrowManagerTest is BaseTest {
         priceIds[1] = bytes32(uint256(2));
         priceIds[2] = bytes32(uint256(3));
 
-        // Expected collateral value: 5 ETH * $1000 = $5,000,000 (normalized to 18 decimals and divided by 1e8)
-        uint256 expectedCollateralValue = (5 ether * 100000000) / 1e8; // = 5 * 10^18
+        // Expected collateral value: 5 ETH * $1000 = $5,000 (normalized: (5 ether * 1e11) / 1e8 = 5e21)
+        uint256 expectedCollateralValue = (5 ether * 100000000000) / 1e8; // = 5 * 10^21
 
         // Expect the Borrowed event
         vm.expectEmit(true, true, false, true);
@@ -413,7 +416,7 @@ contract BorrowManagerTest is BaseTest {
     }
 
     function test_RepayEvent() public {
-        uint256 borrowAmount = 1 * USDC_DECIMALS;
+        uint256 borrowAmount = 100 * USDC_DECIMALS;
 
         // Setup borrow first
         vm.prank(bob);
@@ -511,9 +514,8 @@ contract BorrowManagerTest is BaseTest {
 
         // Borrow index should have increased due to interest accrual
         assertGt(finalBorrowIndex, initialBorrowIndex, "Borrow index should increase over time");
-
-        console.log("Initial borrow index:", initialBorrowIndex);
-        console.log("Final borrow index:", finalBorrowIndex);
+        assertEq(initialBorrowIndex, 10000000000000000000 * 1e8);
+        assertEq(finalBorrowIndex, 12166666666666666660 * 1e8);
         console.log("Interest accrued factor:", (finalBorrowIndex * 1e18) / initialBorrowIndex);
     }
 
@@ -553,7 +555,10 @@ contract BorrowManagerTest is BaseTest {
 
         // Check that scaled borrow is reduced appropriately
         uint256 finalScaledBorrow = borrowManager.userBorrowScaled(USDC_TOKEN_ID, alice);
+
         assertLt(finalScaledBorrow, initialScaledBorrow);
+        assertEq(initialScaledBorrow, 1000000);
+        assertEq(finalScaledBorrow, 47733);
     }
 
     function test_ScaledBorrowCalculation() public {

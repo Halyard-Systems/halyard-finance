@@ -92,16 +92,40 @@ contract BaseTest is Test {
 
         // Mock getPriceUnsafe for each price ID to return a valid PythStructs.Price
         // Return the struct fields directly as abi.encode does
-        bytes memory mockPriceData = abi.encode(
-            int64(100000000), // $1000 * 1e8 (Pyth uses 8 decimals)
+
+        // ETH price: $1000
+        bytes memory mockEthPriceData = abi.encode(
+            int64(100000000000), // $1000 * 1e8 (Pyth uses 8 decimals)
             uint64(0), // confidence
             int32(-8), // exponent
             uint256(block.timestamp) // publish time
         );
 
-        vm.mockCall(mockPyth, abi.encodeWithSignature("getPriceUnsafe(bytes32)", bytes32(uint256(1))), mockPriceData);
-        vm.mockCall(mockPyth, abi.encodeWithSignature("getPriceUnsafe(bytes32)", bytes32(uint256(2))), mockPriceData);
-        vm.mockCall(mockPyth, abi.encodeWithSignature("getPriceUnsafe(bytes32)", bytes32(uint256(3))), mockPriceData);
+        // USDC price: $1
+        bytes memory mockUsdcPriceData = abi.encode(
+            int64(100000000), // $1 * 1e8 (Pyth uses 8 decimals)
+            uint64(0), // confidence
+            int32(-8), // exponent
+            uint256(block.timestamp) // publish time
+        );
+
+        // USDT price: $1
+        bytes memory mockUsdtPriceData = abi.encode(
+            int64(100000000), // $1 * 1e8 (Pyth uses 8 decimals)
+            uint64(0), // confidence
+            int32(-8), // exponent
+            uint256(block.timestamp) // publish time
+        );
+
+        // Map price IDs to their respective price data
+        // Assuming price ID 1 = ETH, 2 = USDC, 3 = USDT
+        vm.mockCall(mockPyth, abi.encodeWithSignature("getPriceUnsafe(bytes32)", bytes32(uint256(1))), mockEthPriceData);
+        vm.mockCall(
+            mockPyth, abi.encodeWithSignature("getPriceUnsafe(bytes32)", bytes32(uint256(2))), mockUsdcPriceData
+        );
+        vm.mockCall(
+            mockPyth, abi.encodeWithSignature("getPriceUnsafe(bytes32)", bytes32(uint256(3))), mockUsdtPriceData
+        );
 
         // Give users some tokens
         mockUSDC.mint(alice, 10000 * USDC_DECIMALS);
