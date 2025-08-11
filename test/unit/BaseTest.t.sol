@@ -2,7 +2,6 @@
 pragma solidity ^0.8.30;
 
 import {Test, console} from "lib/forge-std/src/Test.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {BorrowManager} from "../../src/BorrowManager.sol";
 import {DepositManager} from "../../src/DepositManager.sol";
