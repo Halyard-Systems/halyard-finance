@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
+import {console} from "lib/forge-std/src/Test.sol";
 import {DepositManager} from "../../../src/DepositManager.sol";
 import {BaseTest} from "../BaseTest.t.sol";
 
@@ -29,68 +30,77 @@ contract InterestTest is BaseTest {
         assertGt(newIndex, initialIndex, "Liquidity index should increase with time and utilization");
     }
 
-    // function test_InterestAccrualOnDeposits() public {
-    //     // Test that users earn interest on their deposits
-    //     uint256 depositAmount = 1000 * USDC_DECIMALS;
+    function test_InterestAccrualOnDeposits() public {
+        // Test that users earn interest on their deposits
+        uint256 depositAmount = 1000 * USDC_DECIMALS;
 
-    //     vm.prank(alice);
-    //     depositManager.deposit(USDC_TOKEN_ID, depositAmount);
+        vm.prank(alice);
+        depositManager.deposit(USDC_TOKEN_ID, depositAmount);
 
-    //     uint256 initialBalance = depositManager.balanceOf(USDC_TOKEN_ID, alice);
+        uint256 initialBalance = depositManager.balanceOf(USDC_TOKEN_ID, alice);
 
-    //     // Add borrows and time to create interest
-    //     // Use same parameters as working test for consistency
-    //     depositManager.incrementTotalBorrows(
-    //         USDC_TOKEN_ID,
-    //         100 * USDC_DECIMALS // 10% utilization
-    //     );
+        // Bob needs to deposit ETH as collateral before borrowing USDC
+        vm.prank(bob);
+        depositManager.deposit{value: 10 ether}(ETH_TOKEN_ID, 10 ether);
 
-    //     vm.warp(block.timestamp + 365 days);
+        // Add borrows and time to create interest
+        // Use proper borrow flow instead of direct incrementTotalBorrows
+        bytes[] memory emptyPythData = new bytes[](0);
+        bytes32[] memory priceIds = new bytes32[](3);
+        priceIds[0] = bytes32(uint256(1)); // ETH price ID
+        priceIds[1] = bytes32(uint256(2)); // USDC price ID
+        priceIds[2] = bytes32(uint256(3)); // USDT price ID
 
-    //     // Check the state before triggering update
-    //     DepositManager.Asset memory assetBefore = depositManager.getAsset(
-    //         USDC_TOKEN_ID
-    //     );
-    //     console.log(
-    //         "Before update - Liquidity Index:",
-    //         assetBefore.liquidityIndex
-    //     );
-    //     console.log(
-    //         "Before update - Total Deposits:",
-    //         assetBefore.totalDeposits
-    //     );
-    //     console.log("Before update - Total Borrows:", assetBefore.totalBorrows);
+        // Bob borrows USDC to create utilization
+        vm.prank(bob);
+        borrowManager.borrow(USDC_TOKEN_ID, 100 * USDC_DECIMALS, emptyPythData, priceIds);
 
-    //     // Trigger liquidity index update by making a small deposit
-    //     vm.prank(bob);
-    //     depositManager.deposit(USDC_TOKEN_ID, 1 * USDC_DECIMALS);
+        vm.warp(block.timestamp + 365 days);
 
-    //     // Check the state after triggering update
-    //     DepositManager.Asset memory assetAfter = depositManager.getAsset(
-    //         USDC_TOKEN_ID
-    //     );
-    //     console.log(
-    //         "After update - Liquidity Index:",
-    //         assetAfter.liquidityIndex
-    //     );
+        // Check the state before triggering update
+        DepositManager.Asset memory assetBefore = depositManager.getAsset(
+            USDC_TOKEN_ID
+        );
+        console.log(
+            "Before update - Liquidity Index:",
+            assetBefore.liquidityIndex
+        );
+        console.log(
+            "Before update - Total Deposits:",
+            assetBefore.totalDeposits
+        );
+        console.log("Before update - Total Borrows:", assetBefore.totalBorrows);
 
-    //     // Alice's balance should have increased due to interest
-    //     uint256 newBalance = depositManager.balanceOf(USDC_TOKEN_ID, alice);
-    //     console.log("Initial balance:", initialBalance);
-    //     console.log("New balance:", newBalance);
-    //     console.log(
-    //         "Interest earned:",
-    //         newBalance > initialBalance ? newBalance - initialBalance : 0
-    //     );
+        // Trigger liquidity index update by making a small deposit
+        vm.prank(bob);
+        depositManager.deposit(USDC_TOKEN_ID, 1 * USDC_DECIMALS);
 
-    //     // With 1 year at ~2.7% interest rate, we should see noticeable interest
-    //     // Allow for at least 1 unit of interest (minimum detectable)
-    //     assertGt(
-    //         newBalance,
-    //         initialBalance,
-    //         "Balance should increase due to interest accrual"
-    //     );
-    // }
+        // Check the state after triggering update
+        DepositManager.Asset memory assetAfter = depositManager.getAsset(
+            USDC_TOKEN_ID
+        );
+        console.log(
+            "After update - Liquidity Index:",
+            assetAfter.liquidityIndex
+        );
+
+        // Alice's balance should have increased due to interest
+        uint256 newBalance = depositManager.balanceOf(USDC_TOKEN_ID, alice);
+        console.log("Initial balance:", initialBalance);
+        console.log("New balance:", newBalance);
+        console.log(
+            "Interest earned:",
+            newBalance > initialBalance ? newBalance - initialBalance : 0
+        );
+
+        // With 1 year at ~2.7% interest rate, we should see noticeable interest
+        // Allow for at least 1 unit of interest (minimum detectable)
+        assertGt(
+            newBalance,
+            initialBalance,
+            "Balance should increase due to interest accrual"
+        );
+    }
 
     function test_CalculateBorrowRate() public view {
         // Test borrow rate calculation at different utilization levels

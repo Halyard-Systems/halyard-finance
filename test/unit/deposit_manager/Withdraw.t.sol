@@ -129,4 +129,10 @@ contract WithdrawTest is BaseTest {
         assertEq(contractBalanceAfter, 0, "Contract should be empty after emergency withdraw");
         assertEq(aliceBalanceAfter, aliceBalanceBefore + contractBalanceBefore, "Alice should receive all ETH");
     }
+
+    function test_EmergencyWithdrawETHOnlyOwner() public {
+        vm.prank(alice);
+        vm.expectRevert("Must be owner");
+        depositManager.emergencyWithdraw(ETH_TOKEN_ID, alice);
+    }
 }
