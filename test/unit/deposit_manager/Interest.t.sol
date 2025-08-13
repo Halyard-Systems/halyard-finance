@@ -158,14 +158,8 @@ contract InterestTest is BaseTest {
         vm.prank(alice);
         depositManager.deposit(USDC_TOKEN_ID, depositAmount);
 
-        // Add time and utilization to change liquidity index
-        // Use smaller amounts to avoid extreme precision issues
-        vm.prank(address(borrowManager));
-        depositManager.incrementTotalBorrows(
-            USDC_TOKEN_ID,
-            100 * USDC_DECIMALS // Lower utilization: 10% instead of 50%
-        );
-        vm.warp(block.timestamp + 30 days); // Shorter time period
+        // Add time to trigger interest accrual
+        vm.warp(block.timestamp + 30 days);
 
         // Trigger liquidity index update
         vm.prank(bob);

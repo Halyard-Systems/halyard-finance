@@ -120,20 +120,20 @@ contract DepositManager is ReentrancyGuard {
         if (!asset.isActive) revert TokenNotActive(tokenId);
 
         uint256 delta = block.timestamp - asset.lastUpdateTimestamp;
-
+        
+        // Always update timestamp, even if delta is 0
+        asset.lastUpdateTimestamp = block.timestamp;
+        
         if (delta > 0) {
             if (asset.totalDeposits == 0) {
-                asset.liquidityIndex = RAY;
-                asset.lastUpdateTimestamp = block.timestamp;
+                // No deposits, but still update timestamp
                 return;
             }
 
-            uint256 U = (asset.totalBorrows * 1e18) / asset.totalDeposits;
-            uint256 supplyRate =
-                _calculateSupplyRate(U, asset.baseRate, asset.slope1, asset.slope2, asset.kink, asset.reserveFactor);
+            uint256 U = (asset.totalBorrows * 1e18) / (asset.totalDeposits + asset.totalBorrows);
+            uint256 supplyRate = _calculateSupplyRate(U, asset.baseRate, asset.slope1, asset.slope2, asset.kink, asset.reserveFactor);
             uint256 accrued = (supplyRate * delta) / (365 days);
             asset.liquidityIndex = (asset.liquidityIndex * (RAY + accrued)) / RAY;
-            asset.lastUpdateTimestamp = block.timestamp;
         }
     }
 
@@ -182,8 +182,10 @@ contract DepositManager is ReentrancyGuard {
         Asset storage config = assets[tokenId];
         if (!config.isActive) revert TokenNotActive(tokenId);
 
+        // Update the stored liquidity index first
         _updateLiquidityIndex(tokenId);
 
+        // Use the updated liquidity index for withdrawal calculation
         uint256 scaled = (amount * RAY) / config.liquidityIndex;
         uint256 userScaledBalance = userBalances[tokenId][msg.sender].scaledBalance;
 
@@ -211,8 +213,30 @@ contract DepositManager is ReentrancyGuard {
     function balanceOf(bytes32 tokenId, address user) public view returns (uint256) {
         Asset storage config = assets[tokenId];
         if (!config.isActive) revert TokenNotActive(tokenId);
+        
+        // Update liquidity index to current time (this is what Aave does)
+        uint256 currentLiquidityIndex = _getCurrentLiquidityIndex(tokenId);
+        
+        return (userBalances[tokenId][user].scaledBalance * currentLiquidityIndex) / RAY;
+    }
 
-        return (userBalances[tokenId][user].scaledBalance * config.liquidityIndex) / RAY;
+    function _getCurrentLiquidityIndex(bytes32 tokenId) internal view returns (uint256) {
+        Asset storage asset = assets[tokenId];
+        uint256 delta = block.timestamp - asset.lastUpdateTimestamp;
+        
+        if (delta == 0) {
+            return asset.liquidityIndex;
+        }
+        
+        if (asset.totalDeposits == 0) {
+            return asset.liquidityIndex;
+        }
+        
+        uint256 U = (asset.totalBorrows * 1e18) / (asset.totalDeposits + asset.totalBorrows);
+        uint256 supplyRate = _calculateSupplyRate(U, asset.baseRate, asset.slope1, asset.slope2, asset.kink, asset.reserveFactor);
+        uint256 accrued = (supplyRate * delta) / (365 days);
+        
+        return (asset.liquidityIndex * (RAY + accrued)) / RAY;
     }
 
     function getAsset(bytes32 tokenId) external view returns (Asset memory) {
@@ -239,24 +263,19 @@ contract DepositManager is ReentrancyGuard {
         uint256 kink,
         uint256 reserveFactor
     ) internal pure returns (uint256) {
-        console.log("Base rate", baseRate);
-        console.log("Slope1", slope1);
-        console.log("Slope2", slope2);
-        console.log("Kink", kink);
-        console.log("Reserve factor", reserveFactor);
-        console.log("U", U);
         uint256 borrowRate;
         if (U <= kink) {
             borrowRate = baseRate + ((slope1 * U) / kink);
         } else {
             borrowRate = baseRate + slope1 + ((slope2 * (U - kink)) / (1e18 - kink));
         }
-        uint256 netRate = (borrowRate * (RAY - reserveFactor)) / RAY;
+        
+        // Supply rate = borrow rate * utilization * (1 - reserve factor)
         // When U = 0, return 0 (no supply rate when no utilization)
         // When U > 0, return the supply rate based on utilization
-        return (netRate * U) / RAY;
+        return (borrowRate * U * (RAY - reserveFactor)) / RAY;
     }
-
+    
     function _calculateBorrowRate(uint256 U, uint256 baseRate, uint256 slope1, uint256 slope2, uint256 kink)
         internal
         pure
