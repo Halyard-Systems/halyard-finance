@@ -53,22 +53,14 @@ contract InterestTest is BaseTest {
 
         // Bob borrows USDC to create utilization
         vm.prank(bob);
-        borrowManager.borrow(USDC_TOKEN_ID, 100 * USDC_DECIMALS, emptyPythData, priceIds);
+        borrowManager.borrow(USDC_TOKEN_ID, 800 * USDC_DECIMALS, emptyPythData, priceIds);
 
         vm.warp(block.timestamp + 365 days);
 
         // Check the state before triggering update
-        DepositManager.Asset memory assetBefore = depositManager.getAsset(
-            USDC_TOKEN_ID
-        );
-        console.log(
-            "Before update - Liquidity Index:",
-            assetBefore.liquidityIndex
-        );
-        console.log(
-            "Before update - Total Deposits:",
-            assetBefore.totalDeposits
-        );
+        DepositManager.Asset memory assetBefore = depositManager.getAsset(USDC_TOKEN_ID);
+        console.log("Before update - Liquidity Index:", assetBefore.liquidityIndex);
+        console.log("Before update - Total Deposits:", assetBefore.totalDeposits);
         console.log("Before update - Total Borrows:", assetBefore.totalBorrows);
 
         // Trigger liquidity index update by making a small deposit
@@ -76,30 +68,18 @@ contract InterestTest is BaseTest {
         depositManager.deposit(USDC_TOKEN_ID, 1 * USDC_DECIMALS);
 
         // Check the state after triggering update
-        DepositManager.Asset memory assetAfter = depositManager.getAsset(
-            USDC_TOKEN_ID
-        );
-        console.log(
-            "After update - Liquidity Index:",
-            assetAfter.liquidityIndex
-        );
+        DepositManager.Asset memory assetAfter = depositManager.getAsset(USDC_TOKEN_ID);
+        console.log("After update - Liquidity Index:", assetAfter.liquidityIndex);
 
         // Alice's balance should have increased due to interest
         uint256 newBalance = depositManager.balanceOf(USDC_TOKEN_ID, alice);
         console.log("Initial balance:", initialBalance);
         console.log("New balance:", newBalance);
-        console.log(
-            "Interest earned:",
-            newBalance > initialBalance ? newBalance - initialBalance : 0
-        );
+        console.log("Interest earned:", newBalance > initialBalance ? newBalance - initialBalance : 0);
 
         // With 1 year at ~2.7% interest rate, we should see noticeable interest
         // Allow for at least 1 unit of interest (minimum detectable)
-        assertGt(
-            newBalance,
-            initialBalance,
-            "Balance should increase due to interest accrual"
-        );
+        assertGt(newBalance, initialBalance, "Balance should increase due to interest accrual");
     }
 
     function test_CalculateBorrowRate() public view {

@@ -120,10 +120,10 @@ contract DepositManager is ReentrancyGuard {
         if (!asset.isActive) revert TokenNotActive(tokenId);
 
         uint256 delta = block.timestamp - asset.lastUpdateTimestamp;
-        
+
         // Always update timestamp, even if delta is 0
         asset.lastUpdateTimestamp = block.timestamp;
-        
+
         if (delta > 0) {
             if (asset.totalDeposits == 0) {
                 // No deposits, but still update timestamp
@@ -131,7 +131,8 @@ contract DepositManager is ReentrancyGuard {
             }
 
             uint256 U = (asset.totalBorrows * 1e18) / (asset.totalDeposits + asset.totalBorrows);
-            uint256 supplyRate = _calculateSupplyRate(U, asset.baseRate, asset.slope1, asset.slope2, asset.kink, asset.reserveFactor);
+            uint256 supplyRate =
+                _calculateSupplyRate(U, asset.baseRate, asset.slope1, asset.slope2, asset.kink, asset.reserveFactor);
             uint256 accrued = (supplyRate * delta) / (365 days);
             asset.liquidityIndex = (asset.liquidityIndex * (RAY + accrued)) / RAY;
         }
@@ -213,29 +214,30 @@ contract DepositManager is ReentrancyGuard {
     function balanceOf(bytes32 tokenId, address user) public view returns (uint256) {
         Asset storage config = assets[tokenId];
         if (!config.isActive) revert TokenNotActive(tokenId);
-        
+
         // Update liquidity index to current time (this is what Aave does)
         uint256 currentLiquidityIndex = _getCurrentLiquidityIndex(tokenId);
-        
+
         return (userBalances[tokenId][user].scaledBalance * currentLiquidityIndex) / RAY;
     }
 
     function _getCurrentLiquidityIndex(bytes32 tokenId) internal view returns (uint256) {
         Asset storage asset = assets[tokenId];
         uint256 delta = block.timestamp - asset.lastUpdateTimestamp;
-        
+
         if (delta == 0) {
             return asset.liquidityIndex;
         }
-        
+
         if (asset.totalDeposits == 0) {
             return asset.liquidityIndex;
         }
-        
+
         uint256 U = (asset.totalBorrows * 1e18) / (asset.totalDeposits + asset.totalBorrows);
-        uint256 supplyRate = _calculateSupplyRate(U, asset.baseRate, asset.slope1, asset.slope2, asset.kink, asset.reserveFactor);
+        uint256 supplyRate =
+            _calculateSupplyRate(U, asset.baseRate, asset.slope1, asset.slope2, asset.kink, asset.reserveFactor);
         uint256 accrued = (supplyRate * delta) / (365 days);
-        
+
         return (asset.liquidityIndex * (RAY + accrued)) / RAY;
     }
 
@@ -269,13 +271,10 @@ contract DepositManager is ReentrancyGuard {
         } else {
             borrowRate = baseRate + slope1 + ((slope2 * (U - kink)) / (1e18 - kink));
         }
-        
-        // Supply rate = borrow rate * utilization * (1 - reserve factor)
-        // When U = 0, return 0 (no supply rate when no utilization)
-        // When U > 0, return the supply rate based on utilization
-        return (borrowRate * U * (RAY - reserveFactor)) / RAY;
+
+        return (borrowRate * (RAY - reserveFactor)) / RAY;
     }
-    
+
     function _calculateBorrowRate(uint256 U, uint256 baseRate, uint256 slope1, uint256 slope2, uint256 kink)
         internal
         pure

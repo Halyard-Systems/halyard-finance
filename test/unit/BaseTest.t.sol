@@ -50,9 +50,9 @@ contract BaseTest is Test {
             "ETH",
             address(0), // ETH is represented as address(0)
             18,
-            0.1e27, // 10% base rate
-            0.5e27, // 50% slope1
-            5.0e27, // 500% slope2
+            0.01e27, // 1% base rate
+            0.04e27, // 4% slope1
+            0.08e27, // 8% slope2
             0.8e18, // 80% utilization kink
             0.1e27 // 10% reserve factor
         );
@@ -61,9 +61,9 @@ contract BaseTest is Test {
             "USDC",
             address(mockUSDC), // Use mock USDC address
             6,
-            0.2e27, // 20% base rate
-            0.8e27, // 80% slope1
-            8.0e27, // 800% slope2
+            0.02e27, // 2% base rate
+            0.06e27, // 6% slope1
+            0.12e27, // 12% slope2
             0.8e18, // 80% utilization kink
             0.1e27 // 10% reserve factor
         );
@@ -72,9 +72,9 @@ contract BaseTest is Test {
             "USDT",
             address(mockUSDT), // Use mock USDT address
             6,
-            0.05e27, // 5% base rate
-            0.3e27, // 30% slope1
-            3.0e27, // 300% slope2
+            0.015e27, // 1.5% base rate
+            0.05e27, // 5% slope1
+            0.1e27, // 10% slope2
             0.8e18, // 80% utilization kink
             0.1e27 // 10% reserve factor
         );
