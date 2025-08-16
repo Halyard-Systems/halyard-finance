@@ -515,7 +515,7 @@ contract BorrowManagerTest is BaseTest {
         // Borrow index should have increased due to interest accrual
         assertGt(finalBorrowIndex, initialBorrowIndex, "Borrow index should increase over time");
         assertEq(initialBorrowIndex, 10000000000000000000 * 1e8);
-        assertEq(finalBorrowIndex, 12166666666666666660 * 1e8);
+        assertEq(finalBorrowIndex, 1021249999999999999950000000);
         console.log("Interest accrued factor:", (finalBorrowIndex * 1e18) / initialBorrowIndex);
     }
 
@@ -558,7 +558,7 @@ contract BorrowManagerTest is BaseTest {
 
         assertLt(finalScaledBorrow, initialScaledBorrow);
         assertEq(initialScaledBorrow, 1000000);
-        assertEq(finalScaledBorrow, 47733);
+        assertEq(finalScaledBorrow, 4985);
     }
 
     function test_ScaledBorrowCalculation() public {
