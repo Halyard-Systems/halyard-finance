@@ -133,88 +133,95 @@ contract InterestTest is BaseTest {
         depositManager.decrementTotalBorrows(USDC_TOKEN_ID, 100 * USDC_DECIMALS);
     }
 
-    // TODO: reimplement
-    // function test_ScaledBalanceConsistency() public {
-    //     uint256 depositAmount = 1000 * USDC_DECIMALS;
+    function test_ScaledBalanceConsistency() public {
+        uint256 depositAmount = 1000 * USDC_DECIMALS;
 
-    //     vm.prank(alice);
-    //     depositManager.deposit(USDC_TOKEN_ID, depositAmount);
+        vm.prank(alice);
+        depositManager.deposit(USDC_TOKEN_ID, depositAmount);
 
-    //     // Add time to trigger interest accrual
-    //     vm.warp(block.timestamp + 30 days);
+        // Add time to trigger interest accrual
+        vm.warp(block.timestamp + 30 days);
 
-    //     // Trigger liquidity index update
-    //     vm.prank(bob);
-    //     depositManager.deposit(USDC_TOKEN_ID, 1 * USDC_DECIMALS);
+        // Trigger liquidity index update and add enough liquidity to cover withdrawal of capital + interest
+        vm.prank(bob);
+        depositManager.deposit(USDC_TOKEN_ID, 100 * USDC_DECIMALS);
 
-    //     // Get the actual balance (which includes accrued interest)
-    //     uint256 actualBalance = depositManager.balanceOf(USDC_TOKEN_ID, alice);
+        // Get the actual balance (which includes accrued interest)
+        uint256 actualBalance = depositManager.balanceOf(USDC_TOKEN_ID, alice);
 
-    //     // Withdraw the full balance
-    //     vm.prank(alice);
-    //     depositManager.withdraw(USDC_TOKEN_ID, actualBalance );
+        // Withdraw the full balance
+        vm.prank(alice);
+        depositManager.withdraw(USDC_TOKEN_ID, actualBalance );
 
-    //     uint256 remainingBalance = depositManager.balanceOf(USDC_TOKEN_ID, alice);
-    //     assertLe(
-    //         remainingBalance, 1, "Balance should be zero or have minimal rounding error (<= 1 unit) after withdrawal"
-    //     );
-    // }
+        uint256 remainingBalance = depositManager.balanceOf(USDC_TOKEN_ID, alice);
+        assertLe(
+            remainingBalance, 1, "Balance should be zero or have minimal rounding error (<= 1 unit) after withdrawal"
+        );
+    }
 
-    // function test_MultipleUsersInterestAccrual() public {
-    //     // Test that multiple users earn interest correctly
-    //     uint256 aliceDeposit = 1000 * USDC_DECIMALS;
-    //     uint256 bobDeposit = 500 * USDC_DECIMALS;
+    function test_MultipleUsersInterestAccrual() public {
+        // Test that multiple users earn interest correctly
+        uint256 aliceDeposit = 1000 * USDC_DECIMALS;
+        uint256 bobDeposit = 500 * USDC_DECIMALS;
 
-    //     vm.prank(alice);
-    //     depositManager.deposit(USDC_TOKEN_ID, aliceDeposit);
+        vm.prank(alice);
+        depositManager.deposit(USDC_TOKEN_ID, aliceDeposit);
 
-    //     vm.prank(bob);
-    //     depositManager.deposit(USDC_TOKEN_ID, bobDeposit);
+        vm.prank(bob);
+        depositManager.deposit(USDC_TOKEN_ID, bobDeposit);
 
-    //     uint256 aliceInitialBalance = depositManager.balanceOf(
-    //         USDC_TOKEN_ID,
-    //         alice
-    //     );
-    //     uint256 bobInitialBalance = depositManager.balanceOf(
-    //         USDC_TOKEN_ID,
-    //         bob
-    //     );
+        uint256 aliceInitialBalance = depositManager.balanceOf(
+            USDC_TOKEN_ID,
+            alice
+        );
+        uint256 bobInitialBalance = depositManager.balanceOf(
+            USDC_TOKEN_ID,
+            bob
+        );
 
-    //     // Add borrows and time
-    //     // Use consistent parameters with other working tests
-    //     depositManager.incrementTotalBorrows(
-    //         USDC_TOKEN_ID,
-    //         150 * USDC_DECIMALS // 10% utilization (150/1500 total deposits)
-    //     );
-    //     vm.warp(block.timestamp + 365 days);
+        // Bob needs to deposit ETH as collateral before borrowing USDC
+        vm.prank(bob);
+        depositManager.deposit{value: 10 ether}(ETH_TOKEN_ID, 10 ether);
 
-    //     // Trigger liquidity index update by making a small deposit
-    //     vm.prank(charlie);
-    //     depositManager.deposit(USDC_TOKEN_ID, 1 * USDC_DECIMALS);
+        // Bob borrows USDC to create utilization
+        bytes[] memory emptyPythData = new bytes[](0);
+        bytes32[] memory priceIds = new bytes32[](3);
+        priceIds[0] = bytes32(uint256(1)); // ETH price ID
+        priceIds[1] = bytes32(uint256(2)); // USDC price ID
+        priceIds[2] = bytes32(uint256(3)); // USDT price ID
 
-    //     uint256 aliceNewBalance = depositManager.balanceOf(
-    //         USDC_TOKEN_ID,
-    //         alice
-    //     );
-    //     uint256 bobNewBalance = depositManager.balanceOf(USDC_TOKEN_ID, bob);
+        vm.prank(bob);
+        borrowManager.borrow(USDC_TOKEN_ID, 150 * USDC_DECIMALS, emptyPythData, priceIds);
 
-    //     assertGt(
-    //         aliceNewBalance,
-    //         aliceInitialBalance,
-    //         "Alice should earn interest"
-    //     );
-    //     assertGt(bobNewBalance, bobInitialBalance, "Bob should earn interest");
+        vm.warp(block.timestamp + 365 days);
 
-    //     // Alice should earn more interest proportionally (2:1 ratio)
-    //     uint256 aliceInterest = aliceNewBalance - aliceInitialBalance;
-    //     uint256 bobInterest = bobNewBalance - bobInitialBalance;
-    //     assertApproxEqRel(
-    //         aliceInterest,
-    //         bobInterest * 2,
-    //         0.01e18,
-    //         "Interest should be proportional to deposits"
-    //     );
-    // }
+        // Trigger liquidity index update by making a small deposit
+        vm.prank(charlie);
+        depositManager.deposit(USDC_TOKEN_ID, 1 * USDC_DECIMALS);
+
+        uint256 aliceNewBalance = depositManager.balanceOf(
+            USDC_TOKEN_ID,
+            alice
+        );
+        uint256 bobNewBalance = depositManager.balanceOf(USDC_TOKEN_ID, bob);
+
+        assertGt(
+            aliceNewBalance,
+            aliceInitialBalance,
+            "Alice should earn interest"
+        );
+        assertGt(bobNewBalance, bobInitialBalance, "Bob should earn interest");
+
+        // Alice should earn more interest proportionally (2:1 ratio)
+        uint256 aliceInterest = aliceNewBalance - aliceInitialBalance;
+        uint256 bobInterest = bobNewBalance - bobInitialBalance;
+        assertApproxEqRel(
+            aliceInterest,
+            bobInterest * 2,
+            0.01e18,
+            "Interest should be proportional to deposits"
+        );
+    }
 
     function test_SetLastBorrowTime() public {
         uint256 newTimestamp = block.timestamp + 1000;

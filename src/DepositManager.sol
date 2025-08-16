@@ -167,9 +167,6 @@ contract DepositManager is ReentrancyGuard {
             _safeTransferFrom(config.tokenAddress, msg.sender, address(this), amount);
         }
 
-        console.log("Deposited amount:", amount);
-        console.log("Liquidity index:", config.liquidityIndex);
-
         // Mint scaled receipt tokens
         uint256 scaled = (amount * RAY) / config.liquidityIndex;
         userBalances[tokenId][msg.sender].scaledBalance += scaled;
