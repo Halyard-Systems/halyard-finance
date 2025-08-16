@@ -1,7 +1,5 @@
 ## Halyard Finance
 
-**Multichain money market**
-
 <img width="1094" height="698" alt="Screenshot from 2025-08-16 02-15-26" src="https://github.com/user-attachments/assets/6ec7ed7c-1a80-4b8b-b8a2-e110bb6f1aa1" />
 
 
