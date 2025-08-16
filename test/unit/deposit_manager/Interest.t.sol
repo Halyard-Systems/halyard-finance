@@ -151,7 +151,7 @@ contract InterestTest is BaseTest {
 
         // Withdraw the full balance
         vm.prank(alice);
-        depositManager.withdraw(USDC_TOKEN_ID, actualBalance );
+        depositManager.withdraw(USDC_TOKEN_ID, actualBalance);
 
         uint256 remainingBalance = depositManager.balanceOf(USDC_TOKEN_ID, alice);
         assertLe(
@@ -170,14 +170,8 @@ contract InterestTest is BaseTest {
         vm.prank(bob);
         depositManager.deposit(USDC_TOKEN_ID, bobDeposit);
 
-        uint256 aliceInitialBalance = depositManager.balanceOf(
-            USDC_TOKEN_ID,
-            alice
-        );
-        uint256 bobInitialBalance = depositManager.balanceOf(
-            USDC_TOKEN_ID,
-            bob
-        );
+        uint256 aliceInitialBalance = depositManager.balanceOf(USDC_TOKEN_ID, alice);
+        uint256 bobInitialBalance = depositManager.balanceOf(USDC_TOKEN_ID, bob);
 
         // Bob needs to deposit ETH as collateral before borrowing USDC
         vm.prank(bob);
@@ -199,28 +193,16 @@ contract InterestTest is BaseTest {
         vm.prank(charlie);
         depositManager.deposit(USDC_TOKEN_ID, 1 * USDC_DECIMALS);
 
-        uint256 aliceNewBalance = depositManager.balanceOf(
-            USDC_TOKEN_ID,
-            alice
-        );
+        uint256 aliceNewBalance = depositManager.balanceOf(USDC_TOKEN_ID, alice);
         uint256 bobNewBalance = depositManager.balanceOf(USDC_TOKEN_ID, bob);
 
-        assertGt(
-            aliceNewBalance,
-            aliceInitialBalance,
-            "Alice should earn interest"
-        );
+        assertGt(aliceNewBalance, aliceInitialBalance, "Alice should earn interest");
         assertGt(bobNewBalance, bobInitialBalance, "Bob should earn interest");
 
         // Alice should earn more interest proportionally (2:1 ratio)
         uint256 aliceInterest = aliceNewBalance - aliceInitialBalance;
         uint256 bobInterest = bobNewBalance - bobInitialBalance;
-        assertApproxEqRel(
-            aliceInterest,
-            bobInterest * 2,
-            0.01e18,
-            "Interest should be proportional to deposits"
-        );
+        assertApproxEqRel(aliceInterest, bobInterest * 2, 0.01e18, "Interest should be proportional to deposits");
     }
 
     function test_SetLastBorrowTime() public {
