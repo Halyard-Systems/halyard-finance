@@ -31,11 +31,11 @@ contract BorrowManager is ReentrancyGuard {
     error PriceStale();
     error InsufficientCollateral();
 
-    constructor(address _depositMgr, address _pyth) {
+    constructor(address _depositMgr, address _pyth, uint256 _ltv) {
         depositMgr = DepositManager(payable(_depositMgr));
         pyth = IPyth(_pyth);
         owner = msg.sender;
-        ltv = 0.5e18;
+        ltv = _ltv; // 0.5e18;
     }
 
     function setLtv(uint256 _ltv) external onlyOwner {

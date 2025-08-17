@@ -40,7 +40,7 @@ contract BaseTest is Test {
         depositManager = new DepositManager(mockStargateRouter, mockPoolId);
 
         // Deploy BorrowManager
-        borrowManager = new BorrowManager(address(depositManager), mockPyth);
+        borrowManager = new BorrowManager(address(depositManager), mockPyth, 0.5e18);
 
         // Set up the test contract as the BorrowManager for testing
         depositManager.setBorrowManager(address(borrowManager));

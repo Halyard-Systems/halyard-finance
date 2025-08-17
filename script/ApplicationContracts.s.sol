@@ -85,7 +85,7 @@ contract ApplicationContractsScript is Script {
         console.log("MockPyth deployed at:", address(mockPyth));
 
         // Deploy BorrowManager
-        BorrowManager borrowManager = new BorrowManager(address(depositManager), address(mockPyth));
+        BorrowManager borrowManager = new BorrowManager(address(depositManager), address(mockPyth), 0.8e18);
         console.log("BorrowManager deployed at:", address(borrowManager));
 
         depositManager.setBorrowManager(address(borrowManager));
