@@ -18,6 +18,7 @@ import {
 import type { Asset, Token } from './lib/types'
 
 import TOKENS from './tokens.json'
+import { RepayForm } from './components/RepayForm'
 
 const buildMarketRows = (
   assets: Asset[],
@@ -28,7 +29,8 @@ const buildMarketRows = (
   setSelectedToken: (token: Token) => void,
   setIsDepositModalOpen: (isOpen: boolean) => void,
   setIsWithdrawModalOpen: (isOpen: boolean) => void,
-  setIsBorrowModalOpen: (isOpen: boolean) => void
+  setIsBorrowModalOpen: (isOpen: boolean) => void,
+  setIsRepayModalOpen: (isOpen: boolean) => void
 ) => {
   if (!assets) return []
 
@@ -60,6 +62,10 @@ const buildMarketRows = (
       onBorrow: () => {
         setSelectedToken(token!)
         setIsBorrowModalOpen(true)
+      },
+      onRepay: () => {
+        setSelectedToken(token!)
+        setIsRepayModalOpen(true)
       },
     }
   })
@@ -187,6 +193,7 @@ function App() {
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false)
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false)
   const [isBorrowModalOpen, setIsBorrowModalOpen] = useState(false)
+  const [isRepayModalOpen, setIsRepayModalOpen] = useState(false)
 
   // Function to refresh all data after transaction completion
   const handleTransactionComplete = () => {
@@ -204,7 +211,8 @@ function App() {
     setSelectedToken,
     setIsDepositModalOpen,
     setIsWithdrawModalOpen,
-    setIsBorrowModalOpen
+    setIsBorrowModalOpen,
+    setIsRepayModalOpen
   )
 
   // Get selected token data for modals
@@ -252,6 +260,17 @@ function App() {
               selectedToken={selectedToken}
               tokenId={selectedTokenData?.tokenId}
               tokenIds={tokenIds as `0x${string}`[]}
+              borrows={actualBorrows}
+              onTransactionComplete={handleTransactionComplete}
+            />
+
+            {/* Repay Modal */}
+            <RepayForm
+              key={`repay-${selectedToken.symbol}-${isRepayModalOpen}`}
+              isOpen={isRepayModalOpen}
+              onClose={() => setIsRepayModalOpen(false)}
+              selectedToken={selectedToken}
+              tokenId={selectedTokenData?.tokenId as `0x${string}`}
               borrows={actualBorrows}
               onTransactionComplete={handleTransactionComplete}
             />

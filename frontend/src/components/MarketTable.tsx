@@ -13,6 +13,7 @@ export interface MarketRow {
   onDeposit: () => void
   onWithdraw: () => void
   onBorrow: () => void
+  onRepay: () => void
 }
 
 interface MarketTableProps {
@@ -165,6 +166,11 @@ export function MarketTable({ rows }: MarketTableProps) {
                         onClick={row.onWithdraw}
                       >
                         Withdraw
+                      </Button>
+                    )}
+                    {row.userBorrow > 0 && (
+                      <Button variant='outline' size='sm' onClick={row.onRepay}>
+                        Repay
                       </Button>
                     )}
                   </div>

@@ -10,7 +10,7 @@ import {
 } from './ui/dialog'
 
 import ERC20_ABI from '../abis/ERC20.json'
-import DEPOSIT_MANAGER_ABI from '../abis/DepositManager.json'
+import BORROW_MANAGER_ABI from '../abis/BorrowManager.json'
 import type { Token } from '../lib/types'
 import { toWei, fromWei, formatTransactionError } from '../lib/utils'
 
@@ -25,24 +25,37 @@ import {
   useReadERC20Balance,
 } from '@/lib/hooks'
 
-interface DepositFormProps {
+interface RepayFormProps {
   isOpen: boolean
   onClose: () => void
   selectedToken: Token
-  tokenId?: `0x${string}`
+  tokenId: `0x${string}`
+  borrows: bigint[]
   onTransactionComplete?: () => void
   onTransactionError?: (error: string) => void
 }
 
-export function DepositForm({
+export function RepayForm({
   isOpen,
   onClose,
   selectedToken,
   tokenId,
+  borrows,
   onTransactionComplete,
   onTransactionError,
-}: DepositFormProps) {
+}: RepayFormProps) {
   const { address } = useAccount()
+
+  let borrowedAmount = 0
+  if (borrows?.length > 0) {
+    if (selectedToken.symbol === 'ETH') {
+      borrowedAmount = fromWei(borrows[0], selectedToken.decimals) as number
+    } else if (selectedToken.symbol === 'USDC') {
+      borrowedAmount = fromWei(borrows[1], selectedToken.decimals) as number
+    } else {
+      borrowedAmount = fromWei(borrows[2], selectedToken.decimals) as number
+    }
+  }
 
   let walletBalance = 0
 
@@ -62,21 +75,27 @@ export function DepositForm({
     walletBalance = fromWei(walletBalanceData as any, selectedToken.decimals)
   }
 
-  const { data: allowance } = useReadDepositManagerAllowance(
-    address! as `0x${string}`,
-    selectedToken
-  )
+  const { data: allowance, refetch: refetchAllowance } =
+    useReadDepositManagerAllowance(address! as `0x${string}`, selectedToken)
 
-  const [depositAmount, setDepositAmount] = useState('')
+  const [repayAmount, setRepayAmount] = useState('')
 
   // Check if approval is needed (only for ERC20 tokens, not ETH)
-  const depositAmountNumber = Number(depositAmount) || 0
+  const repayAmountNumber = Number(repayAmount) || 0
   const isETH =
     selectedToken.address === '0x0000000000000000000000000000000000000000'
+
+  // Convert allowance to a number for comparison
+  const allowanceNumber = allowance
+    ? fromWei(allowance as bigint, selectedToken.decimals)
+    : 0
+
   const needsApproval =
-    !isETH &&
-    depositAmountNumber >
-      fromWei((allowance as any)?.data, selectedToken.decimals)
+    !isETH && repayAmountNumber > 0 && repayAmountNumber > allowanceNumber
+
+  console.log('Repay amount:', repayAmountNumber)
+  console.log('Allowance number:', allowanceNumber)
+  console.log('Needs approval:', needsApproval)
 
   const {
     writeContract: writeApproval,
@@ -86,10 +105,10 @@ export function DepositForm({
   } = useWriteContract()
 
   const {
-    writeContract: writeDeposit,
-    isPending: isDepositing,
-    error: depositError,
-    data: depositData,
+    writeContract: writeRepay,
+    isPending: isRepaying,
+    error: repayError,
+    data: repayData,
   } = useWriteContract()
 
   // Wait for transaction receipts and handle completion
@@ -103,32 +122,34 @@ export function DepositForm({
   })
 
   const {
-    isLoading: isDepositConfirming,
-    isSuccess: isDepositConfirmed,
-    isError: isDepositError,
-    error: depositTransactionError,
+    isLoading: isRepayConfirming,
+    isSuccess: isRepayConfirmed,
+    isError: isRepayError,
+    error: repayTransactionError,
   } = useWaitForTransactionReceipt({
-    hash: depositData,
+    hash: repayData,
   })
 
   // Handle approval completion
   useEffect(() => {
     if (isApprovalConfirmed) {
+      // Refetch allowance data to update the UI
+      refetchAllowance()
       // Optionally trigger data refresh in parent
       onTransactionComplete?.()
     }
-  }, [isApprovalConfirmed, onTransactionComplete])
+  }, [isApprovalConfirmed, refetchAllowance, onTransactionComplete])
 
   // Handle deposit completion
   useEffect(() => {
-    if (isDepositConfirmed) {
+    if (isRepayConfirmed) {
       // Clear the input after successful deposit
-      setDepositAmount('')
+      setRepayAmount('')
       onClose()
       // Optionally trigger data refresh in parent
       onTransactionComplete?.()
     }
-  }, [isDepositConfirmed, onTransactionComplete, onClose])
+  }, [isRepayConfirmed, onTransactionComplete, onClose])
 
   // Handle transaction errors
   useEffect(() => {
@@ -141,24 +162,24 @@ export function DepositForm({
   }, [isApprovalError, approvalTransactionError, onTransactionError])
 
   useEffect(() => {
-    if (isDepositError && depositTransactionError) {
+    if (isRepayError && repayTransactionError) {
       const formattedError = formatTransactionError(
-        depositTransactionError.message
+        repayTransactionError.message
       )
       onTransactionError?.(formattedError)
     }
-  }, [isDepositError, depositTransactionError, onTransactionError])
+  }, [isRepayError, repayTransactionError, onTransactionError])
 
   const handleApproval = async () => {
-    if (!depositAmount || !address || isETH) {
-      console.error('Invalid deposit amount, address, or trying to approve ETH')
+    if (!repayAmount || !address || isETH) {
+      console.error('Invalid repay amount, address, or trying to approve ETH')
       return
     }
 
     try {
-      const amountInWei = toWei(Number(depositAmount), selectedToken.decimals)
+      const amountInWei = toWei(Number(repayAmount), selectedToken.decimals)
 
-      // Call the approve function for DepositManager
+      // Call the approve function for DepositManager (BorrowManager uses DepositManager for transfers)
       await writeApproval({
         address: selectedToken.address as `0x${string}`,
         abi: ERC20_ABI,
@@ -173,39 +194,37 @@ export function DepositForm({
     }
   }
 
-  const handleDeposit = async () => {
-    if (!depositAmount || !address || !tokenId) {
-      console.error('Invalid deposit amount, address, or token ID')
+  const handleRepay = async () => {
+    if (!repayAmount || !address || !tokenId) {
+      console.error('Invalid repay amount, address, or token ID')
       return
     }
 
     try {
       if (isETH) {
-        // Handle ETH deposit
-        const amountInWei = toWei(Number(depositAmount), selectedToken.decimals)
+        // Handle ETH repay
+        const amountInWei = toWei(Number(repayAmount), selectedToken.decimals)
 
-        await writeDeposit({
-          address: import.meta.env
-            .VITE_DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
-          abi: DEPOSIT_MANAGER_ABI,
-          functionName: 'deposit',
+        await writeRepay({
+          address: import.meta.env.VITE_BORROW_MANAGER_ADDRESS as `0x${string}`,
+          abi: BORROW_MANAGER_ABI,
+          functionName: 'repay',
           args: [tokenId, amountInWei],
           value: amountInWei, // Send ETH with the transaction
         })
       } else {
-        // Handle ERC20 token deposit
-        const amountInWei = toWei(Number(depositAmount), selectedToken.decimals)
+        // Handle ERC20 token repay
+        const amountInWei = toWei(Number(repayAmount), selectedToken.decimals)
 
-        await writeDeposit({
-          address: import.meta.env
-            .VITE_DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
-          abi: DEPOSIT_MANAGER_ABI,
-          functionName: 'deposit',
+        await writeRepay({
+          address: import.meta.env.VITE_BORROW_MANAGER_ADDRESS as `0x${string}`,
+          abi: BORROW_MANAGER_ABI,
+          functionName: 'repay',
           args: [tokenId, amountInWei],
         })
       }
     } catch (error) {
-      console.error('Deposit failed:', error)
+      console.error('Repay failed:', error)
     }
   }
 
@@ -213,10 +232,9 @@ export function DepositForm({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className='sm:max-w-xl w-[95vw] max-w-[600px] max-h-[90vh] overflow-y-auto'>
         <DialogHeader>
-          <DialogTitle>Deposit {selectedToken.symbol}</DialogTitle>
+          <DialogTitle>Repay {selectedToken.symbol}</DialogTitle>
           <DialogDescription>
-            Enter the amount of {selectedToken.symbol} you want to deposit as
-            collateral.
+            Enter the amount of {selectedToken.symbol} you want to repay.
           </DialogDescription>
         </DialogHeader>
 
@@ -247,6 +265,12 @@ export function DepositForm({
               Amount ({selectedToken.symbol})
             </label>
             <p className='text-sm text-muted-foreground mb-2 break-words'>
+              Owed:{' '}
+              {borrowedAmount.toLocaleString(undefined, {
+                maximumFractionDigits: 6,
+              })}
+            </p>
+            <p className='text-sm text-muted-foreground mb-2 break-words'>
               Available:{' '}
               {walletBalance.toLocaleString(undefined, {
                 maximumFractionDigits: 6,
@@ -254,13 +278,13 @@ export function DepositForm({
             </p>
             <input
               type='number'
-              value={depositAmount}
-              onChange={(e) => setDepositAmount(e.target.value)}
+              value={repayAmount}
+              onChange={(e) => setRepayAmount(e.target.value)}
               placeholder={`0.00 ${selectedToken.symbol}`}
               className='w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground'
               disabled={
-                isDepositing ||
-                isDepositConfirming ||
+                isRepaying ||
+                isRepayConfirming ||
                 isApproving ||
                 isApprovalConfirming
               }
@@ -268,7 +292,7 @@ export function DepositForm({
           </div>
 
           {/* Approval Status */}
-          {depositAmount && !isETH && (
+          {repayAmount && !isETH && (
             <div className='text-sm text-muted-foreground p-3 bg-muted rounded-md w-full min-w-0'>
               <div className='space-y-2 w-full min-w-0'>
                 <div className='flex justify-between items-center w-full min-w-0'>
@@ -276,10 +300,7 @@ export function DepositForm({
                     DepositManager allowance:
                   </span>
                   <span className='font-mono text-right flex-shrink-0'>
-                    {fromWei(
-                      (allowance as any)?.data,
-                      selectedToken.decimals
-                    ).toLocaleString(undefined, {
+                    {allowanceNumber.toLocaleString(undefined, {
                       maximumFractionDigits: 6,
                     })}{' '}
                     {selectedToken.symbol}
@@ -295,7 +316,7 @@ export function DepositForm({
           )}
 
           {/* Error Display */}
-          {(approvalError || depositError) && (
+          {(approvalError || repayError) && (
             <div className='text-sm text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded-md min-w-0'>
               <div className='flex items-start space-x-2'>
                 <div className='flex-shrink-0 mt-0.5'>
@@ -313,7 +334,7 @@ export function DepositForm({
                 </div>
                 <div className='flex-1 break-words leading-relaxed'>
                   {formatTransactionError(
-                    (approvalError || depositError)?.message || ''
+                    (approvalError || repayError)?.message || ''
                   )}
                 </div>
               </div>
@@ -325,10 +346,10 @@ export function DepositForm({
           <Button variant='outline' onClick={onClose} className='flex-1'>
             Cancel
           </Button>
-          {needsApproval && depositAmount && (
+          {needsApproval && repayAmount && (
             <Button
               onClick={handleApproval}
-              disabled={!depositAmount || isApproving || isApprovalConfirming}
+              disabled={!repayAmount || isApproving || isApprovalConfirming}
               className='flex-1'
             >
               {isApproving
@@ -339,23 +360,23 @@ export function DepositForm({
             </Button>
           )}
           <Button
-            onClick={handleDeposit}
+            onClick={handleRepay}
             disabled={
-              !depositAmount ||
+              !repayAmount ||
               !tokenId ||
-              isDepositing ||
-              isDepositConfirming ||
+              isRepaying ||
+              isRepayConfirming ||
               isApproving ||
               isApprovalConfirming ||
               needsApproval
             }
             className='flex-1'
           >
-            {isDepositing
-              ? 'Depositing...'
-              : isDepositConfirming
-              ? 'Confirming Deposit...'
-              : `Deposit ${selectedToken.symbol}`}
+            {isRepaying
+              ? 'Repaying...'
+              : isRepayConfirming
+              ? 'Confirming Repay...'
+              : `Repay ${selectedToken.symbol}`}
           </Button>
         </DialogFooter>
       </DialogContent>
