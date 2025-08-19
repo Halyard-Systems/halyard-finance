@@ -21,15 +21,15 @@ import { toWei, formatTransactionError } from '../lib/utils'
 import type { Token } from '../lib/types'
 import MOCK_PYTH_ABI from '../abis/MockPyth.json'
 import type { RootState } from '../store/store'
-import { maxBorrow } from '@/store/interactions'
-import { useReadDepositManagerBalances } from '@/lib/hooks'
+import { maxBorrow } from '../store/interactions'
+import { useReadDepositManagerBalances } from '../lib/hooks'
+import {
+  ETH_USDC_USDT_PRICE_IDS,
+  createMockPriceFeedUpdateData,
+  updateMockPriceFeeds,
+} from '../lib/prices'
 
 const USE_MOCK_PYTH = import.meta.env.VITE_USE_MOCK_PYTH === 'true'
-const ETH_USDC_USDT_PRICE_IDS = [
-  '0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace', // ETH/USD
-  '0xeaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a', // USDC/USD
-  '0x2b89b9dc8fdf9f34709a5b106b472f0f39bb6ca9ce04b0fd7f2e971688e2e53b', // USDT/USD
-]
 
 // Helper to fetch Pyth update data for a given priceId using Hermes API
 async function fetchPythUpdateDataFromHermes(
@@ -90,6 +90,8 @@ export function BorrowForm({
     data: borrowData,
   } = useWriteContract()
 
+  const { writeContract: writeMockPyth } = useWriteContract()
+
   // Wait for transaction receipt and handle completion
   const {
     isLoading: isConfirming,
@@ -102,6 +104,7 @@ export function BorrowForm({
 
   const [borrowAmount, setBorrowAmount] = useState('')
   const [customError, setCustomError] = useState<string | null>(null)
+  const [isUpdatingMockPyth, setIsUpdatingMockPyth] = useState(false)
 
   // Calculate max borrowable when component mounts or when maxBorrowable is 0
   useEffect(() => {
@@ -160,34 +163,106 @@ export function BorrowForm({
         throw new Error('Public client not available')
       }
 
+      // Check if user has sufficient deposits
+      if (!deposits || deposits.length === 0) {
+        throw new Error('No deposits found. Please deposit some tokens first.')
+      }
+
+      // Check if user has any deposits
+      const hasDeposits = deposits.some(
+        (deposit) => deposit.result && Number(deposit.result) > 0
+      )
+      if (!hasDeposits) {
+        throw new Error('No deposits found. Please deposit some tokens first.')
+      }
+
+      // Check if max borrowable is available and sufficient
+      if (maxBorrowable === undefined || maxBorrowable <= 0) {
+        throw new Error(
+          'Unable to calculate max borrowable amount. Please try again.'
+        )
+      }
+
+      if (Number(borrowAmount) > maxBorrowable) {
+        throw new Error(
+          `Borrow amount exceeds maximum borrowable amount of ${maxBorrowable.toLocaleString()}`
+        )
+      }
+
       const amountInWei = toWei(Number(borrowAmount), selectedToken.decimals)
 
-      let pythUpdateData: string[]
+      let pythUpdateData: string[] = []
+      let fee: bigint
+
       if (USE_MOCK_PYTH) {
         console.log('Using mock Pyth')
-        // Use empty arrays since price feeds are already set up in deployment
-        pythUpdateData = []
+        const mockPythAddress = import.meta.env
+          .VITE_MOCK_PYTH_ADDRESS as `0x${string}`
+
+        try {
+          setIsUpdatingMockPyth(true)
+
+          // Get the most recent block timestamp right before creating price data
+          const latestBlockNumber = await publicClient.getBlockNumber()
+          const latestBlock = await publicClient.getBlock({
+            blockNumber: latestBlockNumber,
+          })
+          console.log(
+            'Latest block timestamp before price creation:',
+            latestBlock.timestamp
+          )
+
+          // Create mock price feed update data with the most recent timestamp
+          let pythUpdateData = await createMockPriceFeedUpdateData(
+            publicClient,
+            mockPythAddress
+          )
+
+          // Update all mock price feeds in a single transaction
+          try {
+            await updateMockPriceFeeds(
+              publicClient,
+              mockPythAddress,
+              pythUpdateData,
+              writeMockPyth
+            )
+            console.log(
+              'All price feeds updated successfully in single transaction'
+            )
+          } catch (updateError) {
+            console.error(
+              'Failed to update mock price feeds, trying with empty data:',
+              updateError
+            )
+            // Fallback: try with empty update data (prices might already be set up)
+            pythUpdateData = []
+          }
+
+          setIsUpdatingMockPyth(false)
+
+          // Calculate the required fee for the borrow transaction
+          fee = (await publicClient.readContract({
+            address: mockPythAddress,
+            abi: MOCK_PYTH_ABI,
+            functionName: 'getUpdateFee',
+            args: [pythUpdateData],
+          })) as bigint
+
+          console.log('Borrow transaction fee:', fee.toString())
+        } catch (error) {
+          setIsUpdatingMockPyth(false)
+          throw new Error(
+            `Failed to update mock price feeds: ${
+              error instanceof Error ? error.message : 'Unknown error'
+            }`
+          )
+        }
       } else {
         try {
           pythUpdateData = await fetchPythUpdateDataFromHermes(
             ETH_USDC_USDT_PRICE_IDS
           )
-        } catch (error) {
-          throw new Error(
-            `Failed to fetch price data: ${
-              error instanceof Error ? error.message : 'Unknown error'
-            }`
-          )
-        }
-      }
 
-      // Calculate the required fee for Pyth update
-      let fee: bigint
-      if (USE_MOCK_PYTH) {
-        // For MockPyth with empty update data, fee is 0
-        fee = 0n
-      } else {
-        try {
           fee = (await publicClient.readContract({
             address: import.meta.env.VITE_MOCK_PYTH_ADDRESS as `0x${string}`,
             abi: MOCK_PYTH_ABI,
@@ -196,7 +271,7 @@ export function BorrowForm({
           })) as bigint
         } catch (error) {
           throw new Error(
-            `Failed to calculate fee: ${
+            `Failed to fetch price data: ${
               error instanceof Error ? error.message : 'Unknown error'
             }`
           )
@@ -278,7 +353,7 @@ export function BorrowForm({
               onChange={(e) => setBorrowAmount(e.target.value)}
               placeholder={`0.00 ${selectedToken.symbol}`}
               className='w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground'
-              disabled={isBorrowing || isConfirming}
+              disabled={isBorrowing || isConfirming || isUpdatingMockPyth}
               max={maxBorrowable}
             />
           </div>
@@ -319,6 +394,7 @@ export function BorrowForm({
               !tokenId ||
               isBorrowing ||
               isConfirming ||
+              isUpdatingMockPyth ||
               Number(borrowAmount) > Number(maxBorrowable) ||
               Number(borrowAmount) <= 0 ||
               maxBorrowable === undefined
@@ -329,6 +405,8 @@ export function BorrowForm({
               ? 'Borrowing...'
               : isConfirming
               ? 'Confirming...'
+              : isUpdatingMockPyth
+              ? 'Updating Prices...'
               : `Borrow ${selectedToken.symbol}`}
           </Button>
         </DialogFooter>

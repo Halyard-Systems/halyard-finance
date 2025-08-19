@@ -85,11 +85,10 @@ contract BorrowManager is ReentrancyGuard {
             console.log("Token id");
             console.logBytes32(tokens[i]);
             bytes32 tid = tokens[i];
-            // PythStructs.Price memory price = pyth.getPriceNoOlderThan(
-            //     priceIds[i],
-            //     60
-            // );
-            PythStructs.Price memory price = pyth.getPriceUnsafe(priceIds[i]);
+            PythStructs.Price memory price = pyth.getPriceNoOlderThan(
+                priceIds[i],
+                60 * 10
+            );
             console.log("Price", price.price);
             require(price.price >= 0, "Negative price");
             uint256 priceUint = uint256(uint64(price.price));
@@ -170,46 +169,6 @@ contract BorrowManager is ReentrancyGuard {
         console.log("Borrow index", borrowIndex[tokenId]);
         depositMgr.setLastBorrowTime(tokenId, block.timestamp);
     }
-
-    // Calculate user's Loan-to-Value (LTV) ratio across all supported tokens
-    // function getUserLtv(
-    //     address user,
-    //     bytes[] calldata pythUpdateData,
-    //     bytes32[] calldata priceIds
-    // ) external returns (uint256 userLtv) {
-    //     // 1. Update all prices
-    //     uint fee = pyth.getUpdateFee(pythUpdateData);
-    //     pyth.updatePriceFeeds{value: fee}(pythUpdateData);
-
-    //     bytes32[] memory tokens = depositMgr.getSupportedTokens();
-    //     require(tokens.length == priceIds.length, "Mismatched tokens/prices");
-
-    //     uint256 totalCollateralUsd = 0;
-    //     uint256 totalBorrowUsd = 0;
-
-    //     for (uint i = 0; i < tokens.length; i++) {
-    //         bytes32 tokenId = tokens[i];
-    //         PythStructs.Price memory price = pyth.getPriceNoOlderThan(
-    //             priceIds[i],
-    //             60
-    //         );
-    //         require(price.price >= 0, "Negative price");
-    //         uint256 priceUint = uint256(uint64(price.price));
-
-    //         // Collateral
-    //         uint256 deposit = depositMgr.balanceOf(tokenId, user);
-    //         totalCollateralUsd += (deposit * priceUint) / 1e8;
-
-    //         // Borrow
-    //         uint256 scaledBorrow = userBorrowScaled[tokenId][user];
-    //         uint256 userBorrowAmount = (scaledBorrow * borrowIndex[tokenId]) /
-    //             depositMgr.RAY();
-    //         totalBorrowUsd += (userBorrowAmount * priceUint) / 1e8;
-    //     }
-
-    //     if (totalCollateralUsd == 0) return 0;
-    //     ltv = (totalBorrowUsd * 1e18) / totalCollateralUsd;
-    // }
 
     receive() external payable {
         revert("ETH transfers not accepted");

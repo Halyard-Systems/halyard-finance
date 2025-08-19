@@ -296,7 +296,7 @@ contract BorrowManagerTest is BaseTest {
             uint256(block.timestamp)
         );
         vm.mockCall(
-            mockPyth, abi.encodeWithSignature("getPriceUnsafe(bytes32)", bytes32(uint256(1))), negativePriceData
+            mockPyth, abi.encodeWithSignature("getPriceNoOlderThan(bytes32,uint256)", bytes32(uint256(1)), uint256(60)), negativePriceData
         );
 
         bytes[] memory emptyPythData = new bytes[](0);
