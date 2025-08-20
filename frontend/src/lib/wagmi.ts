@@ -6,6 +6,6 @@ export const config = createConfig({
   chains: [mainnet],
   connectors: [injected()],
   transports: {
-    [mainnet.id]: http('http://localhost:8545'),
+    [mainnet.id]: http(import.meta.env.VITE_MAINNET_URL),
   },
 })

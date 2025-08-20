@@ -76,7 +76,7 @@ export function DepositForm({
   const needsApproval =
     !isETH &&
     depositAmountNumber >
-      fromWei((allowance as any)?.data, selectedToken.decimals)
+      fromWei((allowance as any) || BigInt(0), selectedToken.decimals)
 
   const {
     writeContract: writeApproval,
@@ -277,7 +277,7 @@ export function DepositForm({
                   </span>
                   <span className='font-mono text-right flex-shrink-0'>
                     {fromWei(
-                      (allowance as any)?.data,
+                      (allowance as any) || BigInt(0),
                       selectedToken.decimals
                     ).toLocaleString(undefined, {
                       maximumFractionDigits: 6,
