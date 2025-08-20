@@ -2,6 +2,8 @@
 
 <img width="1071" height="430" alt="Screenshot from 2025-08-20 01-08-23" src="https://github.com/user-attachments/assets/b40790c9-1194-45c8-97c9-e49086d941b1" />
 
+<img width="1071" height="430" alt="Screenshot from 2025-08-20 01-11-57" src="https://github.com/user-attachments/assets/f5f651e3-0bef-431f-94d2-d8923c915a98" />
+
 ## Development
 
 The local development environment is based on a node with a mainnet fork; see the Makefile for more details.
