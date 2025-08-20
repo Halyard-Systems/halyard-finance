@@ -84,7 +84,7 @@ export function MarketTable({ rows }: MarketTableProps) {
                     {fromWei(row.deposits, row.token.decimals).toLocaleString(
                       undefined,
                       {
-                        maximumFractionDigits: 6,
+                        maximumFractionDigits: 2,
                       }
                     )}{' '}
                     {row.token.symbol}
@@ -97,7 +97,7 @@ export function MarketTable({ rows }: MarketTableProps) {
                     {fromWei(row.borrows, row.token.decimals).toLocaleString(
                       undefined,
                       {
-                        maximumFractionDigits: 6,
+                        maximumFractionDigits: 2,
                       }
                     )}{' '}
                     {row.token.symbol}
@@ -125,7 +125,7 @@ export function MarketTable({ rows }: MarketTableProps) {
                       row.userDeposit,
                       row.token.decimals
                     ).toLocaleString(undefined, {
-                      maximumFractionDigits: 6,
+                      maximumFractionDigits: 2,
                     })}{' '}
                     {row.token.symbol}
                   </div>
@@ -137,7 +137,7 @@ export function MarketTable({ rows }: MarketTableProps) {
                     {fromWei(row.userBorrow, row.token.decimals).toLocaleString(
                       undefined,
                       {
-                        maximumFractionDigits: 6,
+                        maximumFractionDigits: 2,
                       }
                     )}{' '}
                     {row.token.symbol}
