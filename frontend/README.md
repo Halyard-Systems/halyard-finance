@@ -16,7 +16,7 @@ A React + TypeScript frontend for the Halyard Finance protocol, built with Vite 
    pnpm install
    ```
 
-2. **Configure WalletConnect (optional):**
+2. **Configure WalletConnect:**
    - Get a project ID from [WalletConnect Cloud](https://cloud.walletconnect.com)
    - Update `src/lib/wagmi.ts` with your project ID
 
@@ -39,11 +39,15 @@ pnpm preview
 
 ## Environment Variables
 
-Create a `.env` file in the frontend directory:
+Create a `.env` file in the frontend directory.
+The values below will work for a standard local Forge instance:
 
 ```env
-VITE_WALLET_CONNECT_PROJECT_ID=your_project_id_here
-VITE_DEPOSIT_MANAGER_ADDRESS=your_contract_address_here
+VITE_BORROW_MANAGER_ADDRESS=0x5f9dD176ea5282d392225ceC5c2E7A24d5d02672
+VITE_DEPOSIT_MANAGER_ADDRESS=0x2e590d65Dd357a7565EfB5ffB329F8465F18c494
+VITE_MOCK_PYTH_ADDRESS=0x6c7Df3575f1d69eb3B245A082937794794C2b82E
+VITE_USE_MOCK_PYTH=true
+VITE_WALLET_CONNECT_PROJECT_ID=<<your-project-id-here>>
 ```
 
 ## Tech Stack
@@ -54,14 +58,3 @@ VITE_DEPOSIT_MANAGER_ADDRESS=your_contract_address_here
 - **wagmi.js** - Ethereum hooks
 - **viem** - Ethereum client
 - **Tailwind CSS** - Styling
-
-## Project Structure
-
-```
-src/
-├── lib/
-│   └── wagmi.ts          # wagmi configuration
-├── App.tsx               # Main app component
-├── main.tsx              # App entry point
-└── index.css             # Global styles
-```
