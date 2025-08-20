@@ -47,6 +47,7 @@ The values below will work for a standard local Forge instance:
 ```env
 VITE_BORROW_MANAGER_ADDRESS=0x5f9dD176ea5282d392225ceC5c2E7A24d5d02672
 VITE_DEPOSIT_MANAGER_ADDRESS=0x2e590d65Dd357a7565EfB5ffB329F8465F18c494
+VITE_MAINNET_URL="http://localhost:8545"
 # The local deployment script will deploy this contract
 VITE_MOCK_PYTH_ADDRESS=0x6c7Df3575f1d69eb3B245A082937794794C2b82E
 # Tells the front end to update the mock price stream before calling contract functions that use pricing data
