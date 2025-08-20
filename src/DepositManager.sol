@@ -277,19 +277,12 @@ contract DepositManager is ReentrancyGuard {
         pure
         returns (uint256)
     {
-        console.log("Borrow rate calculation - Base rate", baseRate);
-        console.log("Borrow rate calculation - Slope1", slope1);
-        console.log("Borrow rate calculation - Slope2", slope2);
-        console.log("Borrow rate calculation - Kink", kink);
-        console.log("Borrow rate calculation - U", U);
-
         uint256 borrowRate;
         if (U <= kink) {
             borrowRate = baseRate + ((slope1 * U) / kink);
         } else {
             borrowRate = baseRate + slope1 + ((slope2 * (U - kink)) / (1e18 - kink));
         }
-        console.log("Borrow rate calculation - Final borrow rate", borrowRate);
         return borrowRate;
     }
 

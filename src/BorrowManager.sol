@@ -58,8 +58,6 @@ contract BorrowManager is ReentrancyGuard {
         pyth.updatePriceFeeds{value: fee}(pythUpdateData);
 
         bytes32[] memory tokens = depositMgr.getSupportedTokens();
-        console.log("Tokens length", tokens.length);
-        console.log("Price ids length", priceIds.length);
         require(tokens.length == priceIds.length, "Mismatched tokens/prices");
 
         // Update borrow index and accrue interest for this asset
@@ -72,21 +70,15 @@ contract BorrowManager is ReentrancyGuard {
 
         // Scale new borrow
         uint256 scaledDelta = (amount * depositMgr.RAY()) / borrowIndex[tokenId];
-        console.log("Scaled delta", scaledDelta);
         userBorrowScaled[tokenId][msg.sender] += scaledDelta;
         totalBorrowScaled[tokenId] += scaledDelta;
-        console.log("Total borrow scaled", totalBorrowScaled[tokenId]);
         depositMgr.incrementTotalBorrows(tokenId, amount);
-        console.log("Total borrow scaled", totalBorrowScaled[tokenId]);
         // Calculate new LTV after this borrow
         uint256 totalCollateralUsd = 0;
         uint256 totalBorrowUsd = 0;
         for (uint256 i = 0; i < tokens.length; i++) {
-            console.log("Token id");
-            console.logBytes32(tokens[i]);
             bytes32 tid = tokens[i];
             PythStructs.Price memory price = pyth.getPriceNoOlderThan(priceIds[i], 60);
-            console.log("Price", price.price);
             require(price.price >= 0, "Negative price");
             uint256 priceUint = uint256(uint64(price.price));
 
@@ -95,23 +87,17 @@ contract BorrowManager is ReentrancyGuard {
 
             // Collateral - normalize to 18 decimals before applying price
             uint256 deposit = depositMgr.balanceOf(tid, msg.sender);
-            console.log("Deposit", deposit);
             uint256 normalizedDeposit = deposit * (10 ** (18 - tokenConfig.decimals));
             totalCollateralUsd += (normalizedDeposit * priceUint) / 1e8;
 
             // Borrow - normalize to 18 decimals before applying price
             uint256 scaledBorrow = userBorrowScaled[tid][msg.sender];
-            console.log("Scaled borrow", scaledBorrow);
             uint256 userBorrowAmount = (scaledBorrow * borrowIndex[tid]) / depositMgr.RAY();
-            console.log("User borrow amount", userBorrowAmount);
             uint256 normalizedBorrow = userBorrowAmount * (10 ** (18 - tokenConfig.decimals));
             totalBorrowUsd += (normalizedBorrow * priceUint) / 1e8;
         }
-        console.log("Total collateral usd", totalCollateralUsd);
-        console.log("Total borrow usd", totalBorrowUsd);
         require(totalCollateralUsd > 0, "No collateral");
         uint256 userLtv = (totalBorrowUsd * 1e18) / totalCollateralUsd;
-        console.log("User ltv", userLtv);
         require(userLtv <= getLtv(), "Insufficient collateral");
 
         // Transfer borrowed tokens
@@ -136,14 +122,9 @@ contract BorrowManager is ReentrancyGuard {
     }
 
     function _updateBorrowIndex(bytes32 tokenId) internal {
-        console.log("Updating borrow index for tokenId");
-        console.logBytes32(tokenId);
         DepositManager.Asset memory cfg = depositMgr.getAsset(tokenId);
-        console.log("Asset", cfg.lastUpdateTimestamp);
         uint256 delta = block.timestamp - cfg.lastUpdateTimestamp;
-        console.log("Delta", delta);
         if (delta == 0) return;
-        console.log("Delta is not 0");
 
         // Handle case where totalDeposits is 0 to avoid division by zero
         uint256 U;
@@ -152,9 +133,7 @@ contract BorrowManager is ReentrancyGuard {
         } else {
             U = (cfg.totalBorrows * 1e18) / cfg.totalDeposits;
         }
-        console.log("U", U);
         uint256 borrowRate = depositMgr.calculateBorrowRate(tokenId, U);
-        console.log("Borrow rate", borrowRate);
 
         // Initialize borrow index to RAY if it's 0 (first borrow)
         if (borrowIndex[tokenId] == 0) {
@@ -163,7 +142,6 @@ contract BorrowManager is ReentrancyGuard {
 
         borrowIndex[tokenId] =
             (borrowIndex[tokenId] * (depositMgr.RAY() + (borrowRate * delta) / 365 days)) / depositMgr.RAY();
-        console.log("Borrow index", borrowIndex[tokenId]);
         depositMgr.setLastBorrowTime(tokenId, block.timestamp);
     }
 
