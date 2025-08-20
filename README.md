@@ -27,7 +27,7 @@ $ make deploy-local
 $ make transfer-usdc
 ```
 
-### 3. Start the front end
+### 3. Start the front end (the frontend README must be followed first!)
 
 ```shell
 $ cd frontend
