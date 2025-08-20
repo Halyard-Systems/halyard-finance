@@ -22,6 +22,35 @@ contract ApplicationContractsScript is Script {
 
     function setUp() public {}
 
+    function _setupTestPriceFeeds(MockPyth mockPyth) internal {
+        // ETH/USD price id
+        bytes32 priceId = 0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace;
+        uint64 publishTime = uint64(block.timestamp);
+        bytes memory updateData = mockPyth.createPriceFeedUpdateData(
+            priceId, 123 * 1e8, 100, -8, 123 * 1e8, 100, publishTime, publishTime - 60
+        );
+
+        // USDC/USD price id
+        bytes32 usdcPriceId = 0xeaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a;
+        bytes memory usdcUpdateData =
+            mockPyth.createPriceFeedUpdateData(usdcPriceId, 1, 100, -8, 1, 100, publishTime, publishTime - 60);
+
+        // USDT/USD price id
+        bytes32 usdtPriceId = 0x2b89b9dc8fdf9f34709a5b106b472f0f39bb6ca9ce04b0fd7f2e971688e2e53b;
+        bytes memory usdtUpdateData =
+            mockPyth.createPriceFeedUpdateData(usdtPriceId, 1, 100, -8, 1, 100, publishTime, publishTime - 60);
+
+        bytes[] memory updateArray = new bytes[](3);
+        updateArray[0] = updateData;
+        updateArray[1] = usdcUpdateData;
+        updateArray[2] = usdtUpdateData;
+
+        uint256 fee = mockPyth.getUpdateFee(updateArray);
+        console.log("Pyth fees paid", fee);
+
+        mockPyth.updatePriceFeeds{value: fee}(updateArray);
+    }
+
     function run() public {
         // Get constructor parameters from environment or set defaults
         address stargateRouter = vm.envOr("STARGATE_ROUTER", STARGATE_ROUTER_MAINNET);
@@ -54,33 +83,8 @@ contract ApplicationContractsScript is Script {
             1000000000000000
         );
 
-        // Optional: pre-set a test feed
-        // ETH/USD price id
-        bytes32 priceId = 0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace;
-        uint64 publishTime = uint64(block.timestamp);
-        bytes memory updateData = mockPyth.createPriceFeedUpdateData(
-            priceId, 123 * 1e8, 100, -8, 123 * 1e8, 100, publishTime, publishTime - 60
-        );
-
-        // USDC/USD price id
-        bytes32 usdcPriceId = 0xeaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a;
-        bytes memory usdcUpdateData =
-            mockPyth.createPriceFeedUpdateData(usdcPriceId, 1, 100, -8, 1, 100, publishTime, publishTime - 60);
-
-        // USDT/USD price id
-        bytes32 usdtPriceId = 0x2b89b9dc8fdf9f34709a5b106b472f0f39bb6ca9ce04b0fd7f2e971688e2e53b;
-        bytes memory usdtUpdateData =
-            mockPyth.createPriceFeedUpdateData(usdtPriceId, 1, 100, -8, 1, 100, publishTime, publishTime - 60);
-
-        bytes[] memory updateArray = new bytes[](3);
-        updateArray[0] = updateData;
-        updateArray[1] = usdcUpdateData;
-        updateArray[2] = usdtUpdateData;
-
-        uint256 fee = mockPyth.getUpdateFee(updateArray);
-        console.log("Pyth fees paid", fee);
-
-        mockPyth.updatePriceFeeds{value: fee}(updateArray);
+        // Setup test price feeds
+        _setupTestPriceFeeds(mockPyth);
 
         console.log("MockPyth deployed at:", address(mockPyth));
 
