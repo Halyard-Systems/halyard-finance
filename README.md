@@ -1,7 +1,6 @@
 ## Halyard Finance
 
-<img width="1094" height="698" alt="Screenshot from 2025-08-16 02-15-26" src="https://github.com/user-attachments/assets/6ec7ed7c-1a80-4b8b-b8a2-e110bb6f1aa1" />
-
+<img width="1088" height="430" alt="Screenshot from 2025-08-20 00-47-27" src="https://github.com/user-attachments/assets/21afb97a-d748-4b3d-9c50-045f62e9c5b2" />
 
 ## Development
 
