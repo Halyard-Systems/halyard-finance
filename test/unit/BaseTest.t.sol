@@ -89,7 +89,7 @@ contract BaseTest is Test {
         // Mock updatePriceFeeds to succeed
         vm.mockCall(mockPyth, abi.encodeWithSignature("updatePriceFeeds(bytes[])"), abi.encode());
 
-        // Mock getPriceUnsafe for each price ID to return a valid PythStructs.Price
+        // Mock getPriceNoOlderThan for each price ID to return a valid PythStructs.Price
         // Return the struct fields directly as abi.encode does
 
         // ETH price: $1000
@@ -118,12 +118,21 @@ contract BaseTest is Test {
 
         // Map price IDs to their respective price data
         // Assuming price ID 1 = ETH, 2 = USDC, 3 = USDT
-        vm.mockCall(mockPyth, abi.encodeWithSignature("getPriceUnsafe(bytes32)", bytes32(uint256(1))), mockEthPriceData);
+        // Mock getPriceNoOlderThan for each price ID - the second parameter is the max age in seconds
         vm.mockCall(
-            mockPyth, abi.encodeWithSignature("getPriceUnsafe(bytes32)", bytes32(uint256(2))), mockUsdcPriceData
+            mockPyth,
+            abi.encodeWithSignature("getPriceNoOlderThan(bytes32,uint256)", bytes32(uint256(1)), uint256(60)),
+            mockEthPriceData
         );
         vm.mockCall(
-            mockPyth, abi.encodeWithSignature("getPriceUnsafe(bytes32)", bytes32(uint256(3))), mockUsdtPriceData
+            mockPyth,
+            abi.encodeWithSignature("getPriceNoOlderThan(bytes32,uint256)", bytes32(uint256(2)), uint256(60)),
+            mockUsdcPriceData
+        );
+        vm.mockCall(
+            mockPyth,
+            abi.encodeWithSignature("getPriceNoOlderThan(bytes32,uint256)", bytes32(uint256(3)), uint256(60)),
+            mockUsdtPriceData
         );
 
         // Give users some tokens

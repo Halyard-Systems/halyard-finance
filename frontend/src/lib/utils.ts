@@ -79,6 +79,8 @@ export function formatErrorReason(reason: string): string {
     Reentrancy: 'Reentrancy detected. Please try again.',
     Overflow: 'Arithmetic overflow detected. Please try a smaller amount.',
     Underflow: 'Arithmetic underflow detected. Please check your input.',
+    PriceStale: 'Price data is too old. Please try again.',
+    '0x19abf40e': 'Price data is too old. Please try again.',
   }
 
   // Try to find a user-friendly message for the reason
