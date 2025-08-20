@@ -87,7 +87,7 @@ contract BorrowManager is ReentrancyGuard {
             bytes32 tid = tokens[i];
             PythStructs.Price memory price = pyth.getPriceNoOlderThan(
                 priceIds[i],
-                60 * 10
+                60
             );
             console.log("Price", price.price);
             require(price.price >= 0, "Negative price");
