@@ -21,10 +21,10 @@ contract MockERC20DeploymentScript is Script {
         console.log("");
 
         vm.startBroadcast();
-        
+
         console.log("Deploying MockERC20...");
         MockERC20 mockToken = new MockERC20(tokenName, tokenSymbol, tokenDecimals);
-        
+
         vm.stopBroadcast();
 
         console.log("=== Deployment Results ===");
