@@ -6,8 +6,9 @@ import {DepositManager} from "../src/DepositManager.sol";
 import {BorrowManager} from "../src/BorrowManager.sol";
 import {MockPyth} from "../node_modules/@pythnetwork/pyth-sdk-solidity/MockPyth.sol";
 
-contract ApplicationContractsScript is Script {
+contract LocalDeploymentScript is Script {
     DepositManager public depositManager;
+    BorrowManager public borrowManager;
 
     address USDC_MAINNET = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
 
@@ -89,7 +90,7 @@ contract ApplicationContractsScript is Script {
         console.log("MockPyth deployed at:", address(mockPyth));
 
         // Deploy BorrowManager
-        BorrowManager borrowManager = new BorrowManager(address(depositManager), address(mockPyth), 0.8e18);
+        borrowManager = new BorrowManager(address(depositManager), address(mockPyth), 0.8e18);
         console.log("BorrowManager deployed at:", address(borrowManager));
 
         depositManager.setBorrowManager(address(borrowManager));
