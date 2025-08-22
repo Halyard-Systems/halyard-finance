@@ -11,8 +11,8 @@ contract MockERC20DeploymentScript is Script {
 
         vm.startBroadcast();
         console.log("Deploying TOKEN MockERC20...");
-        mockToken = new MockERC20(vm.envString("TOKEN_NAME"), vm.envString("TOKEN_SYMBOL"), vm.envUint("TOKEN_DECIMALS"));
+        mockToken =
+            new MockERC20(vm.envString("TOKEN_NAME"), vm.envString("TOKEN_SYMBOL"), vm.envUint("TOKEN_DECIMALS"));
         console.log("MockERC20 %s deployed at:", vm.envString("TOKEN_NAME"), address(mockToken));
     }
 }
-

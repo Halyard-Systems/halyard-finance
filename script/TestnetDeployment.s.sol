@@ -14,14 +14,14 @@ contract TestnetDeploymentScript is Script {
 
     // Testnet addresses
     address constant STARGATE_ROUTER_SEPOLIA = 0x2836045A50744FB50D3d04a9C8D18aD7B5012102;
-    address constant STARGATE_ROUTER_ARBITRUM_SEPOLIA = 0x2a6C4ae6C3f6F91E8ec7C2f40bAd9351A0108A81;
-    address constant STARGATE_ROUTER_BASE_SEPOLIA = 0x2a6C4ae6C3f6F91E8ec7C2f40bAd9351A0108A81;
-    
+    address constant STARGATE_ROUTER_ARBITRUM_SEPOLIA = 0x2a6C4aE6c3F6f91E8ec7C2f40bAD9351a0108A81;
+    address constant STARGATE_ROUTER_BASE_SEPOLIA = 0x2a6C4aE6c3F6f91E8ec7C2f40bAD9351a0108A81;
+
     // Testnet token addresses (Sepolia)
     address constant USDC_SEPOLIA = 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238;
     address constant USDT_SEPOLIA = 0xaA8E23Fb1079EA71e0a56F48a2aA51851D8433D0;
     address constant WETH_SEPOLIA = 0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9;
-    
+
     // Pool IDs for different testnets
     uint256 constant USDC_POOL_ID_SEPOLIA = 1;
     uint256 constant USDC_POOL_ID_ARBITRUM_SEPOLIA = 1;
@@ -29,10 +29,13 @@ contract TestnetDeploymentScript is Script {
 
     function setUp() public {}
 
-
-    function _getNetworkConfig() internal view returns (address router, uint256 poolId, address usdc, address usdt, address weth) {
+    function _getNetworkConfig()
+        internal
+        view
+        returns (address router, uint256 poolId, address usdc, address usdt, address weth)
+    {
         string memory network = vm.envOr("NETWORK", "sepolia");
-        
+
         if (keccak256(abi.encodePacked(network)) == keccak256(abi.encodePacked("sepolia"))) {
             router = STARGATE_ROUTER_SEPOLIA;
             poolId = USDC_POOL_ID_SEPOLIA;
@@ -58,8 +61,9 @@ contract TestnetDeploymentScript is Script {
 
     function run() public {
         // Get network configuration
-        (address stargateRouter, uint256 poolId, address usdcToken, address usdtToken, address wethToken) = _getNetworkConfig();
-        
+        (address stargateRouter, uint256 poolId, address usdcToken, address usdtToken, address wethToken) =
+            _getNetworkConfig();
+
         // Get deployment parameters from environment or use defaults
         uint256 liquidationThreshold = vm.envOr("LIQUIDATION_THRESHOLD", uint256(0.8e18)); // 80%
         uint256 updateFee = vm.envOr("PYTH_UPDATE_FEE", uint256(1000000000000000)); // 0.001 ETH
@@ -87,40 +91,40 @@ contract TestnetDeploymentScript is Script {
         // Add tokens to DepositManager with testnet-appropriate parameters
         // ETH (native token)
         depositManager.addToken(
-            "ETH", 
+            "ETH",
             address(0), // Native ETH
-            18, 
-            0.1e27,    // minDeposit: 0.1 ETH
-            0.5e27,    // maxDeposit: 0.5 ETH
-            5.0e27,    // maxTotalDeposit: 5 ETH
-            0.8e18,    // collateralRatio: 80%
-            0.1e27     // liquidationPenalty: 10%
+            18,
+            0.1e27, // minDeposit: 0.1 ETH
+            0.5e27, // maxDeposit: 0.5 ETH
+            5.0e27, // maxTotalDeposit: 5 ETH
+            0.8e18, // collateralRatio: 80%
+            0.1e27 // liquidationPenalty: 10%
         );
         console.log("ETH token added to protocol");
 
         // USDC
         depositManager.addToken(
-            "USDC", 
-            usdcToken, 
-            6, 
-            100e6,     // minDeposit: 100 USDC
-            1000e6,    // maxDeposit: 1000 USDC
-            10000e6,   // maxTotalDeposit: 10000 USDC
-            0.8e18,    // collateralRatio: 80%
-            0.1e27     // liquidationPenalty: 10%
+            "USDC",
+            usdcToken,
+            6,
+            100e6, // minDeposit: 100 USDC
+            1000e6, // maxDeposit: 1000 USDC
+            10000e6, // maxTotalDeposit: 10000 USDC
+            0.8e18, // collateralRatio: 80%
+            0.1e27 // liquidationPenalty: 10%
         );
         console.log("USDC token added to protocol");
 
         // USDT
         depositManager.addToken(
-            "USDT", 
-            usdtToken, 
-            6, 
-            100e6,     // minDeposit: 100 USDT
-            1000e6,    // maxDeposit: 1000 USDT
-            10000e6,   // maxTotalDeposit: 10000 USDT
-            0.8e18,    // collateralRatio: 80%
-            0.1e27     // liquidationPenalty: 10%
+            "USDT",
+            usdtToken,
+            6,
+            100e6, // minDeposit: 100 USDT
+            1000e6, // maxDeposit: 1000 USDT
+            10000e6, // maxTotalDeposit: 10000 USDT
+            0.8e18, // collateralRatio: 80%
+            0.1e27 // liquidationPenalty: 10%
         );
         console.log("USDT token added to protocol");
 
@@ -149,4 +153,3 @@ contract TestnetDeploymentScript is Script {
         console.log("==========================");
     }
 }
-
