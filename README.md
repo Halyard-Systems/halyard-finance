@@ -59,6 +59,13 @@ TOKEN_DECIMALS=6
 
 ### 2. Deploy mock ERC20 contracts (if not already done)
 
+***The following MockERC20 contracts are already deployed and allow open minting***
+```
+USDC: 0x6e2622F28a0ba92fb398B3232399C3BEc2fe43e7
+USDT: 0x6fa28d30Becf5Ab2568cFAE11f9f83D5E8A5B013
+```
+
+
 On testnet, accounts with funds are needed for the ERC20 tokens that are configured
 into the application. The easiest way to do this is to deploy your own. Update the
 `.env.sepolia` file with the token parameters, and run the script:
