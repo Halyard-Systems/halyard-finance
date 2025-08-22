@@ -39,7 +39,7 @@ See [frontend/README.md](frontend/README.md) for detailed frontend documentation
 
 ## Sepolia Testnet Deployment
 
-### 1. Set environment variables
+### 1. Create the `.env.sepolia` file in the project root and replace the dummy data:
 
 ```shell
 # Alchemy API Key for Sepolia testnet
@@ -62,6 +62,19 @@ TOKEN_DECIMALS=6
 On testnet, accounts with funds are needed for the ERC20 tokens that are configured
 into the application. The easiest way to do this is to deploy your own. Update the
 `.env.sepolia` file with the token parameters, and run the script:
-```
 
+```
+# Alchemy API Key for Sepolia testnet
+ALCHEMY_API_KEY=your-alchemy-api-key-here
+
+# Deployer wallet address (must have ETH for gas)
+TESTNET_DEPLOYER_ADDRESS=0x1234567890123456789012345678901234567890
+
+# Deployer private key (keep this secret!)
+TESTNET_DEPLOYER_PRIVATE_KEY=0x1234567890123456789012345678901234567890123456789012345678901234
+
+# MockERC20 configuration for testnet deployment
+TOKEN_NAME="My Test Token"
+TOKEN_SYMBOL="MTT"
+TOKEN_DECIMALS=6
 ```

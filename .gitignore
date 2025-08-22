@@ -9,10 +9,10 @@ out/
 # Docs
 docs/
 
-# Dotenv file
+# Dotenv files
 .env
 .env.sepolia
 
 # Foundry dependencies for Pyth
 node_modules/
-.env.sepolia
+

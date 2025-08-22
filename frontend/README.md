@@ -41,7 +41,7 @@ pnpm preview
 
 ## Environment Variables
 
-Create a `.env` file in the frontend directory.
+Create a `.env` file in the `frontend/` directory.
 The values below will work for a standard local Forge instance:
 
 ```env
