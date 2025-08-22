@@ -11,6 +11,7 @@ docs/
 
 # Dotenv file
 .env
+.env.sepolia
 
 # Foundry dependencies for Pyth
 node_modules/
