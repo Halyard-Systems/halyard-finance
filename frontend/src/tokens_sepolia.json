@@ -1,0 +1,23 @@
+[
+  {
+    "symbol": "ETH",
+    "name": "Ethereum",
+    "icon": "/ethereum-eth-logo.svg",
+    "decimals": 18,
+    "address": "0x0000000000000000000000000000000000000000"
+  },
+  {
+    "symbol": "USDC",
+    "name": "USD Coin",
+    "icon": "/usd-coin-usdc-logo.svg",
+    "decimals": 6,
+    "address": "0x6e2622F28a0ba92fb398B3232399C3BEc2fe43e7"
+  },
+  {
+    "symbol": "USDT",
+    "name": "Tether",
+    "icon": "/tether-usdt-logo.svg",
+    "decimals": 6,
+    "address": "0x6fa28d30Becf5Ab2568cFAE11f9f83D5E8A5B013"
+  }
+]

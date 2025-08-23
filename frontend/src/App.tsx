@@ -17,7 +17,19 @@ import {
 } from './lib/hooks'
 import type { Asset, Token } from './lib/types'
 
-import TOKENS from './tokens.json'
+// Import both token files
+import MAINNET_TOKENS from './tokens.json'
+import SEPOLIA_TOKENS from './tokens_sepolia.json'
+
+// Function to get tokens based on network
+const getTokens = (): Token[] => {
+  const network = import.meta.env.VITE_NETWORK
+  if (network === 'sepolia') {
+    return SEPOLIA_TOKENS
+  }
+  // Default to mainnet tokens
+  return MAINNET_TOKENS
+}
 import { RepayForm } from './components/RepayForm'
 
 const buildMarketRows = (
@@ -107,14 +119,15 @@ function App() {
     const tokenMap = new Map<string, `0x${string}`>()
     if (!tokenIds || !Array.isArray(tokenIds)) return tokenMap
 
-    TOKENS.forEach((token, index) => {
+    const tokens = getTokens()
+    tokens.forEach((token, index) => {
       const tokenId = tokenIds[index]
       if (tokenId) {
         tokenMap.set(token.symbol, tokenId as `0x${string}`)
       }
     })
     return tokenMap
-  }, [tokenIds, TOKENS])
+  }, [tokenIds])
 
   // Asset data
   const { data: assets } = useReadAssets(tokenIds as `0x${string}`[])
@@ -189,7 +202,7 @@ function App() {
     })
   }, [borrowManagerBalances, borrowIndices, ray, tokenIds])
 
-  const [selectedToken, setSelectedToken] = useState<Token>(TOKENS[0])
+  const [selectedToken, setSelectedToken] = useState<Token>(getTokens()[0])
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false)
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false)
   const [isBorrowModalOpen, setIsBorrowModalOpen] = useState(false)
@@ -202,7 +215,7 @@ function App() {
 
   const marketRows = buildMarketRows(
     assets ? assets!.map((asset) => asset.result as Asset) : [],
-    TOKENS,
+    getTokens(),
     tokenIdMap,
     depositManagerBalances
       ? depositManagerBalances!.map((balance) => balance.result as bigint)
