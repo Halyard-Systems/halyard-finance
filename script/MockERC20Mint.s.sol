@@ -11,7 +11,7 @@ contract MockERC20MintScript is Script {
         // Get minting parameters from environment or use defaults
         address tokenAddress = vm.envAddress("TOKEN_ADDRESS");
         address recipient = vm.envOr("RECIPIENT_ADDRESS", msg.sender);
-        uint256 amount = vm.envOr("MINT_AMOUNT", uint256(1000 * 10**18)); // Default 1000 tokens
+        uint256 amount = vm.envOr("MINT_AMOUNT", uint256(1000 * 10 ** 18)); // Default 1000 tokens
 
         console.log("=== MockERC20 Minting Configuration ===");
         console.log("Token Address:", tokenAddress);
