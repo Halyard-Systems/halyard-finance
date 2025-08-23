@@ -6,7 +6,7 @@ import {Test, console} from "lib/forge-std/src/Test.sol";
 import {BorrowManager} from "../../src/BorrowManager.sol";
 import {DepositManager} from "../../src/DepositManager.sol";
 import {IStargateRouter} from "../../src/interfaces/IStargateRouter.sol";
-import {MockERC20} from "../../test/mocks/MockERC20.sol";
+import {MockERC20} from "../../src/mocks/MockERC20.sol";
 
 contract BaseTest is Test {
     BorrowManager public borrowManager;
