@@ -24,6 +24,9 @@ define deploy_testnet_script
 		-vvvv
 endef
 
+add-token-testnet:
+	$(call deploy_testnet_script,script/AddTokenToDepositManager.s.sol:AddTokenToDepositManagerScript)
+
 deploy-local:
 	forge script script/LocalDeployment.s.sol:LocalDeploymentScript \
 		--rpc-url http://127.0.0.1:8545 \
@@ -37,6 +40,22 @@ deploy-mock-erc20:
 
 deploy-sepolia-testnet:
 	$(call deploy_testnet_script,script/TestnetDeployment.s.sol:TestnetDeploymentScript)
+
+mint-mock-erc20:
+	set -a; source .env.sepolia; set +a; \
+	# Replace with the address of a mock ERC20 contract
+	export TOKEN_ADDRESS=0x6fa28d30Becf5Ab2568cFAE11f9f83D5E8A5B013; \
+	# Replace with the address of the recipient, or remove this line to use the sender address
+	#export RECIPIENT_ADDRESS=0x1234567890123456789012345678901234567890; \
+	# Replace with the amount of tokens to mint, or remove to default to 1000
+	export MINT_AMOUNT=5000000000000; \
+	forge script script/MockERC20Mint.s.sol:MockERC20MintScript \
+		--rpc-url https://eth-sepolia.g.alchemy.com/v2/$$ALCHEMY_API_KEY \
+		--sender $$TESTNET_DEPLOYER_ADDRESS \
+		--private-key $$TESTNET_DEPLOYER_PRIVATE_KEY \
+		--gas-price 30000000000 \
+		--broadcast \
+		-vvvv
 
 node:
 	anvil --fork-url https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY} --fork-block-number 22900000
