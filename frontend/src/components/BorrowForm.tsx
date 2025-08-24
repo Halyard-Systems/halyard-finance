@@ -35,18 +35,25 @@ const USE_MOCK_PYTH = import.meta.env.VITE_USE_MOCK_PYTH === 'true'
 async function fetchPythUpdateDataFromHermes(
   priceIds: string[]
 ): Promise<string[]> {
-  const url = `https://hermes.pyth.network/api/latest_vaas?ids[]=${priceIds.join(
-    '&ids[]='
-  )}&binary=true`
-  const response = await fetch(url)
-  if (!response.ok) throw new Error('Failed to fetch Pyth update data')
-  const arrayBuffer = await response.arrayBuffer()
-  const hex =
-    '0x' +
-    Array.from(new Uint8Array(arrayBuffer))
-      .map((b) => b.toString(16).padStart(2, '0'))
-      .join('')
-  return [hex]
+  // Fetch individual VAAs for each price ID
+  const hexUpdates: string[] = []
+
+  for (const priceId of priceIds) {
+    const url = `https://hermes.pyth.network/api/latest_vaas?ids[]=${priceId}&binary=true`
+    const response = await fetch(url)
+    if (!response.ok) throw new Error('Failed to fetch Pyth update data')
+
+    const arrayBuffer = await response.arrayBuffer()
+    const hex =
+      '0x' +
+      Array.from(new Uint8Array(arrayBuffer))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('')
+
+    hexUpdates.push(hex)
+  }
+
+  return hexUpdates
 }
 
 interface BorrowFormProps {
@@ -75,7 +82,6 @@ export function BorrowForm({
     address! as `0x${string}`,
     tokenIds!
   )
-  console.log('deposits', deposits)
   const dispatch = useDispatch()
   const maxBorrowable = useSelector(
     (state: RootState) => state.borrowManager.maxBorrow

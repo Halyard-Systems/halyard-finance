@@ -78,7 +78,7 @@ TOKEN_NAME="My Test Token"
 TOKEN_SYMBOL="MTT"
 TOKEN_DECIMALS=6
 
-# Set after deployment
+# Set after Step 3 deployment
 DEPOSIT_MANAGER_ADDRESS=0x1234567890123456789012345678901234567890
 
 # Settings for adding a token to DepositManager

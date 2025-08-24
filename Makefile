@@ -27,6 +27,14 @@ endef
 add-token-testnet:
 	$(call deploy_testnet_script,script/AddTokenToDepositManager.s.sol:AddTokenToDepositManagerScript)
 
+check-tokens-testnet:
+	set -a; source .env.sepolia; set +a; \
+	forge script script/CheckDepositManagerTokens.s.sol:CheckDepositManagerTokensScript \
+		--rpc-url https://eth-sepolia.g.alchemy.com/v2/$$ALCHEMY_API_KEY \
+		--sender $$TESTNET_DEPLOYER_ADDRESS \
+		--private-key $$TESTNET_DEPLOYER_PRIVATE_KEY \
+		-vvvv
+
 deploy-local:
 	forge script script/LocalDeployment.s.sol:LocalDeploymentScript \
 		--rpc-url http://127.0.0.1:8545 \
