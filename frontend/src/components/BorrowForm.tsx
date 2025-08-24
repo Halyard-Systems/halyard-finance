@@ -19,6 +19,7 @@ import {
 import BORROW_MANAGER_ABI from '../abis/BorrowManager.json'
 import { toWei, formatTransactionError } from '../lib/utils'
 import type { Token } from '../lib/types'
+import PYTH_ABI from '../abis/IPyth.json'
 import MOCK_PYTH_ABI from '../abis/MockPyth.json'
 import type { RootState } from '../store/store'
 import { maxBorrow } from '../store/interactions'
@@ -31,29 +32,27 @@ import {
 
 const USE_MOCK_PYTH = import.meta.env.VITE_USE_MOCK_PYTH === 'true'
 
-// Helper to fetch Pyth update data for a given priceId using Hermes API
+// Helper to fetch Pyth update data using the Hermes client
+import { HermesClient } from '@pythnetwork/hermes-client'
+
 async function fetchPythUpdateDataFromHermes(
   priceIds: string[]
-): Promise<string[]> {
-  // Fetch individual VAAs for each price ID
-  const hexUpdates: string[] = []
+): Promise<`0x${string}`[]> {
+  const client = new HermesClient('https://hermes.pyth.network')
 
-  for (const priceId of priceIds) {
-    const url = `https://hermes.pyth.network/api/latest_vaas?ids[]=${priceId}&binary=true`
-    const response = await fetch(url)
-    if (!response.ok) throw new Error('Failed to fetch Pyth update data')
+  // Get the latest price updates with binary encoding
+  const priceUpdate = await client.getLatestPriceUpdates(priceIds, {})
 
-    const arrayBuffer = await response.arrayBuffer()
-    const hex =
-      '0x' +
-      Array.from(new Uint8Array(arrayBuffer))
-        .map((b) => b.toString(16).padStart(2, '0'))
-        .join('')
-
-    hexUpdates.push(hex)
+  // Extract the binary updates from the response
+  if (
+    priceUpdate.binary &&
+    priceUpdate.binary.data &&
+    Array.isArray(priceUpdate.binary.data)
+  ) {
+    return priceUpdate.binary.data as `0x${string}`[]
   }
 
-  return hexUpdates
+  throw new Error('Failed to get price update data from Hermes')
 }
 
 interface BorrowFormProps {
@@ -270,10 +269,12 @@ export function BorrowForm({
           )
 
           fee = (await publicClient.readContract({
-            address: import.meta.env.VITE_MOCK_PYTH_ADDRESS as `0x${string}`,
-            abi: MOCK_PYTH_ABI,
+            // Pyth Sepolia
+            address:
+              '0xDd24F84d36BF92C65F92307595335bdFab5Bbd21' as `0x${string}`,
+            abi: PYTH_ABI,
             functionName: 'getUpdateFee',
-            args: [pythUpdateData],
+            args: [pythUpdateData.map((data) => `0x${data}`)],
           })) as bigint
         } catch (error) {
           throw new Error(

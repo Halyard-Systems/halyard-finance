@@ -157,22 +157,11 @@ export async function updateMockPriceFeeds(
     args: [updateData],
   })
 
-  const result = await writeMockPyth({
+  await writeMockPyth({
     address: mockPythAddress,
     abi: MOCK_PYTH_ABI,
     functionName: 'updatePriceFeeds',
     args: [updateData],
     value: fee as bigint,
   })
-
-  console.log(result, 'RESULT')
-  // Wait for the transaction to be mined
-  console.log('Waiting for mock price update transaction to be mined...')
-  const receipt = await publicClient.waitForTransactionReceipt({
-    hash: result.hash,
-  })
-  console.log(
-    'Mock price feeds updated successfully, block number:',
-    receipt.blockNumber
-  )
 }
