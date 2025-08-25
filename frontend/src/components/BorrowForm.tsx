@@ -40,19 +40,44 @@ async function fetchPythUpdateDataFromHermes(
 ): Promise<`0x${string}`[]> {
   const client = new HermesClient('https://hermes.pyth.network')
 
-  // Get the latest price updates with binary encoding
-  const priceUpdate = await client.getLatestPriceUpdates(priceIds, {})
+  // Try to get individual price updates for each price ID
+  const individualUpdates: `0x${string}`[] = []
 
-  // Extract the binary updates from the response
-  if (
-    priceUpdate.binary &&
-    priceUpdate.binary.data &&
-    Array.isArray(priceUpdate.binary.data)
-  ) {
-    return priceUpdate.binary.data as `0x${string}`[]
+  for (const priceId of priceIds) {
+    try {
+      const singlePriceUpdate = await client.getLatestPriceUpdates(
+        [priceId],
+        {}
+      )
+
+      if (singlePriceUpdate.binary?.data) {
+        const data = singlePriceUpdate.binary.data
+        if (Array.isArray(data) && data.length > 0) {
+          const updateData = data[0] as string
+          individualUpdates.push(
+            (updateData.startsWith('0x')
+              ? updateData
+              : `0x${updateData}`) as `0x${string}`
+          )
+        } else if (typeof data === 'string') {
+          const updateData = data as string
+          individualUpdates.push(
+            (updateData.startsWith('0x')
+              ? updateData
+              : `0x${updateData}`) as `0x${string}`
+          )
+        }
+      }
+    } catch (error) {
+      console.error(`Failed to fetch price update for ${priceId}:`, error)
+    }
   }
 
-  throw new Error('Failed to get price update data from Hermes')
+  if (individualUpdates.length === 0) {
+    throw new Error('Failed to get any price update data from Hermes')
+  }
+
+  return individualUpdates
 }
 
 interface BorrowFormProps {
@@ -231,9 +256,6 @@ export function BorrowForm({
               pythUpdateData,
               writeMockPyth
             )
-            console.log(
-              'All price feeds updated successfully in single transaction'
-            )
           } catch (updateError) {
             console.error(
               'Failed to update mock price feeds, trying with empty data:',
@@ -252,8 +274,6 @@ export function BorrowForm({
             functionName: 'getUpdateFee',
             args: [pythUpdateData],
           })) as bigint
-
-          console.log('Borrow transaction fee:', fee.toString())
         } catch (error) {
           setIsUpdatingMockPyth(false)
           throw new Error(
@@ -274,7 +294,7 @@ export function BorrowForm({
               '0xDd24F84d36BF92C65F92307595335bdFab5Bbd21' as `0x${string}`,
             abi: PYTH_ABI,
             functionName: 'getUpdateFee',
-            args: [pythUpdateData.map((data) => `0x${data}`)],
+            args: [pythUpdateData],
           })) as bigint
         } catch (error) {
           throw new Error(
@@ -293,7 +313,6 @@ export function BorrowForm({
         value: fee, // Send the required fee
       })
     } catch (error) {
-      console.error('Borrow failed:', error)
       const rawErrorMessage =
         error instanceof Error ? error.message : 'Unknown error'
       const formattedError = formatTransactionError(rawErrorMessage)
