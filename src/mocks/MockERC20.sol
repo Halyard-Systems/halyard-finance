@@ -29,7 +29,7 @@ contract MockERC20 {
     function transfer(address to, uint256 amount) external returns (bool) {
         require(to != address(0), "ERC20: transfer to the zero address");
         require(balanceOf[msg.sender] >= amount, "ERC20: transfer amount exceeds balance");
-        
+
         balanceOf[msg.sender] -= amount;
         balanceOf[to] += amount;
         emit Transfer(msg.sender, to, amount);
@@ -41,18 +41,18 @@ contract MockERC20 {
         require(to != address(0), "ERC20: transfer to the zero address");
         require(balanceOf[from] >= amount, "ERC20: transfer amount exceeds balance");
         require(allowance[from][msg.sender] >= amount, "ERC20: insufficient allowance");
-        
+
         balanceOf[from] -= amount;
         balanceOf[to] += amount;
         allowance[from][msg.sender] -= amount;
-        
+
         emit Transfer(from, to, amount);
         return true;
     }
 
     function approve(address spender, uint256 amount) external returns (bool) {
         require(spender != address(0), "ERC20: approve to the zero address");
-        
+
         allowance[msg.sender][spender] = amount;
         emit Approval(msg.sender, spender, amount);
         return true;

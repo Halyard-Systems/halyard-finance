@@ -20,13 +20,13 @@ contract CheckDepositManagerTokensScript is Script {
 
         // Get all supported tokens
         bytes32[] memory supportedTokens = depositManager.getSupportedTokens();
-        
+
         console.log("Number of supported tokens:", supportedTokens.length);
-        
-        for (uint i = 0; i < supportedTokens.length; i++) {
+
+        for (uint256 i = 0; i < supportedTokens.length; i++) {
             bytes32 tokenId = supportedTokens[i];
             DepositManager.Asset memory asset = depositManager.getAsset(tokenId);
-            
+
             console.log("=== Token", i + 1, "===");
             console.log("Token ID:");
             console.logBytes32(tokenId);
