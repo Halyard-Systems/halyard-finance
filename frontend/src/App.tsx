@@ -21,9 +21,10 @@ import type { Asset, Token } from './lib/types'
 import MAINNET_TOKENS from './tokens.json'
 import SEPOLIA_TOKENS from './tokens_sepolia.json'
 
+const network = import.meta.env.VITE_NETWORK
+
 // Function to get tokens based on network
 const getTokens = (): Token[] => {
-  const network = import.meta.env.VITE_NETWORK
   if (network === 'sepolia') {
     return SEPOLIA_TOKENS
   }
@@ -31,6 +32,7 @@ const getTokens = (): Token[] => {
   return MAINNET_TOKENS
 }
 import { RepayForm } from './components/RepayForm'
+import { TestnetInstructions } from './components/TestnetInstructions'
 
 const buildMarketRows = (
   assets: Asset[],
@@ -244,6 +246,12 @@ function App() {
           <>
             {/* Deposit & Borrow Section */}
             <MarketTable rows={marketRows} />
+
+            {network === 'sepolia' && (
+              <div className='mt-8'>
+                <TestnetInstructions />
+              </div>
+            )}
 
             {/* Deposit Modal */}
             <DepositForm
