@@ -111,7 +111,10 @@ const calculateAPY = (
 
 function App() {
   const queryClient = useQueryClient()
-  const { address, isConnected } = useAccount()
+  const { address, isConnected, chainId } = useAccount()
+
+  // Check if connected to Sepolia
+  const isSepolia = chainId === 11155111
 
   // Supported tokens
   const { data: tokenIds } = useReadSupportedTokens()
@@ -167,40 +170,21 @@ function App() {
     }
 
     return borrowManagerBalances.map((balance, index) => {
-      console.log('=== Token', index, 'Borrow Calculation ===')
-      console.log('balance', balance)
-      console.log('borrowIndices', borrowIndices)
-      console.log('ray', ray)
-
       const scaledBorrow = BigInt((balance as any).result || 0)
       const borrowIndex = BigInt((borrowIndices[index] as any).result || 0)
       const rayValue = BigInt((ray as any) || 0)
 
-      console.log('scaledBorrow (raw):', scaledBorrow.toString())
-      console.log('borrowIndex (raw):', borrowIndex.toString())
-      console.log('rayValue (raw):', rayValue.toString())
-
       // If no borrows, return 0
       if (scaledBorrow === 0n) {
-        console.log('No borrows found, returning 0')
         return 0n
       }
 
       // If borrow index is 0, it means no borrows have happened yet
       // In this case, use RAY as the borrow index (matches contract initialization)
       const effectiveBorrowIndex = borrowIndex === 0n ? rayValue : borrowIndex
-      console.log('effectiveBorrowIndex:', effectiveBorrowIndex.toString())
 
       // Calculate actual borrow: (scaledBorrow * effectiveBorrowIndex) / RAY
-      const result = (scaledBorrow * effectiveBorrowIndex) / rayValue
-      console.log('Final calculated result:', result.toString())
-      console.log(
-        'Result in human readable:',
-        Number(result) / Math.pow(10, 18)
-      )
-      console.log('=====================================')
-
-      return result
+      return (scaledBorrow * effectiveBorrowIndex) / rayValue
     })
   }, [borrowManagerBalances, borrowIndices, ray, tokenIds])
 
@@ -244,6 +228,38 @@ function App() {
       <main className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
         {isConnected && (
           <>
+            {/* Network Warning */}
+            {network === 'sepolia' && !isSepolia && (
+              <div className='bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6'>
+                <div className='flex items-center'>
+                  <div className='flex-shrink-0'>
+                    <svg
+                      className='h-5 w-5 text-yellow-400'
+                      viewBox='0 0 20 20'
+                      fill='currentColor'
+                    >
+                      <path
+                        fillRule='evenodd'
+                        d='M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z'
+                        clipRule='evenodd'
+                      />
+                    </svg>
+                  </div>
+                  <div className='ml-3'>
+                    <h3 className='text-sm font-medium text-yellow-800'>
+                      Wrong Network
+                    </h3>
+                    <div className='mt-2 text-sm text-yellow-700'>
+                      <p>
+                        You are connected to the wrong network. Please switch
+                        your wallet to Sepolia testnet to use.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Deposit & Borrow Section */}
             <MarketTable rows={marketRows} />
 
