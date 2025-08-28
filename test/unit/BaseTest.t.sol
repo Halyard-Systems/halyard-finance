@@ -119,19 +119,20 @@ contract BaseTest is Test {
         // Map price IDs to their respective price data
         // Assuming price ID 1 = ETH, 2 = USDC, 3 = USDT
         // Mock getPriceNoOlderThan for each price ID - the second parameter is the max age in seconds
+        // BorrowManager calls with 60 * 5 = 300 seconds
         vm.mockCall(
             mockPyth,
-            abi.encodeWithSignature("getPriceNoOlderThan(bytes32,uint256)", bytes32(uint256(1)), uint256(60)),
+            abi.encodeWithSignature("getPriceNoOlderThan(bytes32,uint256)", bytes32(uint256(1)), uint256(300)),
             mockEthPriceData
         );
         vm.mockCall(
             mockPyth,
-            abi.encodeWithSignature("getPriceNoOlderThan(bytes32,uint256)", bytes32(uint256(2)), uint256(60)),
+            abi.encodeWithSignature("getPriceNoOlderThan(bytes32,uint256)", bytes32(uint256(2)), uint256(300)),
             mockUsdcPriceData
         );
         vm.mockCall(
             mockPyth,
-            abi.encodeWithSignature("getPriceNoOlderThan(bytes32,uint256)", bytes32(uint256(3)), uint256(60)),
+            abi.encodeWithSignature("getPriceNoOlderThan(bytes32,uint256)", bytes32(uint256(3)), uint256(300)),
             mockUsdtPriceData
         );
 
