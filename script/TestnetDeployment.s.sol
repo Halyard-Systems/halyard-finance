@@ -9,7 +9,8 @@ contract TestnetDeploymentScript is Script {
     DepositManager public depositManager;
     BorrowManager public borrowManager;
 
-    // Sepolia Testnet Pyth address
+    // Sepolia Testnet addresses
+    address constant LAYERZERO_ENDPOINT_V2_SEPOLIA = 0x3C22696570886A815a339A2c43DC18b3eb4420A1;
     address public PYTH_SEPOLIA = 0xDd24F84d36BF92C65F92307595335bdFab5Bbd21;
     address constant STARGATE_ROUTER_SEPOLIA = 0x2836045A50744FB50D3d04a9C8D18aD7B5012102;
 
@@ -26,12 +27,14 @@ contract TestnetDeploymentScript is Script {
         console.log("Pyth Valid Time:", validTime);
         console.log("========================================");
 
+        address deployer = msg.sender;
+
         vm.startBroadcast();
 
         // Deploy DepositManager
         console.log("Deploying DepositManager...");
         // Pool ID is not currently used
-        depositManager = new DepositManager(STARGATE_ROUTER_SEPOLIA, 1);
+        depositManager = new DepositManager(STARGATE_ROUTER_SEPOLIA, 1, LAYERZERO_ENDPOINT_V2_SEPOLIA, deployer);
         console.log("DepositManager deployed at:", address(depositManager));
 
         // Deploy BorrowManager

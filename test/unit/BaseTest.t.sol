@@ -18,6 +18,7 @@ contract BaseTest is Test {
     address public bob = address(0x2);
     address public charlie = address(0x3);
     address public mockStargateRouter = address(0x123);
+    address public mockLzEndpoint = address(0x456);
     address public mockPyth = address(0x456);
 
     uint256 public constant RAY = 1e27;
@@ -37,7 +38,7 @@ contract BaseTest is Test {
 
         // Mock Stargate router address and pool ID for testing
         uint256 mockPoolId = 1;
-        depositManager = new DepositManager(mockStargateRouter, mockPoolId);
+        depositManager = new DepositManager(mockStargateRouter, mockPoolId, mockLzEndpoint, msg.sender);
 
         // Deploy BorrowManager
         borrowManager = new BorrowManager(address(depositManager), mockPyth, 0.5e18);
