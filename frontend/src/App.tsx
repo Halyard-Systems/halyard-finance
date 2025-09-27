@@ -33,6 +33,7 @@ const getTokens = (): Token[] => {
 }
 import { RepayForm } from './components/RepayForm'
 import { TestnetInstructions } from './components/TestnetInstructions'
+import { AccountSummary } from './components/AccountSummary'
 
 const buildMarketRows = (
   assets: Asset[],
@@ -226,93 +227,7 @@ function App() {
 
       {/* Main Content */}
       <main className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
-        {isConnected && (
-          <>
-            {/* Network Warning */}
-            {network === 'sepolia' && !isSepolia && (
-              <div className='bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6'>
-                <div className='flex items-center'>
-                  <div className='flex-shrink-0'>
-                    <svg
-                      className='h-5 w-5 text-yellow-400'
-                      viewBox='0 0 20 20'
-                      fill='currentColor'
-                    >
-                      <path
-                        fillRule='evenodd'
-                        d='M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z'
-                        clipRule='evenodd'
-                      />
-                    </svg>
-                  </div>
-                  <div className='ml-3'>
-                    <h3 className='text-sm font-medium text-yellow-800'>
-                      Wrong Network
-                    </h3>
-                    <div className='mt-2 text-sm text-yellow-700'>
-                      <p>
-                        You are connected to the wrong network. Please switch
-                        your wallet to Sepolia testnet to use.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Deposit & Borrow Section */}
-            <MarketTable rows={marketRows} />
-
-            {network === 'sepolia' && (
-              <div className='mt-8'>
-                <TestnetInstructions />
-              </div>
-            )}
-
-            {/* Deposit Modal */}
-            <DepositForm
-              key={`deposit-${selectedToken.symbol}-${isDepositModalOpen}`}
-              isOpen={isDepositModalOpen}
-              onClose={() => setIsDepositModalOpen(false)}
-              selectedToken={selectedToken}
-              tokenId={selectedTokenData?.tokenId}
-              onTransactionComplete={handleTransactionComplete}
-            />
-
-            {/* Withdraw Modal */}
-            <WithdrawForm
-              key={`withdraw-${selectedToken.symbol}-${isWithdrawModalOpen}`}
-              isOpen={isWithdrawModalOpen}
-              onClose={() => setIsWithdrawModalOpen(false)}
-              selectedToken={selectedToken}
-              tokenId={selectedTokenData?.tokenId}
-              onTransactionComplete={handleTransactionComplete}
-            />
-
-            {/* Borrow Modal */}
-            <BorrowForm
-              key={`borrow-${selectedToken.symbol}-${isBorrowModalOpen}`}
-              isOpen={isBorrowModalOpen}
-              onClose={() => setIsBorrowModalOpen(false)}
-              selectedToken={selectedToken}
-              tokenId={selectedTokenData?.tokenId}
-              tokenIds={tokenIds as `0x${string}`[]}
-              borrows={actualBorrows}
-              onTransactionComplete={handleTransactionComplete}
-            />
-
-            {/* Repay Modal */}
-            <RepayForm
-              key={`repay-${selectedToken.symbol}-${isRepayModalOpen}`}
-              isOpen={isRepayModalOpen}
-              onClose={() => setIsRepayModalOpen(false)}
-              selectedToken={selectedToken}
-              tokenId={selectedTokenData?.tokenId as `0x${string}`}
-              borrows={actualBorrows}
-              onTransactionComplete={handleTransactionComplete}
-            />
-          </>
-        )}
+        {isConnected && <AccountSummary />}
         {!isConnected && <Connect />}
       </main>
     </div>
