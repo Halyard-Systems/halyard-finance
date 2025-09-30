@@ -83,8 +83,6 @@ async function fetchPythUpdateDataFromHermes(
 interface BorrowFormProps {
   isOpen: boolean
   onClose: () => void
-  selectedToken: Token
-  tokenId?: `0x${string}`
   tokenIds?: `0x${string}`[]
   borrows?: bigint[]
   onTransactionComplete?: () => void
@@ -94,8 +92,6 @@ interface BorrowFormProps {
 export function BorrowForm({
   isOpen,
   onClose,
-  selectedToken,
-  tokenId,
   tokenIds,
   borrows,
   onTransactionComplete,

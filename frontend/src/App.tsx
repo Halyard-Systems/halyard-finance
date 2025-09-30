@@ -34,6 +34,8 @@ const getTokens = (): Token[] => {
 import { RepayForm } from './components/RepayForm'
 import { TestnetInstructions } from './components/TestnetInstructions'
 import { AccountSummary } from './components/AccountSummary'
+import { Portfolio } from './components/Portfolio'
+import { QuickActions } from './components/QuickActions'
 
 const buildMarketRows = (
   assets: Asset[],
@@ -227,8 +229,69 @@ function App() {
 
       {/* Main Content */}
       <main className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
-        {isConnected && <AccountSummary />}
+        {isConnected && (
+          <>
+            <AccountSummary />
+            <Portfolio />
+            <QuickActions
+              onDeposit={() => {
+                setSelectedToken(getTokens()[0])
+                setIsDepositModalOpen(true)
+              }}
+              onWithdraw={() => {
+                setSelectedToken(getTokens()[0])
+                setIsWithdrawModalOpen(true)
+              }}
+              onBorrow={() => {
+                setSelectedToken(getTokens()[0])
+                setIsBorrowModalOpen(true)
+              }}
+              onRepay={() => {
+                setSelectedToken(getTokens()[0])
+                setIsRepayModalOpen(true)
+              }}
+            />
+          </>
+        )}
         {!isConnected && <Connect />}
+
+        {/* Modals */}
+        {isDepositModalOpen && (
+          <DepositForm
+            isOpen={isDepositModalOpen}
+            onClose={() => setIsDepositModalOpen(false)}
+            onTransactionComplete={handleTransactionComplete}
+          />
+        )}
+
+        {isWithdrawModalOpen && (
+          <WithdrawForm
+            isOpen={isWithdrawModalOpen}
+            onClose={() => setIsWithdrawModalOpen(false)}
+            onTransactionComplete={handleTransactionComplete}
+          />
+        )}
+
+        {isBorrowModalOpen && (
+          <BorrowForm
+            isOpen={isBorrowModalOpen}
+            tokenIds={tokenIds as `0x${string}`[]}
+            borrows={actualBorrows}
+            onClose={() => setIsBorrowModalOpen(false)}
+            onTransactionComplete={handleTransactionComplete}
+          />
+        )}
+
+        {isRepayModalOpen && (
+          <RepayForm
+            isOpen={isRepayModalOpen}
+            borrows={actualBorrows}
+            onClose={() => setIsRepayModalOpen(false)}
+            onTransactionComplete={handleTransactionComplete}
+          />
+        )}
+
+        {isSepolia && <TestnetInstructions />}
       </main>
     </div>
   )

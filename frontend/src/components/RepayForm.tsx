@@ -13,6 +13,7 @@ import ERC20_ABI from '../abis/ERC20.json'
 import BORROW_MANAGER_ABI from '../abis/BorrowManager.json'
 import type { Token } from '../lib/types'
 import { toWei, fromWei, formatTransactionError } from '../lib/utils'
+import { portfolioData } from '@/lib/sample-data'
 
 import {
   useAccount,
@@ -28,8 +29,6 @@ import {
 interface RepayFormProps {
   isOpen: boolean
   onClose: () => void
-  selectedToken: Token
-  tokenId: `0x${string}`
   borrows: bigint[]
   onTransactionComplete?: () => void
   onTransactionError?: (error: string) => void
@@ -38,13 +37,56 @@ interface RepayFormProps {
 export function RepayForm({
   isOpen,
   onClose,
-  selectedToken,
-  tokenId,
   borrows,
   onTransactionComplete,
   onTransactionError,
 }: RepayFormProps) {
   const { address } = useAccount()
+
+  // Chain and asset selection state
+  const [selectedChain, setSelectedChain] = useState(portfolioData[0])
+  const [selectedAsset, setSelectedAsset] = useState(selectedChain.assets[0])
+  const [isChainDropdownOpen, setIsChainDropdownOpen] = useState(false)
+  const [isAssetDropdownOpen, setIsAssetDropdownOpen] = useState(false)
+
+  // Update selected asset when chain changes
+  useEffect(() => {
+    setSelectedAsset(selectedChain.assets[0])
+  }, [selectedChain])
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element
+      if (
+        !target.closest('[data-chain-dropdown]') &&
+        !target.closest('[data-asset-dropdown]')
+      ) {
+        setIsChainDropdownOpen(false)
+        setIsAssetDropdownOpen(false)
+      }
+    }
+
+    if (isChainDropdownOpen || isAssetDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isChainDropdownOpen, isAssetDropdownOpen])
+
+  // Create a mock Token object from the selected asset
+  const selectedToken: Token = {
+    symbol: selectedAsset.asset,
+    name: selectedAsset.asset,
+    icon: `/public/${selectedAsset.logo}`,
+    decimals: 18, // Default to 18 decimals, would need to be mapped properly in real implementation
+    address:
+      selectedAsset.asset === 'ETH'
+        ? '0x0000000000000000000000000000000000000000'
+        : '0x' + '0'.repeat(40), // Mock address
+  }
 
   let borrowedAmount = 0
   if (borrows?.length > 0) {
@@ -195,8 +237,8 @@ export function RepayForm({
   }
 
   const handleRepay = async () => {
-    if (!repayAmount || !address || !tokenId) {
-      console.error('Invalid repay amount, address, or token ID')
+    if (!repayAmount || !address) {
+      console.error('Invalid repay amount or address')
       return
     }
 
@@ -209,7 +251,7 @@ export function RepayForm({
           address: import.meta.env.VITE_BORROW_MANAGER_ADDRESS as `0x${string}`,
           abi: BORROW_MANAGER_ABI,
           functionName: 'repay',
-          args: [tokenId, amountInWei],
+          args: [('0x' + '0'.repeat(64)) as `0x${string}`, amountInWei], // Mock token ID
           value: amountInWei, // Send ETH with the transaction
         })
       } else {
@@ -220,7 +262,7 @@ export function RepayForm({
           address: import.meta.env.VITE_BORROW_MANAGER_ADDRESS as `0x${string}`,
           abi: BORROW_MANAGER_ABI,
           functionName: 'repay',
-          args: [tokenId, amountInWei],
+          args: [('0x' + '0'.repeat(64)) as `0x${string}`, amountInWei], // Mock token ID
         })
       }
     } catch (error) {
@@ -230,7 +272,7 @@ export function RepayForm({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className='sm:max-w-xl w-[95vw] max-w-[600px] max-h-[90vh] overflow-y-auto'>
+      <DialogContent className='max-h-[90vh] overflow-y-auto sm:max-w-6xl'>
         <DialogHeader>
           <DialogTitle>Repay {selectedToken.symbol}</DialogTitle>
           <DialogDescription>
@@ -239,23 +281,125 @@ export function RepayForm({
         </DialogHeader>
 
         <div className='space-y-4 w-full min-w-0'>
-          {/* Token Display */}
+          {/* Chain Selection */}
           <div className='w-full min-w-0'>
             <label className='block text-sm font-medium text-card-foreground mb-2'>
-              Token
+              Chain
             </label>
-            <div className='px-3 py-2 border border-input rounded-md bg-muted flex items-center space-x-2 w-full min-w-0'>
-              <img
-                src={selectedToken.icon}
-                alt={`${selectedToken.symbol} icon`}
-                className='w-5 h-5 flex-shrink-0'
-              />
-              <span className='font-medium truncate'>
-                {selectedToken.symbol}
-              </span>
-              <span className='text-muted-foreground truncate'>
-                ({selectedToken.name})
-              </span>
+            <div className='relative' data-chain-dropdown>
+              <button
+                type='button'
+                onClick={() => setIsChainDropdownOpen(!isChainDropdownOpen)}
+                className='w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground text-left flex items-center justify-between'
+              >
+                <div className='flex items-center space-x-2'>
+                  <img
+                    src={`/public/${selectedChain.logo}`}
+                    alt={`${selectedChain.chain} icon`}
+                    className='w-4 h-4'
+                  />
+                  <span>{selectedChain.chain}</span>
+                </div>
+                <svg
+                  className={`w-4 h-4 transition-transform ${
+                    isChainDropdownOpen ? 'rotate-180' : ''
+                  }`}
+                  fill='none'
+                  stroke='currentColor'
+                  viewBox='0 0 24 24'
+                >
+                  <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    strokeWidth={2}
+                    d='M19 9l-7 7-7-7'
+                  />
+                </svg>
+              </button>
+
+              {isChainDropdownOpen && (
+                <div className='absolute z-10 w-full mt-1 bg-background border border-input rounded-md shadow-lg max-h-60 overflow-y-auto'>
+                  {portfolioData.map((chain) => (
+                    <button
+                      key={chain.chain}
+                      type='button'
+                      onClick={() => {
+                        setSelectedChain(chain)
+                        setIsChainDropdownOpen(false)
+                      }}
+                      className='w-full px-3 py-2 text-left hover:bg-muted flex items-center space-x-2'
+                    >
+                      <img
+                        src={`/public/${chain.logo}`}
+                        alt={`${chain.chain} icon`}
+                        className='w-4 h-4'
+                      />
+                      <span>{chain.chain}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Asset Selection */}
+          <div className='w-full min-w-0'>
+            <label className='block text-sm font-medium text-card-foreground mb-2'>
+              Asset
+            </label>
+            <div className='relative' data-asset-dropdown>
+              <button
+                type='button'
+                onClick={() => setIsAssetDropdownOpen(!isAssetDropdownOpen)}
+                className='w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground text-left flex items-center justify-between'
+              >
+                <div className='flex items-center space-x-2'>
+                  <img
+                    src={selectedToken.icon}
+                    alt={`${selectedToken.symbol} icon`}
+                    className='w-4 h-4'
+                  />
+                  <span>{selectedAsset.asset}</span>
+                </div>
+                <svg
+                  className={`w-4 h-4 transition-transform ${
+                    isAssetDropdownOpen ? 'rotate-180' : ''
+                  }`}
+                  fill='none'
+                  stroke='currentColor'
+                  viewBox='0 0 24 24'
+                >
+                  <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    strokeWidth={2}
+                    d='M19 9l-7 7-7-7'
+                  />
+                </svg>
+              </button>
+
+              {isAssetDropdownOpen && (
+                <div className='absolute z-10 w-full mt-1 bg-background border border-input rounded-md shadow-lg max-h-60 overflow-y-auto'>
+                  {selectedChain.assets.map((asset) => (
+                    <button
+                      key={asset.asset}
+                      type='button'
+                      onClick={() => {
+                        setSelectedAsset(asset)
+                        setIsAssetDropdownOpen(false)
+                      }}
+                      className='w-full px-3 py-2 text-left hover:bg-muted flex items-center space-x-2'
+                    >
+                      <img
+                        src={`/public/${asset.logo}`}
+                        alt={`${asset.asset} icon`}
+                        className='w-4 h-4'
+                      />
+                      <span>{asset.asset}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -363,7 +507,6 @@ export function RepayForm({
             onClick={handleRepay}
             disabled={
               !repayAmount ||
-              !tokenId ||
               isRepaying ||
               isRepayConfirming ||
               isApproving ||
