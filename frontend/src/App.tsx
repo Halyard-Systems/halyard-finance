@@ -14,6 +14,7 @@ import {
   useReadBorrowIndices,
   useReadRay,
   useReadSupportedTokens,
+  useReadTotalBorrowScaled,
 } from "./lib/hooks";
 import type { Asset, Token } from "./lib/types";
 
@@ -40,6 +41,8 @@ const buildMarketRows = (
   tokenIdMap: Map<string, `0x${string}`>,
   userDeposits: bigint[],
   userBorrows: bigint[],
+  totalBorrowScaledValues: bigint[],
+  borrowIndicesValues: bigint[],
   setSelectedToken: (token: Token) => void,
   setIsDepositModalOpen: (isOpen: boolean) => void,
   setIsWithdrawModalOpen: (isOpen: boolean) => void,
@@ -53,17 +56,26 @@ const buildMarketRows = (
     const tokenId = tokenIdMap.get(token!.symbol);
     const userDeposit = userDeposits[index];
     const userBorrow = userBorrows[index];
+    const totalBorrowScaled = totalBorrowScaledValues[index] || 0n;
+    const storedBorrowIndex = borrowIndicesValues[index] || 0n;
 
     const { depositApy, borrowApy } = calculateAPY(asset);
 
     // Calculate actual total deposits with accrued interest
     const actualTotalDeposits = calculateActualTotalDeposits(asset);
 
+    // Calculate actual total borrows with accrued interest
+    const actualTotalBorrows = calculateActualTotalBorrows(
+      asset,
+      totalBorrowScaled,
+      storedBorrowIndex
+    );
+
     return {
       token: token!,
       tokenId,
       deposits: actualTotalDeposits,
-      borrows: asset.totalBorrows,
+      borrows: actualTotalBorrows,
       depositApy,
       borrowApy,
       userDeposit,
@@ -151,6 +163,75 @@ const calculateActualTotalDeposits = (asset: Asset): bigint => {
   return (asset.totalScaledSupply * currentLiquidityIndex) / RAY;
 };
 
+// Calculate borrow rate using the contract's interest rate model (without reserve factor)
+const calculateBorrowRate = (
+  U: bigint,
+  baseRate: bigint,
+  slope1: bigint,
+  slope2: bigint,
+  kink: bigint
+): bigint => {
+  let borrowRate: bigint;
+  const ONE_E18 = 1000000000000000000n; // 1e18
+
+  if (U <= kink) {
+    borrowRate = baseRate + (slope1 * U) / kink;
+  } else {
+    borrowRate = baseRate + slope1 + (slope2 * (U - kink)) / (ONE_E18 - kink);
+  }
+
+  return borrowRate;
+};
+
+// Calculate the current borrow index (same as contract's _updateBorrowIndex)
+const getCurrentBorrowIndex = (
+  asset: Asset,
+  storedBorrowIndex: bigint
+): bigint => {
+  const now = BigInt(Math.floor(Date.now() / 1000));
+  const delta = now - asset.lastUpdateTimestamp;
+
+  if (delta === 0n) {
+    return storedBorrowIndex;
+  }
+
+  const ONE_E18 = 1000000000000000000n; // 1e18
+  const SECONDS_PER_YEAR = 31536000n; // 365 days
+
+  // Handle case where totalDeposits is 0 to avoid division by zero
+  let U: bigint;
+  if (asset.totalDeposits === 0n) {
+    U = 0n;
+  } else {
+    U = (asset.totalBorrows * ONE_E18) / asset.totalDeposits;
+  }
+
+  const borrowRate = calculateBorrowRate(
+    U,
+    asset.baseRate,
+    asset.slope1,
+    asset.slope2,
+    asset.kink
+  );
+
+  const accrued = (borrowRate * delta) / SECONDS_PER_YEAR;
+
+  return (storedBorrowIndex * (RAY + accrued)) / RAY;
+};
+
+// Calculate the actual total borrows with accrued interest
+const calculateActualTotalBorrows = (
+  asset: Asset,
+  totalBorrowScaled: bigint,
+  storedBorrowIndex: bigint
+): bigint => {
+  // If no stored borrow index, use RAY as default (matches contract initialization)
+  const effectiveBorrowIndex =
+    storedBorrowIndex === 0n ? RAY : storedBorrowIndex;
+  const currentBorrowIndex = getCurrentBorrowIndex(asset, effectiveBorrowIndex);
+  return (totalBorrowScaled * currentBorrowIndex) / RAY;
+};
+
 // TODO: Replace with contract interest rate model
 // Calculate APY from asset data
 const calculateAPY = (
@@ -220,6 +301,11 @@ function App() {
     tokenIds as `0x${string}`[]
   );
 
+  // Total scaled borrows
+  const { data: totalBorrowScaled } = useReadTotalBorrowScaled(
+    tokenIds as `0x${string}`[]
+  );
+
   // RAY constant
   const { data: ray } = useReadRay();
 
@@ -273,6 +359,12 @@ function App() {
       ? depositManagerBalances!.map((balance) => balance.result as bigint)
       : [],
     actualBorrows,
+    totalBorrowScaled
+      ? totalBorrowScaled!.map((item) => BigInt((item as any).result || 0))
+      : [],
+    borrowIndices
+      ? borrowIndices!.map((item) => BigInt((item as any).result || 0))
+      : [],
     setSelectedToken,
     setIsDepositModalOpen,
     setIsWithdrawModalOpen,

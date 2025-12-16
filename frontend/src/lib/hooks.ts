@@ -162,3 +162,22 @@ export const useReadBorrowIndices = (
     },
   })
 }
+
+// Read total scaled borrows for all tokens
+export const useReadTotalBorrowScaled = (
+  tokenIds: `0x${string}`[]
+): UseReadContractsReturnType => {
+  if (!tokenIds) tokenIds = []
+
+  return useReadContracts({
+    contracts: tokenIds.map((tokenId) => ({
+      address: BORROW_MANAGER_ADDRESS as `0x${string}`,
+      abi: BORROW_MANAGER_ABI as Abi,
+      functionName: 'totalBorrowScaled',
+      args: [tokenId],
+    })),
+    query: {
+      enabled: tokenIds.length > 0 && tokenIds !== undefined,
+    },
+  })
+}
