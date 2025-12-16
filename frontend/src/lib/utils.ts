@@ -1,6 +1,8 @@
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import type { AssetData } from '@/sample-data'
 
+// Helper for Shadcn components
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
@@ -29,6 +31,10 @@ export function formatTransactionError(errorMessage: string): string {
 
   // If no specific reason found, return a generic message
   return 'Transaction failed. Please try again or check your input.'
+}
+
+export function isNativeToken(token: AssetData): boolean {
+  return token.asset === '0x0000000000000000000000000000000000000000'
 }
 
 // Helper function to format specific error reasons
@@ -91,7 +97,6 @@ export function formatErrorReason(reason: string): string {
   }
 
   // If no specific match, return a formatted version of the reason
-  return `Transaction failed: ${
-    reason.charAt(0).toUpperCase() + reason.slice(1).toLowerCase()
-  }`
+  return `Transaction failed: ${reason.charAt(0).toUpperCase() + reason.slice(1).toLowerCase()
+    }`
 }

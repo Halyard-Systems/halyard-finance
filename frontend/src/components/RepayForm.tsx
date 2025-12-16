@@ -13,7 +13,7 @@ import ERC20_ABI from '../abis/ERC20.json'
 import BORROW_MANAGER_ABI from '../abis/BorrowManager.json'
 import type { Token } from '../lib/types'
 import { toWei, fromWei, formatTransactionError } from '../lib/utils'
-import { portfolioData } from '@/lib/sample-data'
+import { portfolioData } from '@/sample-data'
 
 import {
   useAccount,

@@ -34,6 +34,7 @@ const USE_MOCK_PYTH = import.meta.env.VITE_USE_MOCK_PYTH === 'true'
 
 // Helper to fetch Pyth update data using the Hermes client
 import { HermesClient } from '@pythnetwork/hermes-client'
+import { portfolioData } from '@/sample-data'
 
 async function fetchPythUpdateDataFromHermes(
   priceIds: string[]
@@ -131,6 +132,7 @@ export function BorrowForm({
   const [borrowAmount, setBorrowAmount] = useState('')
   const [customError, setCustomError] = useState<string | null>(null)
   const [isUpdatingMockPyth, setIsUpdatingMockPyth] = useState(false)
+  const [selectedToken, setSelectedToken] = useState(portfolioData[0].assets[0])
 
   // Calculate max borrowable when component mounts or when maxBorrowable is 0
   useEffect(() => {
@@ -305,7 +307,9 @@ export function BorrowForm({
         address: import.meta.env.VITE_BORROW_MANAGER_ADDRESS as `0x${string}`,
         abi: BORROW_MANAGER_ABI,
         functionName: 'borrow',
-        args: [tokenId, amountInWei, pythUpdateData, ETH_USDC_USDT_PRICE_IDS],
+        args: [
+          //tokenId, 
+          amountInWei, pythUpdateData, ETH_USDC_USDT_PRICE_IDS],
         value: fee, // Send the required fee
       })
     } catch (error) {
@@ -331,9 +335,9 @@ export function BorrowForm({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className='sm:max-w-md max-h-[90vh] overflow-y-auto overflow-x-hidden'>
         <DialogHeader>
-          <DialogTitle>Borrow {selectedToken.symbol}</DialogTitle>
+          <DialogTitle>Borrow {selectedToken.ticker}</DialogTitle>
           <DialogDescription>
-            Enter the amount of {selectedToken.symbol} you want to borrow. Make
+            Enter the amount of {selectedToken.ticker} you want to borrow. Make
             sure you have sufficient collateral.
           </DialogDescription>
         </DialogHeader>
@@ -342,16 +346,16 @@ export function BorrowForm({
           {/* Token Info */}
           <div className='flex items-center space-x-2 p-3 bg-muted rounded-md min-w-0'>
             <img
-              src={selectedToken.icon}
-              alt={`${selectedToken.symbol} icon`}
+              src={selectedToken.logo}
+              alt={`${selectedToken.ticker} icon`}
               className='w-6 h-6 flex-shrink-0'
             />
             <div className='min-w-0 flex-1'>
               <div className='font-medium text-card-foreground truncate'>
-                {selectedToken.symbol}
+                {selectedToken.ticker}
               </div>
               <div className='text-sm text-muted-foreground truncate'>
-                {selectedToken.name}
+                {selectedToken.ticker}
               </div>
             </div>
           </div>
@@ -359,7 +363,7 @@ export function BorrowForm({
           {/* Amount Input */}
           <div className='min-w-0'>
             <label className='block text-sm font-medium text-card-foreground mb-2'>
-              Amount ({selectedToken.symbol})
+              Amount ({selectedToken.ticker})
             </label>
             <p className='text-sm text-muted-foreground mb-2 break-words'>
               Max borrowable:{' '}
@@ -373,7 +377,7 @@ export function BorrowForm({
               type='number'
               value={borrowAmount}
               onChange={(e) => setBorrowAmount(e.target.value)}
-              placeholder={`0.00 ${selectedToken.symbol}`}
+              placeholder={`0.00 ${selectedToken.ticker}`}
               className='w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground'
               disabled={isBorrowing || isConfirming || isUpdatingMockPyth}
               max={maxBorrowable}
@@ -413,7 +417,7 @@ export function BorrowForm({
             onClick={handleBorrow}
             disabled={
               !borrowAmount ||
-              !tokenId ||
+              /*!tokenId || */
               isBorrowing ||
               isConfirming ||
               isUpdatingMockPyth ||
@@ -429,7 +433,7 @@ export function BorrowForm({
               ? 'Confirming...'
               : isUpdatingMockPyth
               ? 'Updating Prices...'
-              : `Borrow ${selectedToken.symbol}`}
+              : `Borrow ${selectedToken.ticker}`}
           </Button>
         </DialogFooter>
       </DialogContent>

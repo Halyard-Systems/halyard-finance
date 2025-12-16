@@ -2,8 +2,6 @@ import { useMemo, useState } from 'react'
 import { useAccount } from 'wagmi'
 import { useQueryClient } from '@tanstack/react-query'
 import { DepositForm } from './components/DepositForm'
-import { WithdrawForm } from './components/WithdrawForm'
-import { MarketTable } from './components/MarketTable'
 import { Header } from './components/Header'
 import { Connect } from './components/Connect'
 import { BorrowForm } from './components/BorrowForm'
@@ -17,25 +15,24 @@ import {
 } from './lib/hooks'
 import type { Asset, Token } from './lib/types'
 
+import { RepayForm } from './components/RepayForm'
+import { AccountSummary } from './components/AccountSummary'
+import { Portfolio } from './components/Portfolio'
+import { QuickActions } from './components/QuickActions'
+import { TransactionForm } from './components/TransactionForm'
+
 // Import both token files
 import MAINNET_TOKENS from './tokens.json'
 import SEPOLIA_TOKENS from './tokens_sepolia.json'
 
-const network = import.meta.env.VITE_NETWORK
-
 // Function to get tokens based on network
 const getTokens = (): Token[] => {
-  if (network === 'sepolia') {
+  if (import.meta.env.VITE_NETWORK === 'sepolia') {
     return SEPOLIA_TOKENS
   }
   // Default to mainnet tokens
   return MAINNET_TOKENS
 }
-import { RepayForm } from './components/RepayForm'
-import { TestnetInstructions } from './components/TestnetInstructions'
-import { AccountSummary } from './components/AccountSummary'
-import { Portfolio } from './components/Portfolio'
-import { QuickActions } from './components/QuickActions'
 
 const buildMarketRows = (
   assets: Asset[],
@@ -52,8 +49,10 @@ const buildMarketRows = (
   if (!assets) return []
 
   return assets.map((asset, index) => {
+    console.log('asset', asset)
+    console.log('tokens', tokens)
     const token = tokens.find((token) => token.symbol === asset.symbol)
-    const tokenId = tokenIdMap.get(token!.symbol)
+    const tokenId = tokenIdMap.get(token?.symbol || '')
     const userDeposit = userDeposits[index]
     const userBorrow = userBorrows[index]
 
@@ -114,10 +113,7 @@ const calculateAPY = (
 
 function App() {
   const queryClient = useQueryClient()
-  const { address, isConnected, chainId } = useAccount()
-
-  // Check if connected to Sepolia
-  const isSepolia = chainId === 11155111
+  const { address, isConnected } = useAccount()
 
   // Supported tokens
   const { data: tokenIds } = useReadSupportedTokens()
@@ -265,9 +261,13 @@ function App() {
         )}
 
         {isWithdrawModalOpen && (
-          <WithdrawForm
+          <TransactionForm
             isOpen={isWithdrawModalOpen}
             onClose={() => setIsWithdrawModalOpen(false)}
+            actionDescription='Enter the amount you want to withdraw from your deposited collateral.'
+            actionName='Withdraw'
+            maxTransactable={Number(selectedTokenData?.userDeposit || 0)}
+            handleTransaction={() => {}}
             onTransactionComplete={handleTransactionComplete}
           />
         )}
@@ -290,8 +290,6 @@ function App() {
             onTransactionComplete={handleTransactionComplete}
           />
         )}
-
-        {isSepolia && <TestnetInstructions />}
       </main>
     </div>
   )

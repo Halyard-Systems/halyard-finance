@@ -1,4 +1,4 @@
-import { portfolioData } from '@/lib/sample-data'
+import { portfolioData } from '@/sample-data'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import {
   Table,
@@ -29,16 +29,16 @@ export function Portfolio() {
             </TableHeader>
             <TableBody>
               {portfolioData.map((chainData) => (
-                <TableRow key={chainData.chain}>
+                <TableRow key={chainData.name}>
                   <TableCell className='font-medium align-top'>
                     <div className='flex items-center'>
                       <img
                         src={`/${chainData.logo}`}
-                        alt={`${chainData.chain} logo`}
+                        alt={`${chainData.name} logo`}
                         className='w-6 h-6 mr-3'
                       />
                       <span className='text-lg font-semibold'>
-                        {chainData.chain}
+                        {chainData.name}
                       </span>
                     </div>
                   </TableCell>
@@ -47,7 +47,7 @@ export function Portfolio() {
                       <TableBody>
                         {chainData.assets.map((asset, assetIndex) => (
                           <TableRow
-                            key={asset.asset}
+                            key={asset.ticker}
                             className={
                               assetIndex === chainData.assets.length - 1
                                 ? 'border-b-0'
@@ -58,10 +58,10 @@ export function Portfolio() {
                               <div className='flex items-center'>
                                 <img
                                   src={`/${asset.logo}`}
-                                  alt={`${asset.asset} logo`}
+                                  alt={`${asset.ticker} logo`}
                                   className='w-3 h-3 mr-2'
                                 />
-                                {asset.asset}
+                                {asset.ticker}
                               </div>
                             </TableCell>
                             <TableCell className='w-[120px] text-right font-medium'>

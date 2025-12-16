@@ -18,7 +18,7 @@ import DEPOSIT_MANAGER_ABI from '../abis/DepositManager.json'
 import { fromWei, toWei, formatTransactionError } from '../lib/utils'
 import { useReadDepositManagerBalance } from '../lib/hooks'
 import type { Token } from '../lib/types'
-import { portfolioData } from '@/lib/sample-data'
+import { portfolioData } from '@/sample-data'
 
 interface WithdrawFormProps {
   isOpen: boolean
@@ -70,14 +70,13 @@ export function WithdrawForm({
 
   // Create a mock Token object from the selected asset
   const selectedToken: Token = {
-    symbol: selectedAsset.asset,
-    name: selectedAsset.asset,
+    symbol: selectedAsset.ticker,
+    name: selectedAsset.ticker,
     icon: `/public/${selectedAsset.logo}`,
     decimals: 18, // Default to 18 decimals, would need to be mapped properly in real implementation
-    address:
-      selectedAsset.asset === 'ETH'
-        ? '0x0000000000000000000000000000000000000000'
-        : '0x' + '0'.repeat(40), // Mock address
+    address: selectedAsset.ticker === 'ETH'
+      ? '0x0000000000000000000000000000000000000000'
+      : '0x' + '0'.repeat(40), // Mock address
   }
 
   const { data: depositedBalanceData } = useReadDepositManagerBalance(
@@ -176,10 +175,10 @@ export function WithdrawForm({
                 <div className='flex items-center space-x-2'>
                   <img
                     src={`/public/${selectedChain.logo}`}
-                    alt={`${selectedChain.chain} icon`}
+                    alt={`${selectedChain.name} icon`}
                     className='w-4 h-4'
                   />
-                  <span>{selectedChain.chain}</span>
+                  <span>{selectedChain.name}</span>
                 </div>
                 <svg
                   className={`w-4 h-4 transition-transform ${
@@ -202,7 +201,7 @@ export function WithdrawForm({
                 <div className='absolute z-10 w-full mt-1 bg-background border border-input rounded-md shadow-lg max-h-60 overflow-y-auto'>
                   {portfolioData.map((chain) => (
                     <button
-                      key={chain.chain}
+                      key={chain.name}
                       type='button'
                       onClick={() => {
                         setSelectedChain(chain)
@@ -212,10 +211,10 @@ export function WithdrawForm({
                     >
                       <img
                         src={`/public/${chain.logo}`}
-                        alt={`${chain.chain} icon`}
+                        alt={`${chain.name} icon`}
                         className='w-4 h-4'
                       />
-                      <span>{chain.chain}</span>
+                      <span>{chain.name}</span>
                     </button>
                   ))}
                 </div>
@@ -240,7 +239,7 @@ export function WithdrawForm({
                     alt={`${selectedToken.symbol} icon`}
                     className='w-4 h-4'
                   />
-                  <span>{selectedAsset.asset}</span>
+                  <span>{selectedAsset.ticker}</span>
                 </div>
                 <svg
                   className={`w-4 h-4 transition-transform ${
@@ -263,7 +262,7 @@ export function WithdrawForm({
                 <div className='absolute z-10 w-full mt-1 bg-background border border-input rounded-md shadow-lg max-h-60 overflow-y-auto'>
                   {selectedChain.assets.map((asset) => (
                     <button
-                      key={asset.asset}
+                      key={asset.ticker}
                       type='button'
                       onClick={() => {
                         setSelectedAsset(asset)
@@ -273,10 +272,10 @@ export function WithdrawForm({
                     >
                       <img
                         src={`/public/${asset.logo}`}
-                        alt={`${asset.asset} icon`}
+                        alt={`${asset.ticker} icon`}
                         className='w-4 h-4'
                       />
-                      <span>{asset.asset}</span>
+                      <span>{asset.ticker}</span>
                     </button>
                   ))}
                 </div>

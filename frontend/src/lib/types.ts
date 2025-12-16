@@ -7,15 +7,21 @@ export interface Token {
   address: string
 }
 
-// Market asset
+// Aggregate token data
 export interface Asset {
-  symbol: string
-  tokenAddress: string
-  decimals: number
+  token: Token
   isActive: boolean
   liquidityIndex: bigint
   lastUpdateTimestamp: bigint
+  symbol: string
   totalScaledSupply: bigint
   totalDeposits: bigint
   totalBorrows: bigint
+}
+
+export interface ContractCall {
+  address: `0x${string}`
+  abi: any
+  functionName: string
+  args: any[]
 }
