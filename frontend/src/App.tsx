@@ -12,7 +12,6 @@ import {
   useReadDepositManagerBalances,
   useReadBorrowManagerBalances,
   useReadBorrowIndices,
-  useReadRay,
   useReadSupportedTokens,
   useReadTotalBorrowScaled,
 } from "./lib/hooks";
@@ -306,15 +305,12 @@ function App() {
     tokenIds as `0x${string}`[]
   );
 
-  // RAY constant
-  const { data: ray } = useReadRay();
-
-  // Calculate actual borrowed amounts
+  // Calculate actual borrowed amounts (with time-based interest accrual)
   const actualBorrows = useMemo(() => {
     if (
       !borrowManagerBalances ||
       !borrowIndices ||
-      !ray ||
+      !assets ||
       !tokenIds ||
       !Array.isArray(tokenIds)
     ) {
@@ -323,22 +319,38 @@ function App() {
 
     return borrowManagerBalances.map((balance, index) => {
       const scaledBorrow = BigInt((balance as any).result || 0);
-      const borrowIndex = BigInt((borrowIndices[index] as any).result || 0);
-      const rayValue = BigInt((ray as any) || 0);
+      const storedBorrowIndex = BigInt(
+        (borrowIndices[index] as any).result || 0
+      );
+      const asset = (assets[index] as any)?.result as Asset | undefined;
 
       // If no borrows, return 0
       if (scaledBorrow === 0n) {
         return 0n;
       }
 
+      // If no asset data, fall back to stored index
+      if (!asset) {
+        const effectiveIndex =
+          storedBorrowIndex === 0n ? RAY : storedBorrowIndex;
+        return (scaledBorrow * effectiveIndex) / RAY;
+      }
+
       // If borrow index is 0, it means no borrows have happened yet
       // In this case, use RAY as the borrow index (matches contract initialization)
-      const effectiveBorrowIndex = borrowIndex === 0n ? rayValue : borrowIndex;
+      const effectiveBorrowIndex =
+        storedBorrowIndex === 0n ? RAY : storedBorrowIndex;
 
-      // Calculate actual borrow: (scaledBorrow * effectiveBorrowIndex) / RAY
-      return (scaledBorrow * effectiveBorrowIndex) / rayValue;
+      // Calculate current borrow index with time-based accrual
+      const currentBorrowIndex = getCurrentBorrowIndex(
+        asset,
+        effectiveBorrowIndex
+      );
+
+      // Calculate actual borrow: (scaledBorrow * currentBorrowIndex) / RAY
+      return (scaledBorrow * currentBorrowIndex) / RAY;
     });
-  }, [borrowManagerBalances, borrowIndices, ray, tokenIds]);
+  }, [borrowManagerBalances, borrowIndices, assets, tokenIds]);
 
   const [selectedToken, setSelectedToken] = useState<Token>(getTokens()[0]);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
