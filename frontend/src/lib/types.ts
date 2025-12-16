@@ -18,4 +18,10 @@ export interface Asset {
   totalScaledSupply: bigint
   totalDeposits: bigint
   totalBorrows: bigint
+  // Interest rate model parameters
+  baseRate: bigint
+  slope1: bigint
+  slope2: bigint
+  kink: bigint
+  reserveFactor: bigint
 }
