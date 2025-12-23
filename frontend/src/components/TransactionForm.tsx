@@ -24,7 +24,7 @@ import {
   type MockAssetData,
 } from "@/sample-data";
 import { ChainPicker } from "./ChainPicker";
-import { AssetPickerNew } from "./AssetPickerNew";
+import { AssetPicker } from "./AssetPicker";
 
 type ActionName = "Borrow" | "Repay" | "Withdraw" | "Deposit";
 
@@ -119,7 +119,7 @@ export function TransactionForm({
           />
 
           {/* Asset Selection */}
-          <AssetPickerNew
+          <AssetPicker
             selectedChain={selectedChain}
             selectedAsset={selectedAsset}
             onAssetSelect={setSelectedAsset}
@@ -130,16 +130,6 @@ export function TransactionForm({
             <label className="block text-sm font-medium text-card-foreground mb-2">
               Amount ({selectedAsset.ticker})
             </label>
-            <p className="text-sm text-muted-foreground mb-2 break-words">
-              {/*}
-              Max borrowable:{' '}
-              {maxBorrowable !== undefined
-                ? (maxBorrowable as number).toLocaleString(undefined, {
-                    maximumFractionDigits: 6,
-                  })
-                : 'Loading...'}
-              */}
-            </p>
             <input
               type="number"
               value={amount}
