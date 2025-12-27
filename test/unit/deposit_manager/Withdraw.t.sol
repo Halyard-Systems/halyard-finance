@@ -12,26 +12,15 @@ contract WithdrawTest is BaseTest {
         uint256 aliceBalanceBefore = alice.balance;
 
         vm.prank(alice);
-        depositManager.deposit{value: depositAmount}(
-            ETH_TOKEN_ID,
-            depositAmount
-        );
+        depositManager.deposit{value: depositAmount}(ETH_TOKEN_ID, depositAmount);
 
         vm.prank(alice);
         depositManager.withdraw(ETH_TOKEN_ID, withdrawAmount);
 
-        assertEq(
-            depositManager.balanceOf(ETH_TOKEN_ID, alice),
-            depositAmount - withdrawAmount
-        );
-        assertEq(
-            alice.balance,
-            aliceBalanceBefore - depositAmount + withdrawAmount
-        );
+        assertEq(depositManager.balanceOf(ETH_TOKEN_ID, alice), depositAmount - withdrawAmount);
+        assertEq(alice.balance, aliceBalanceBefore - depositAmount + withdrawAmount);
 
-        DepositManager.Asset memory config = depositManager.getAsset(
-            ETH_TOKEN_ID
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(ETH_TOKEN_ID);
         assertEq(config.totalDeposits, depositAmount - withdrawAmount);
     }
 
@@ -45,14 +34,9 @@ contract WithdrawTest is BaseTest {
         vm.prank(alice);
         depositManager.withdraw(USDC_TOKEN_ID, withdrawAmount);
 
-        assertEq(
-            depositManager.balanceOf(USDC_TOKEN_ID, alice),
-            depositAmount - withdrawAmount
-        );
+        assertEq(depositManager.balanceOf(USDC_TOKEN_ID, alice), depositAmount - withdrawAmount);
 
-        DepositManager.Asset memory config = depositManager.getAsset(
-            USDC_TOKEN_ID
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(USDC_TOKEN_ID);
         assertEq(config.totalDeposits, depositAmount - withdrawAmount);
     }
 
@@ -67,9 +51,7 @@ contract WithdrawTest is BaseTest {
 
         assertEq(depositManager.balanceOf(USDC_TOKEN_ID, alice), depositAmount);
 
-        DepositManager.Asset memory config = depositManager.getAsset(
-            USDC_TOKEN_ID
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(USDC_TOKEN_ID);
         assertEq(config.totalDeposits, depositAmount);
     }
 
@@ -102,9 +84,7 @@ contract WithdrawTest is BaseTest {
 
         assertEq(depositManager.balanceOf(USDC_TOKEN_ID, alice), 0);
 
-        DepositManager.Asset memory config = depositManager.getAsset(
-            USDC_TOKEN_ID
-        );
+        DepositManager.Asset memory config = depositManager.getAsset(USDC_TOKEN_ID);
         assertEq(config.totalDeposits, 0);
     }
 
@@ -114,39 +94,22 @@ contract WithdrawTest is BaseTest {
         vm.prank(alice);
         depositManager.deposit(USDC_TOKEN_ID, depositAmount);
 
-        uint256 contractBalanceBefore = mockUSDC.balanceOf(
-            address(depositManager)
-        );
+        uint256 contractBalanceBefore = mockUSDC.balanceOf(address(depositManager));
         uint256 ownerBalanceBefore = mockUSDC.balanceOf(address(this));
 
         depositManager.emergencyWithdraw(USDC_TOKEN_ID, address(this));
 
-        uint256 contractBalanceAfter = mockUSDC.balanceOf(
-            address(depositManager)
-        );
+        uint256 contractBalanceAfter = mockUSDC.balanceOf(address(depositManager));
         uint256 ownerBalanceAfter = mockUSDC.balanceOf(address(this));
 
-        assertEq(
-            contractBalanceAfter,
-            0,
-            "Contract should be empty after emergency withdraw"
-        );
-        assertEq(
-            ownerBalanceAfter,
-            ownerBalanceBefore + contractBalanceBefore,
-            "Owner should receive all tokens"
-        );
+        assertEq(contractBalanceAfter, 0, "Contract should be empty after emergency withdraw");
+        assertEq(ownerBalanceAfter, ownerBalanceBefore + contractBalanceBefore, "Owner should receive all tokens");
     }
 
     function test_EmergencyWithdrawOnlyOwner() public {
         vm.prank(alice);
         // TODO: stub OwnableUnauthorizedAccount
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                Ownable.OwnableUnauthorizedAccount.selector,
-                alice
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
         depositManager.emergencyWithdraw(USDC_TOKEN_ID, alice);
     }
 
@@ -154,10 +117,7 @@ contract WithdrawTest is BaseTest {
         uint256 depositAmount = 1 ether;
 
         vm.prank(alice);
-        depositManager.deposit{value: depositAmount}(
-            ETH_TOKEN_ID,
-            depositAmount
-        );
+        depositManager.deposit{value: depositAmount}(ETH_TOKEN_ID, depositAmount);
 
         uint256 contractBalanceBefore = address(depositManager).balance;
         uint256 aliceBalanceBefore = alice.balance;
@@ -168,27 +128,14 @@ contract WithdrawTest is BaseTest {
         uint256 contractBalanceAfter = address(depositManager).balance;
         uint256 aliceBalanceAfter = alice.balance;
 
-        assertEq(
-            contractBalanceAfter,
-            0,
-            "Contract should be empty after emergency withdraw"
-        );
-        assertEq(
-            aliceBalanceAfter,
-            aliceBalanceBefore + contractBalanceBefore,
-            "Alice should receive all ETH"
-        );
+        assertEq(contractBalanceAfter, 0, "Contract should be empty after emergency withdraw");
+        assertEq(aliceBalanceAfter, aliceBalanceBefore + contractBalanceBefore, "Alice should receive all ETH");
     }
 
     function test_EmergencyWithdrawETHOnlyOwner() public {
         vm.prank(alice);
         // TODO: stub OwnableUnauthorizedAccount
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                Ownable.OwnableUnauthorizedAccount.selector,
-                alice
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
         depositManager.emergencyWithdraw(ETH_TOKEN_ID, alice);
     }
 }

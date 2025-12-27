@@ -41,27 +41,14 @@ contract BaseTest is Test {
         vm.etch(mockPyth, hex"00");
 
         // Mock LZ endpoint setDelegate (called in OAppCore constructor)
-        vm.mockCall(
-            mockLzEndpoint,
-            abi.encodeWithSignature("setDelegate(address)"),
-            abi.encode()
-        );
+        vm.mockCall(mockLzEndpoint, abi.encodeWithSignature("setDelegate(address)"), abi.encode());
 
         // Mock Stargate router address and pool ID for testing
         uint256 mockPoolId = 1;
-        depositManager = new DepositManager(
-            mockStargateRouter,
-            mockPoolId,
-            mockLzEndpoint,
-            address(this)
-        );
+        depositManager = new DepositManager(mockStargateRouter, mockPoolId, mockLzEndpoint, address(this));
 
         // Deploy BorrowManager
-        borrowManager = new BorrowManager(
-            address(depositManager),
-            mockPyth,
-            0.5e18
-        );
+        borrowManager = new BorrowManager(address(depositManager), mockPyth, 0.5e18);
 
         // Set up the test contract as the BorrowManager for testing
         depositManager.setBorrowManager(address(borrowManager));
@@ -101,26 +88,14 @@ contract BaseTest is Test {
         );
 
         // Mock the Stargate router addLiquidity call to always succeed
-        vm.mockCall(
-            mockStargateRouter,
-            abi.encodeWithSelector(IStargateRouter.addLiquidity.selector),
-            abi.encode()
-        );
+        vm.mockCall(mockStargateRouter, abi.encodeWithSelector(IStargateRouter.addLiquidity.selector), abi.encode());
 
         // Mock Pyth oracle calls
         // Mock getUpdateFee to return 0 (no fee for empty data)
-        vm.mockCall(
-            mockPyth,
-            abi.encodeWithSignature("getUpdateFee(bytes[])", new bytes[](0)),
-            abi.encode(uint256(0))
-        );
+        vm.mockCall(mockPyth, abi.encodeWithSignature("getUpdateFee(bytes[])", new bytes[](0)), abi.encode(uint256(0)));
 
         // Mock updatePriceFeeds to succeed
-        vm.mockCall(
-            mockPyth,
-            abi.encodeWithSignature("updatePriceFeeds(bytes[])"),
-            abi.encode()
-        );
+        vm.mockCall(mockPyth, abi.encodeWithSignature("updatePriceFeeds(bytes[])"), abi.encode());
 
         // Mock getPriceNoOlderThan for each price ID to return a valid PythStructs.Price
         // Return the struct fields directly as abi.encode does
@@ -155,29 +130,17 @@ contract BaseTest is Test {
         // BorrowManager calls with 60 * 5 = 300 seconds
         vm.mockCall(
             mockPyth,
-            abi.encodeWithSignature(
-                "getPriceNoOlderThan(bytes32,uint256)",
-                bytes32(uint256(1)),
-                uint256(300)
-            ),
+            abi.encodeWithSignature("getPriceNoOlderThan(bytes32,uint256)", bytes32(uint256(1)), uint256(300)),
             mockEthPriceData
         );
         vm.mockCall(
             mockPyth,
-            abi.encodeWithSignature(
-                "getPriceNoOlderThan(bytes32,uint256)",
-                bytes32(uint256(2)),
-                uint256(300)
-            ),
+            abi.encodeWithSignature("getPriceNoOlderThan(bytes32,uint256)", bytes32(uint256(2)), uint256(300)),
             mockUsdcPriceData
         );
         vm.mockCall(
             mockPyth,
-            abi.encodeWithSignature(
-                "getPriceNoOlderThan(bytes32,uint256)",
-                bytes32(uint256(3)),
-                uint256(300)
-            ),
+            abi.encodeWithSignature("getPriceNoOlderThan(bytes32,uint256)", bytes32(uint256(3)), uint256(300)),
             mockUsdtPriceData
         );
 
