@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from "react";
-import { useSelector, useDispatch } from "react-redux";
 import { Button } from "./ui/button";
 import {
   Dialog,
@@ -9,20 +8,10 @@ import {
   DialogFooter,
   DialogDescription,
 } from "./ui/dialog";
-import {
-  useWriteContract,
-  useWaitForTransactionReceipt,
-  usePublicClient,
-  useAccount,
-} from "wagmi";
 
-const USE_MOCK_PYTH = import.meta.env.VITE_USE_MOCK_PYTH === "true";
+//const USE_MOCK_PYTH = import.meta.env.VITE_USE_MOCK_PYTH === "true";
 
-import {
-  portfolioData,
-  type MockChainData,
-  type MockAssetData,
-} from "@/sample-data";
+import { portfolioData, type MockChainData } from "@/sample-data";
 import { ChainPicker } from "./ChainPicker";
 import { AssetPicker } from "./AssetPicker";
 
@@ -45,22 +34,11 @@ export function TransactionForm({
   actionName,
   isOpen,
   onClose,
-  tokenIds,
   maxTransactable,
   handleTransaction,
-  onTransactionComplete,
-  onTransactionError,
 }: TransactionFormProps) {
-  const { address } = useAccount();
-  // const { data: deposits } = useReadDepositManagerBalances(
-  //   address! as `0x${string}`,
-  //   tokenIds!
-  // )
-  const dispatch = useDispatch();
-
   const [amount, setAmount] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [isUpdatingMockPyth, setIsUpdatingMockPyth] = useState(false);
   const [selectedChain, setSelectedChain] = useState(portfolioData[0]);
   const [selectedAsset, setSelectedAsset] = useState(selectedChain.assets[0]);
 
@@ -75,7 +53,7 @@ export function TransactionForm({
     },
     [selectedAsset]
   );
-  // Handle transaction completion
+  // TODO: Handle transaction completion
   // useEffect(() => {
   //   if (isConfirmed) {
   //     // Clear the input and errors after successful borrow

@@ -3,8 +3,6 @@ import {
   type UseReadContractReturnType,
   useReadContracts,
   type UseReadContractsReturnType,
-  useWriteContract,
-  type UseWriteContractReturnType,
 } from 'wagmi'
 import type { Abi } from 'viem'
 
@@ -12,7 +10,6 @@ import DEPOSIT_MANAGER_ABI from '../abis/DepositManager.json'
 import BORROW_MANAGER_ABI from '../abis/BorrowManager.json'
 import ERC20_ABI from '../abis/ERC20.json'
 import type { Token } from './types'
-import type { AssetData } from '@/sample-data'
 
 const DEPOSIT_MANAGER_ADDRESS = import.meta.env.VITE_DEPOSIT_MANAGER_ADDRESS
 const BORROW_MANAGER_ADDRESS = import.meta.env.VITE_BORROW_MANAGER_ADDRESS
