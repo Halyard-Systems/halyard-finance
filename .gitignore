@@ -15,4 +15,5 @@ docs/
 
 # Foundry dependencies for Pyth
 node_modules/
-
+lib/
+!frontend/src/lib/

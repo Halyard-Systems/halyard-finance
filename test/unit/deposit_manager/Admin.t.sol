@@ -2,24 +2,28 @@
 pragma solidity ^0.8.30;
 
 import {DepositManager} from "../../../src/DepositManager.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {BaseTest} from "../BaseTest.t.sol";
 
 contract AdminTest is BaseTest {
     function test_AddTokenOnlyOwner() public {
         vm.prank(alice);
-        vm.expectRevert("Must be owner");
+        // TODO: stub OwnableUnauthorizedAccount
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
         depositManager.addToken("TEST", address(0x123), 18, 0.1e27, 0.5e27, 5.0e27, 0.8e18, 0.1e27);
     }
 
     function test_SetBorrowManagerOnlyOwner() public {
         vm.prank(alice);
-        vm.expectRevert("Must be owner");
+        // TODO: stub OwnableUnauthorizedAccount
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
         depositManager.setBorrowManager(alice);
     }
 
     function test_SetTokenActiveOnlyOwner() public {
         vm.prank(alice);
-        vm.expectRevert("Must be owner");
+        // TODO: stub OwnableUnauthorizedAccount
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
         depositManager.setTokenActive(USDC_TOKEN_ID, false);
     }
 

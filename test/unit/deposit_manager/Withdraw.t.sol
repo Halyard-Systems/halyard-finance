@@ -2,6 +2,7 @@
 pragma solidity ^0.8.30;
 
 import {DepositManager} from "../../../src/DepositManager.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {BaseTest} from "../BaseTest.t.sol";
 
 contract WithdrawTest is BaseTest {
@@ -107,7 +108,8 @@ contract WithdrawTest is BaseTest {
 
     function test_EmergencyWithdrawOnlyOwner() public {
         vm.prank(alice);
-        vm.expectRevert("Must be owner");
+        // TODO: stub OwnableUnauthorizedAccount
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
         depositManager.emergencyWithdraw(USDC_TOKEN_ID, alice);
     }
 
@@ -132,7 +134,8 @@ contract WithdrawTest is BaseTest {
 
     function test_EmergencyWithdrawETHOnlyOwner() public {
         vm.prank(alice);
-        vm.expectRevert("Must be owner");
+        // TODO: stub OwnableUnauthorizedAccount
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
         depositManager.emergencyWithdraw(ETH_TOKEN_ID, alice);
     }
 }

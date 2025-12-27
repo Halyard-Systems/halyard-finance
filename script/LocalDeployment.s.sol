@@ -15,6 +15,7 @@ contract LocalDeploymentScript is Script {
     //address STARGATE_ROUTER_SEPOLIA_TESTNET =
     //    0x2836045A50744FB50D3d04a9C8D18aD7B5012102;
 
+    address LAYERZERO_ENDPOINT_V2_MAINNET = 0x1a44076050125825900e736c501f859c50fE728c;
     address STARGATE_ROUTER_MAINNET = 0x8731d54E9D02c286767d56ac03e8037C07e01e98;
     //address STARGATE_USDC_POOL_MAINNET =
     //    0xc026395860Db2d07ee33e05fE50ed7bD583189C7;
@@ -53,13 +54,16 @@ contract LocalDeploymentScript is Script {
     }
 
     function run() public {
+        address deployer = msg.sender;
+
         // Get constructor parameters from environment or set defaults
+        address lzEndpoint = vm.envOr("LAYERZERO_ENDPOINT_V2", LAYERZERO_ENDPOINT_V2_MAINNET);
         address stargateRouter = vm.envOr("STARGATE_ROUTER", STARGATE_ROUTER_MAINNET);
         uint256 poolId = vm.envOr("POOL_ID", uint256(1)); // USDC pool ID
 
         vm.startBroadcast();
 
-        depositManager = new DepositManager(stargateRouter, poolId);
+        depositManager = new DepositManager(stargateRouter, poolId, lzEndpoint, deployer);
 
         depositManager.addToken("ETH", address(0), 18, 0.1e27, 0.5e27, 5.0e27, 0.8e18, 0.1e27);
         console.log("ETH token added to protocol");

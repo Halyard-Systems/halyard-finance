@@ -18,6 +18,7 @@ contract BaseTest is Test {
     address public bob = address(0x2);
     address public charlie = address(0x3);
     address public mockStargateRouter = address(0x123);
+    address public mockLzEndpoint = address(0x456);
     address public mockPyth = address(0x456);
 
     uint256 public constant RAY = 1e27;
@@ -35,9 +36,16 @@ contract BaseTest is Test {
         mockUSDC = new MockERC20("USD Coin", "USDC", 6);
         mockUSDT = new MockERC20("Tether USD", "USDT", 6);
 
+        // Put bytecode at mock addresses so calls don't fail with "non-contract address"
+        vm.etch(mockLzEndpoint, hex"00");
+        vm.etch(mockPyth, hex"00");
+
+        // Mock LZ endpoint setDelegate (called in OAppCore constructor)
+        vm.mockCall(mockLzEndpoint, abi.encodeWithSignature("setDelegate(address)"), abi.encode());
+
         // Mock Stargate router address and pool ID for testing
         uint256 mockPoolId = 1;
-        depositManager = new DepositManager(mockStargateRouter, mockPoolId);
+        depositManager = new DepositManager(mockStargateRouter, mockPoolId, mockLzEndpoint, address(this));
 
         // Deploy BorrowManager
         borrowManager = new BorrowManager(address(depositManager), mockPyth, 0.5e18);
