@@ -20,6 +20,10 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
 
+      - name: Install Forge dependencies
+        run: |
+          forge install layerzero-labs/devtools layerzero-labs/LayerZero-v2
+
       - name: Install pnpm
         run: |
           npm install -g pnpm
