@@ -3,13 +3,9 @@ pragma solidity ^0.8.30;
 
 import "./DepositManager.sol";
 import {IPyth} from "../node_modules/@pythnetwork/pyth-sdk-solidity/IPyth.sol";
-import {
-    PythStructs
-} from "../node_modules/@pythnetwork/pyth-sdk-solidity/PythStructs.sol";
+import {PythStructs} from "../node_modules/@pythnetwork/pyth-sdk-solidity/PythStructs.sol";
 
-import {
-    ReentrancyGuard
-} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 contract BorrowManager is ReentrancyGuard {
     DepositManager public immutable depositMgr;
@@ -29,12 +25,7 @@ contract BorrowManager is ReentrancyGuard {
         _;
     }
 
-    event Borrowed(
-        bytes32 indexed tokenId,
-        address indexed user,
-        uint256 amount,
-        uint256 collateralValueUsd
-    );
+    event Borrowed(bytes32 indexed tokenId, address indexed user, uint256 amount, uint256 collateralValueUsd);
     event Repaid(bytes32 indexed tokenId, address indexed user, uint256 amount);
 
     error PriceStale();
@@ -57,12 +48,11 @@ contract BorrowManager is ReentrancyGuard {
     }
 
     // Called when a user borrows; updates Pyth only for this asset
-    function borrow(
-        bytes32 tokenId,
-        uint256 amount,
-        bytes[] calldata pythUpdateData,
-        bytes32[] calldata priceIds
-    ) external payable nonReentrant {
+    function borrow(bytes32 tokenId, uint256 amount, bytes[] calldata pythUpdateData, bytes32[] calldata priceIds)
+        external
+        payable
+        nonReentrant
+    {
         // Pull latest price updates for all relevant assets
         uint256 fee = pyth.getUpdateFee(pythUpdateData);
         pyth.updatePriceFeeds{value: fee}(pythUpdateData);
@@ -79,8 +69,7 @@ contract BorrowManager is ReentrancyGuard {
         }
 
         // Scale new borrow
-        uint256 scaledDelta = (amount * depositMgr.RAY()) /
-            borrowIndex[tokenId];
+        uint256 scaledDelta = (amount * depositMgr.RAY()) / borrowIndex[tokenId];
         userBorrowScaled[tokenId][msg.sender] += scaledDelta;
         totalBorrowScaled[tokenId] += scaledDelta;
         depositMgr.incrementTotalBorrows(tokenId, amount);
@@ -89,10 +78,7 @@ contract BorrowManager is ReentrancyGuard {
         uint256 totalBorrowUsd = 0;
         for (uint256 i = 0; i < tokens.length; i++) {
             bytes32 tid = tokens[i];
-            PythStructs.Price memory price = pyth.getPriceNoOlderThan(
-                priceIds[i],
-                60 * 5
-            );
+            PythStructs.Price memory price = pyth.getPriceNoOlderThan(priceIds[i], 60 * 5);
             require(price.price >= 0, "Negative price");
             uint256 priceUint = uint256(uint64(price.price));
 
@@ -101,16 +87,13 @@ contract BorrowManager is ReentrancyGuard {
 
             // Collateral - normalize to 18 decimals before applying price
             uint256 deposit = depositMgr.balanceOf(tid, msg.sender);
-            uint256 normalizedDeposit = deposit *
-                (10 ** (18 - tokenConfig.decimals));
+            uint256 normalizedDeposit = deposit * (10 ** (18 - tokenConfig.decimals));
             totalCollateralUsd += (normalizedDeposit * priceUint) / 1e8;
 
             // Borrow - normalize to 18 decimals before applying price
             uint256 scaledBorrow = userBorrowScaled[tid][msg.sender];
-            uint256 userBorrowAmount = (scaledBorrow * borrowIndex[tid]) /
-                depositMgr.RAY();
-            uint256 normalizedBorrow = userBorrowAmount *
-                (10 ** (18 - tokenConfig.decimals));
+            uint256 userBorrowAmount = (scaledBorrow * borrowIndex[tid]) / depositMgr.RAY();
+            uint256 normalizedBorrow = userBorrowAmount * (10 ** (18 - tokenConfig.decimals));
             totalBorrowUsd += (normalizedBorrow * priceUint) / 1e8;
         }
         require(totalCollateralUsd > 0, "No collateral");
@@ -123,15 +106,11 @@ contract BorrowManager is ReentrancyGuard {
     }
 
     // Repay borrowed tokens
-    function repay(
-        bytes32 tokenId,
-        uint256 amount
-    ) external payable nonReentrant {
+    function repay(bytes32 tokenId, uint256 amount) external payable nonReentrant {
         // Accrue interest
         _updateBorrowIndex(tokenId);
         // Calculate scaled repayment
-        uint256 scaledRepay = (amount * depositMgr.RAY()) /
-            borrowIndex[tokenId];
+        uint256 scaledRepay = (amount * depositMgr.RAY()) / borrowIndex[tokenId];
         uint256 userScaled = userBorrowScaled[tokenId][msg.sender];
         require(scaledRepay <= userScaled, "Repay exceeds borrow");
         userBorrowScaled[tokenId][msg.sender] -= scaledRepay;
@@ -162,9 +141,7 @@ contract BorrowManager is ReentrancyGuard {
         }
 
         borrowIndex[tokenId] =
-            (borrowIndex[tokenId] *
-                (depositMgr.RAY() + (borrowRate * delta) / 365 days)) /
-            depositMgr.RAY();
+            (borrowIndex[tokenId] * (depositMgr.RAY() + (borrowRate * delta) / 365 days)) / depositMgr.RAY();
         depositMgr.setLastBorrowTime(tokenId, block.timestamp);
     }
 
