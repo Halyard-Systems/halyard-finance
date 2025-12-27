@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
-import type { AssetData } from '@/sample-data'
+import type { MockAssetData } from '@/sample-data'
 
 // Helper for Shadcn components
 export function cn(...inputs: ClassValue[]) {
@@ -33,8 +33,8 @@ export function formatTransactionError(errorMessage: string): string {
   return 'Transaction failed. Please try again or check your input.'
 }
 
-export function isNativeToken(token: AssetData): boolean {
-  return token.asset === '0x0000000000000000000000000000000000000000'
+export function isNativeToken(token: MockAssetData): boolean {
+  return token.address === '0x0000000000000000000000000000000000000000'
 }
 
 // Helper function to format specific error reasons
