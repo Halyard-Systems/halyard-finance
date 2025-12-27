@@ -3,12 +3,11 @@ pragma solidity ^0.8.30;
 
 import "./interfaces/IStargateRouter.sol";
 
-import { OApp, Origin, MessagingFee } from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
-import { OAppOptionsType3 } from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OAppOptionsType3.sol";
+import {OApp, Origin, MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
+import {OAppOptionsType3} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OAppOptionsType3.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
-
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 import "forge-std/console.sol";
 
@@ -69,12 +68,10 @@ contract DepositManager is OApp, OAppOptionsType3, ReentrancyGuard {
     error InsufficientBalance(bytes32 tokenId, address user, uint256 requested, uint256 available);
     error TransferFailed();
 
-    constructor(
-        address _stargateRouter, 
-        uint256 _poolId,
-        address _lzEndpoint,
-        address _owner
-     ) OApp(_lzEndpoint, _owner) Ownable(_owner) {
+    constructor(address _stargateRouter, uint256 _poolId, address _lzEndpoint, address _owner)
+        OApp(_lzEndpoint, _owner)
+        Ownable(_owner)
+    {
         stargateRouter = IStargateRouter(_stargateRouter);
         poolId = _poolId;
         //owner = msg.sender;
@@ -152,12 +149,18 @@ contract DepositManager is OApp, OAppOptionsType3, ReentrancyGuard {
     }
 
     function _lzReceive(
-        Origin calldata /*_origin*/,
-        bytes32 /*_guid*/,
+        Origin calldata,
+        /*_origin*/
+        bytes32,
+        /*_guid*/
         bytes calldata _message,
-        address /*_executor*/,
+        address,
+        /*_executor*/
         bytes calldata /*_extraData*/
-    ) internal override {
+    )
+        internal
+        override
+    {
         // 1. Decode the incoming bytes into a string
         //    You can use abi.decode, abi.decodePacked, or directly splice bytes
         //    if you know the format of your data structures

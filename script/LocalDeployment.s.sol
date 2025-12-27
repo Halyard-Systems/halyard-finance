@@ -55,7 +55,7 @@ contract LocalDeploymentScript is Script {
 
     function run() public {
         address deployer = msg.sender;
-        
+
         // Get constructor parameters from environment or set defaults
         address lzEndpoint = vm.envOr("LAYERZERO_ENDPOINT_V2", LAYERZERO_ENDPOINT_V2_MAINNET);
         address stargateRouter = vm.envOr("STARGATE_ROUTER", STARGATE_ROUTER_MAINNET);
