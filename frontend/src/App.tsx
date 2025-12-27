@@ -8,7 +8,6 @@ import {
   useReadDepositManagerBalances,
   useReadBorrowManagerBalances,
   useReadBorrowIndices,
-  useReadRay,
   useReadSupportedTokens,
 } from "./lib/hooks";
 import type { Asset, Token } from "./lib/types";
@@ -37,6 +36,8 @@ const buildMarketRows = (
   tokenIdMap: Map<string, `0x${string}`>,
   userDeposits: bigint[],
   userBorrows: bigint[],
+  totalBorrowScaledValues: bigint[],
+  borrowIndicesValues: bigint[],
   setSelectedToken: (token: Token) => void,
   setIsDepositModalOpen: (isOpen: boolean) => void,
   setIsWithdrawModalOpen: (isOpen: boolean) => void,
@@ -58,8 +59,8 @@ const buildMarketRows = (
     return {
       token: token!,
       tokenId,
-      deposits: asset.totalDeposits,
-      borrows: asset.totalBorrows,
+      deposits: actualTotalDeposits,
+      borrows: actualTotalBorrows,
       depositApy,
       borrowApy,
       userDeposit,
@@ -153,12 +154,12 @@ function App() {
   // RAY constant
   const { data: ray } = useReadRay();
 
-  // Calculate actual borrowed amounts
+  // Calculate actual borrowed amounts (with time-based interest accrual)
   const actualBorrows = useMemo(() => {
     if (
       !borrowManagerBalances ||
       !borrowIndices ||
-      !ray ||
+      !assets ||
       !tokenIds ||
       !Array.isArray(tokenIds)
     ) {
@@ -203,6 +204,12 @@ function App() {
       ? depositManagerBalances!.map((balance) => balance.result as bigint)
       : [],
     actualBorrows,
+    totalBorrowScaled
+      ? totalBorrowScaled!.map((item) => BigInt((item as any).result || 0))
+      : [],
+    borrowIndices
+      ? borrowIndices!.map((item) => BigInt((item as any).result || 0))
+      : [],
     setSelectedToken,
     setIsDepositModalOpen,
     setIsWithdrawModalOpen,
