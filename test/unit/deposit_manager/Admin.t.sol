@@ -2,30 +2,60 @@
 pragma solidity ^0.8.30;
 
 import {DepositManager} from "../../../src/DepositManager.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {BaseTest} from "../BaseTest.t.sol";
 
 contract AdminTest is BaseTest {
     function test_AddTokenOnlyOwner() public {
         vm.prank(alice);
-        vm.expectRevert("Must be owner");
-        depositManager.addToken("TEST", address(0x123), 18, 0.1e27, 0.5e27, 5.0e27, 0.8e18, 0.1e27);
+        // TODO: stub OwnableUnauthorizedAccount
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Ownable.OwnableUnauthorizedAccount.selector,
+                alice
+            )
+        );
+        depositManager.addToken(
+            "TEST",
+            address(0x123),
+            18,
+            0.1e27,
+            0.5e27,
+            5.0e27,
+            0.8e18,
+            0.1e27
+        );
     }
 
     function test_SetBorrowManagerOnlyOwner() public {
         vm.prank(alice);
-        vm.expectRevert("Must be owner");
+        // TODO: stub OwnableUnauthorizedAccount
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Ownable.OwnableUnauthorizedAccount.selector,
+                alice
+            )
+        );
         depositManager.setBorrowManager(alice);
     }
 
     function test_SetTokenActiveOnlyOwner() public {
         vm.prank(alice);
-        vm.expectRevert("Must be owner");
+        // TODO: stub OwnableUnauthorizedAccount
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Ownable.OwnableUnauthorizedAccount.selector,
+                alice
+            )
+        );
         depositManager.setTokenActive(USDC_TOKEN_ID, false);
     }
 
     function test_AddNewToken() public {
         string memory symbol = "DAI";
-        address daiAddress = address(0x6B175474E89094C44Da98b954EedeAC495271d0F);
+        address daiAddress = address(
+            0x6B175474E89094C44Da98b954EedeAC495271d0F
+        );
         uint8 decimals = 18;
 
         vm.prank(address(this));
@@ -41,7 +71,9 @@ contract AdminTest is BaseTest {
         );
 
         bytes32 daiTokenId = keccak256(abi.encodePacked(symbol));
-        DepositManager.Asset memory config = depositManager.getAsset(daiTokenId);
+        DepositManager.Asset memory config = depositManager.getAsset(
+            daiTokenId
+        );
 
         assertEq(config.tokenAddress, daiAddress);
         assertEq(config.decimals, decimals);
@@ -52,7 +84,9 @@ contract AdminTest is BaseTest {
         vm.prank(address(this));
         depositManager.setTokenActive(USDC_TOKEN_ID, false);
 
-        DepositManager.Asset memory config = depositManager.getAsset(USDC_TOKEN_ID);
+        DepositManager.Asset memory config = depositManager.getAsset(
+            USDC_TOKEN_ID
+        );
         assertFalse(config.isActive);
 
         vm.prank(alice);
@@ -65,13 +99,25 @@ contract AdminTest is BaseTest {
         vm.prank(alice);
         depositManager.deposit(USDC_TOKEN_ID, 1000 * USDC_DECIMALS);
 
-        assertEq(depositManager.balanceOf(USDC_TOKEN_ID, alice), 1000 * USDC_DECIMALS);
+        assertEq(
+            depositManager.balanceOf(USDC_TOKEN_ID, alice),
+            1000 * USDC_DECIMALS
+        );
     }
 
     function test_AddTokenAlreadyExists() public {
         vm.prank(address(this));
         vm.expectRevert("Token already exists");
-        depositManager.addToken("USDC", address(0x123), 18, 0.1e27, 0.5e27, 5.0e27, 0.8e18, 0.1e27);
+        depositManager.addToken(
+            "USDC",
+            address(0x123),
+            18,
+            0.1e27,
+            0.5e27,
+            5.0e27,
+            0.8e18,
+            0.1e27
+        );
     }
 
     function test_SetTokenActiveForETH() public {
@@ -91,8 +137,12 @@ contract AdminTest is BaseTest {
         // Test that the contract can receive ETH
         uint256 ethAmount = 1 ether;
 
-        (bool success,) = address(depositManager).call{value: ethAmount}("");
+        (bool success, ) = address(depositManager).call{value: ethAmount}("");
         assertTrue(success, "Contract should be able to receive ETH");
-        assertEq(address(depositManager).balance, ethAmount, "Contract should have received the ETH");
+        assertEq(
+            address(depositManager).balance,
+            ethAmount,
+            "Contract should have received the ETH"
+        );
     }
 }
