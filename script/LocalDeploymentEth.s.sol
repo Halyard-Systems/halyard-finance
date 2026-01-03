@@ -6,7 +6,7 @@ import {DepositManager} from "../src/DepositManager.sol";
 import {BorrowManager} from "../src/BorrowManager.sol";
 import {MockPyth} from "../node_modules/@pythnetwork/pyth-sdk-solidity/MockPyth.sol";
 
-contract LocalDeploymentScript is Script {
+contract LocalDeploymentEthScript is Script {
     DepositManager public depositManager;
     BorrowManager public borrowManager;
 
@@ -58,12 +58,11 @@ contract LocalDeploymentScript is Script {
 
         // Get constructor parameters from environment or set defaults
         address lzEndpoint = vm.envOr("LAYERZERO_ENDPOINT_V2", LAYERZERO_ENDPOINT_V2_MAINNET);
-        address stargateRouter = vm.envOr("STARGATE_ROUTER", STARGATE_ROUTER_MAINNET);
         uint256 poolId = vm.envOr("POOL_ID", uint256(1)); // USDC pool ID
 
         vm.startBroadcast();
 
-        depositManager = new DepositManager(stargateRouter, poolId, lzEndpoint, deployer);
+        depositManager = new DepositManager(lzEndpoint, deployer);
 
         depositManager.addToken("ETH", address(0), 18, 0.1e27, 0.5e27, 5.0e27, 0.8e18, 0.1e27);
         console.log("ETH token added to protocol");
@@ -77,7 +76,6 @@ contract LocalDeploymentScript is Script {
         console.log("USDT token added to protocol");
 
         console.log("DepositManager deployed at:", address(depositManager));
-        console.log("Stargate Router:", stargateRouter);
         console.log("Pool ID:", poolId);
 
         // Deploy MockPyth

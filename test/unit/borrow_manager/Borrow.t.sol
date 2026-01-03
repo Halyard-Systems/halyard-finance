@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.30;
+pragma solidity ^0.8.26;
 
 import {console} from "lib/forge-std/src/Test.sol";
 
 import {DepositManager} from "../../../src/DepositManager.sol";
 import {BorrowManager} from "../../../src/BorrowManager.sol";
 
-import {BaseTest} from "../BaseTest.t.sol";
+import {BaseTestOld} from "../BaseTestOld.t.sol";
 
-contract BorrowManagerTest is BaseTest {
+contract BorrowManagerTest is BaseTestOld {
     function test_ETHBorrow() public {
         uint256 borrowAmount = 0.1 ether; // Borrow less ETH to stay within LTV limits
         uint256 aliceBalanceBefore = alice.balance;

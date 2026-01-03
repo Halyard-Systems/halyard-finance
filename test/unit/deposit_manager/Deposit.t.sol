@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.30;
+pragma solidity ^0.8.26;
 
 import {DepositManager} from "../../../src/DepositManager.sol";
 
-import {BaseTest} from "../BaseTest.t.sol";
+import {BaseTestOld} from "../BaseTestOld.t.sol";
 
-contract DepositTest is BaseTest {
+contract DepositTest is BaseTestOld {
     function test_ETHDeposit() public {
         uint256 depositAmount = 1 ether;
         uint256 aliceBalanceBefore = alice.balance;

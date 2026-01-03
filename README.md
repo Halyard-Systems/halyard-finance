@@ -14,17 +14,25 @@ Alchemy is recommended for the node connection; set the ALCHEMY_API_KEY before r
 
 Three terminals/processes are required:
 
-### 1. Start the local Anvil node
+### 1. In separate terminals, start the local Anvil node for each chain:
 
 ```shell
-$ make node
+$ make eth-node
+```
+
+```shell
+$ make arb-node
 ```
 
 ### 2. Deploy the contracts and transfer USDC to the development account
 
 ```shell
-$ make deploy-local
-$ make transfer-usdc
+$ make deploy-local-eth
+$ make transfer-tokens-eth
+```
+
+```shell
+$
 ```
 
 ### 3. Start the front end (the frontend README must be followed first!)
@@ -103,7 +111,7 @@ Run `make deploy-sepolia-testnet` in terminal and note the resulting addresses f
 
 ### 4. Deploy mock ERC20 contracts (if not already done)
 
-***The following MockERC20 contracts are already deployed and allow open minting, use the MockERC20Mint.s.sol script to obtain tokens.***
+**_The following MockERC20 contracts are already deployed and allow open minting, use the MockERC20Mint.s.sol script to obtain tokens._**
 
 ```
 USDC: 0x6e2622F28a0ba92fb398B3232399C3BEc2fe43e7
@@ -111,10 +119,10 @@ USDT: 0x6fa28d30Becf5Ab2568cFAE11f9f83D5E8A5B013
 ```
 
 If you wish to add your own Mock ERC20 contracts:
+
 1. Update the `TOKEN_NAME`, `TOKEN_SYMBOL`, and `TOKEN_DECIMALS`
 2. Run `make deploy-mock-erc20`
 3. Note the resulting contract address
- 
 
 ### 5. Add the Mock ERC20 tokens to the DepositManager contract
 

@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.30;
-
-import "./interfaces/IStargateRouter.sol";
+pragma solidity ^0.8.26;
 
 import {OApp, Origin, MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {OAppOptionsType3} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OAppOptionsType3.sol";
@@ -39,10 +37,6 @@ contract DepositManager is OApp, OAppOptionsType3, ReentrancyGuard {
         uint256 lastUpdateTimestamp;
     }
 
-    // Stargate router for liquidity operations
-    IStargateRouter public immutable stargateRouter;
-    uint256 public immutable poolId;
-
     // Asset registry
     mapping(bytes32 => Asset) public assets;
     mapping(bytes32 => mapping(address => UserBalance)) public userBalances;
@@ -68,12 +62,10 @@ contract DepositManager is OApp, OAppOptionsType3, ReentrancyGuard {
     error InsufficientBalance(bytes32 tokenId, address user, uint256 requested, uint256 available);
     error TransferFailed();
 
-    constructor(address _stargateRouter, uint256 _poolId, address _lzEndpoint, address _owner)
+    constructor(address _lzEndpoint, address _owner)
         OApp(_lzEndpoint, _owner)
         Ownable(_owner)
     {
-        stargateRouter = IStargateRouter(_stargateRouter);
-        poolId = _poolId;
         //owner = msg.sender;
     }
 
