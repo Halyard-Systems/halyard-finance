@@ -18,6 +18,7 @@ import "forge-std/console.sol";
  */
 contract HubController is OApp, OAppOptionsType3, ReentrancyGuard {
     error Paused();
+    error InvalidSpoke(address expected, address actual);
 
     event PausedSet(bool paused);
     event SpokeSet(uint32 indexed eid, bytes32 spoke);
@@ -92,8 +93,8 @@ contract HubController is OApp, OAppOptionsType3, ReentrancyGuard {
     // Override _lzReceive to decode the incoming bytes and apply your logic.
     // The base OAppReceiver.lzReceive ensures:
     //   • Only the LayerZero Endpoint can call this method
-    //   • The sender is a registered spoke (spoke[srcEid] == origin.sender)
     //
+    // This implementation validates that the sender is a registered spoke.
     // To register a spoke, call setSpoke(eid, spokeAddress)
     // ──────────────────────────────────────────────────────────────────────────────
 
@@ -104,12 +105,20 @@ contract HubController is OApp, OAppOptionsType3, ReentrancyGuard {
     /// @dev   _executor  Executor address that delivered the message
     /// @dev   _extraData Additional data from the Executor (unused here)
     function _lzReceive(
-        Origin calldata /*_origin*/,
+        Origin calldata _origin,
         bytes32 /*_guid*/,
         bytes calldata _message,
         address /*_executor*/,
         bytes calldata /*_extraData*/
     ) internal override {
+        // Validate that the sender is a registered spoke before any message decoding or state changes
+        bytes32 expectedSpoke = spoke[_origin.srcEid];
+        if (expectedSpoke == bytes32(0) || expectedSpoke != _origin.sender) {
+            address expectedAddr = address(uint160(uint256(expectedSpoke)));
+            address actualAddr = address(uint160(uint256(_origin.sender)));
+            revert InvalidSpoke(expectedAddr, actualAddr);
+        }
+
         if (paused) revert Paused();
         // Decode the incoming bytes into a string
         // You can use abi.decode, abi.decodePacked, or directly splice bytes

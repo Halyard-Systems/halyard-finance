@@ -72,7 +72,7 @@ mint-mock-erc20:
 
 # Start the local Anvil node for the Arbitrum chain
 arb-node:
-	anvil --fork-url https://arb-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY} --fork-block-number 22900000 -p 8546
+	anvil --fork-url https://arb-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY} --fork-block-number 417526226 -p 8546
 
 # Start the local Anvil node for the Ethereum chain
 eth-node:

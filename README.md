@@ -31,10 +31,6 @@ $ make deploy-local-eth
 $ make transfer-tokens-eth
 ```
 
-```shell
-$
-```
-
 ### 3. Start the front end (the frontend README must be followed first!)
 
 ```shell

@@ -13,12 +13,12 @@ interface IERC20 {
 
 contract TransferTokensArb is Script {
     // Mainnet USDC and a known whale
-    address constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
-    address constant USDC_WHALE = 0x64F23F66C82e6B77916ad435f09511d608fD8EEa;
+    address constant USDC = 0xaf88d065e77c8cC2239327C5EDb3A432268e5831;
+    address constant USDC_WHALE = 0x74bBBb0E7F0bAd6938509Dd4B556a39A4Db1F2Cd;
 
     // Mainnet USDT and a known whale
-    address constant USDT = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
-    address constant USDT_WHALE = 0xF977814e90dA44bFA03b6295A0616a897441aceC;
+    address constant USDT0 = 0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9;
+    address constant USDT0_WHALE = 0xc678E0A1e9700e497B209bc17Ad4dD910a572d55;
 
     // Local contracts will be deployed to these addresses
     address constant BORROW_MANAGER = 0x74ef79CFC735A10436eF9D4808547df0Ce38f788;
@@ -38,15 +38,16 @@ contract TransferTokensArb is Script {
 
         vm.stopBroadcast();
 
-        vm.startBroadcast(USDT_WHALE);
+        vm.startBroadcast(USDT0_WHALE);
 
-        uint256 amountUSDT = 1_000_000e6; // 1000000 USDT, 6 decimals
+        uint256 amountUSDT0 = 1_000_000e6; // 1000000 USDT, 6 decimals
 
         // Transfer USDT using low-level call (USDT doesn't return bool) USDT is not a standard ERC20 token
-        (bool successUSDT,) = USDT.call(abi.encodeWithSelector(IERC20.transfer.selector, recipient, amountUSDT));
-        require(successUSDT, "USDT Transfer failed");
+        (bool successUSDT, bytes memory data) = USDT.call(abi.encodeWithSelector(IERC20.transfer.selector, recipient, amountUSDT));
+        require(successUSDT && (data.length == 0 || abi.decode(data, (bool))), "USDT Transfer failed");
 
-        console.log("Recipient USDT Balance", IERC20(USDT).balanceOf(recipient));
+
+        console.log("Recipient USDT0 Balance", IERC20(USDT0).balanceOf(recipient));
 
         vm.stopBroadcast();
 

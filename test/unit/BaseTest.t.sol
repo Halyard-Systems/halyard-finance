@@ -22,7 +22,7 @@ contract BaseTest is Test {
     address public alice = address(0x1);
     address public bob = address(0x2);
     address public charlie = address(0x3);
-    address public mockLzEndpoint = address(0x0);
+    address public mockLzEndpoint = makeAddr("lzEndpoint");
     //address public mockPyth = address(0x456);
 
     // uint256 public constant RAY = 1e27;
@@ -57,7 +57,7 @@ contract BaseTest is Test {
 
         assetRegistry = new AssetRegistry(address(hubAccessManager));
 
-        
+
 
         // Mock Stargate router address and pool ID for testing
         //uint256 mockPoolId = 1;

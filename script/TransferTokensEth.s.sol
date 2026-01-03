@@ -43,8 +43,8 @@ contract TransferTokensEth is Script {
         uint256 amountUSDT = 1_000_000e6; // 1000000 USDT, 6 decimals
 
         // Transfer USDT using low-level call (USDT doesn't return bool) USDT is not a standard ERC20 token
-        (bool successUSDT,) = USDT.call(abi.encodeWithSelector(IERC20.transfer.selector, recipient, amountUSDT));
-        require(successUSDT, "USDT Transfer failed");
+        (bool successUSDT, bytes memory data) = USDT.call(abi.encodeWithSelector(IERC20.transfer.selector, recipient, amountUSDT));
+        require(successUSDT && (data.length == 0 || abi.decode(data, (bool))), "USDT Transfer failed");
 
         console.log("Recipient USDT Balance", IERC20(USDT).balanceOf(recipient));
 

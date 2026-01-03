@@ -33,7 +33,6 @@ contract TestnetDeploymentScript is Script {
 
         // Deploy DepositManager
         console.log("Deploying DepositManager...");
-        // Pool ID is not currently used
         depositManager = new DepositManager(LAYERZERO_ENDPOINT_V2_SEPOLIA, deployer);
         console.log("DepositManager deployed at:", address(depositManager));
 
