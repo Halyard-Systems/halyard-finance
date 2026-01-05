@@ -65,9 +65,8 @@ contract AssetRegistry is AccessManaged {
     event MaxPriceAgeSet(address indexed asset, uint256 maxAgeSeconds);
     event BorrowRateSet(uint32 indexed eid, address indexed asset, uint256 ratePerSecondRay);
 
-    constructor(address _authority) {
+    constructor(address _authority) AccessManaged(_authority) {
         if (_authority == address(0)) revert InvalidAuthority();
-        AccessManaged(_authority);
     }
 
     // ---------------------------------------------------------------------
@@ -148,14 +147,18 @@ contract AssetRegistry is AccessManaged {
 
     function disableCollateral(uint32 eid, address asset) external restricted validEid(eid) validAsset(asset) {
         CollateralConfig storage c = _collateralConfig[eid][asset];
+        c.isSupported = false;
+        emit CollateralDisabled(eid, asset);
+    }
+
     function _validateCollateralConfig(CollateralConfig calldata cfg) internal pure {
-        if (cfg.decimals == 0 || cfg.decimals > 36) revert InvalidDecimals();
+        if (!cfg.isSupported) {
+            // You may want to allow setting unsupported configs; but we enforce supported here.
+            // If you want to stage configs before enabling, remove this check.
+        }
 
         // ltv <= liqThreshold is typical (or equal). liqThreshold should not exceed 100%.
         if (cfg.ltvBps > 10_000 || cfg.liqThresholdBps > 10_000 || cfg.liqBonusBps > 10_000) revert InvalidBps();
-        if (cfg.ltvBps > cfg.liqThresholdBps) revert InvalidBps();
-        // supplyCap can be 0 (no cap)
-    }
         if (cfg.ltvBps > cfg.liqThresholdBps) revert InvalidBps();
         if (cfg.decimals > 36) revert InvalidDecimals(); // generous upper bound
         // supplyCap can be 0 (no cap)

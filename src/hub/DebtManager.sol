@@ -3,6 +3,7 @@ pragma solidity ^0.8.23;
 
 import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * DebtManager (Hub-side)
@@ -54,6 +55,7 @@ contract DebtManager is AccessManaged, ReentrancyGuard {
     // Errors
     // -----------------------------
     error OnlyMinter();
+    error OnlyOwner();
     error InvalidAddress();
     error UnsupportedDebtAsset(address asset);
     error InvalidAmount();
@@ -75,6 +77,8 @@ contract DebtManager is AccessManaged, ReentrancyGuard {
     /// @notice authorized caller for mint/burn (usually HubController, or a Router/Facade)
     address public minter;
 
+    address public owner;
+
     IAssetRegistryDebtRates public assetRegistry;
 
     modifier onlyMinter() {
@@ -82,7 +86,12 @@ contract DebtManager is AccessManaged, ReentrancyGuard {
         _;
     }
 
-    constructor(address _owner, address _assetRegistry) Ownable(_owner) {
+    modifier onlyOwner() {
+        if (msg.sender != owner) revert OnlyOwner();
+        _;
+    }
+
+    constructor(address _owner, address _assetRegistry) AccessManaged(_owner) {
         if (_owner == address(0) || _assetRegistry == address(0)) revert InvalidAddress();
         assetRegistry = IAssetRegistryDebtRates(_assetRegistry);
         emit AssetRegistrySet(_assetRegistry);
@@ -90,7 +99,8 @@ contract DebtManager is AccessManaged, ReentrancyGuard {
 
     function setOwner(address newOwner) external onlyOwner {
         if (newOwner == address(0)) revert InvalidAddress();
-        _transferOwnership(newOwner);
+        owner = newOwner;
+        emit OwnerSet(newOwner);
     }
 
     function setMinter(address _minter) external onlyOwner {

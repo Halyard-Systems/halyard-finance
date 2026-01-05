@@ -13,6 +13,7 @@ contract SpokeController is OApp, ReentrancyGuard {
     /// @param _owner    The address permitted to configure this OApp
     constructor(address _lzEndpoint, address _owner)
         OApp(_lzEndpoint, _owner)
+        Ownable(_owner)
     {}
 
     /// @dev Required by OApp - handles incoming LayerZero messages

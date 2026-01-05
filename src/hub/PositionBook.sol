@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import "forge-std/console.sol";
 
 /**
- * PositionBook (Hub-side) -storage for user positions.
+ * PositionBook (Hub-side) - storage for user positions.
  *
  * Responsibility:
  * - Store collateral balances per user per chain (EID) per asset.
@@ -28,13 +28,13 @@ import "forge-std/console.sol";
  * likely move to OpenZeppelin AccessControl, but this is deliberately dependency-light.
  */
 
-contract PositionBook is Ownable, ReentrancyGuard {
+contract PositionBook is AccessManaged, ReentrancyGuard {
     // ---------------------------------------------------------------------
     // Errors
     // ---------------------------------------------------------------------
-    error OnlyHubController();
-    error OnlyRiskEngine();
-    error OnlyLiquidationEngine();
+    //error OnlyHubController();
+    //error OnlyRiskEngine();
+    //error OnlyLiquidationEngine();
     error InvalidAddress();
     error InvalidAmount();
     error InvalidEid();
@@ -49,10 +49,10 @@ contract PositionBook is Ownable, ReentrancyGuard {
     // ---------------------------------------------------------------------
     // Events
     // ---------------------------------------------------------------------
-    event OwnerSet(address indexed owner);
-    event HubControllerSet(address indexed hubController);
-    event RiskEngineSet(address indexed riskEngine);
-    event LiquidationEngineSet(address indexed liquidationEngine);
+    // event OwnerSet(address indexed owner);
+    // event HubControllerSet(address indexed hubController);
+    // event RiskEngineSet(address indexed riskEngine);
+    // event LiquidationEngineSet(address indexed liquidationEngine);
 
     event CollateralCredited(address indexed user, uint32 indexed eid, address indexed asset, uint256 amount);
     event CollateralDebited(address indexed user, uint32 indexed eid, address indexed asset, uint256 amount);
@@ -69,50 +69,31 @@ contract PositionBook is Ownable, ReentrancyGuard {
     // ---------------------------------------------------------------------
     // Roles / pointers
     // ---------------------------------------------------------------------
-    address public hubController;       // LayerZero receiver/dispatcher (finalizes receipts)
-    address public riskEngine;          // validates (read-only here; may also call "reserve" helpers)
-    address public liquidationEngine;   // creates liquidation pendings
+    // address public hubController;       // LayerZero receiver/dispatcher (finalizes receipts)
+    // address public riskEngine;          // validates (read-only here; may also call "reserve" helpers)
+    // address public liquidationEngine;   // creates liquidation pendings
 
-    modifier onlyHubController() {
-        if (msg.sender != hubController) revert OnlyHubController();
-        _;
-    }
+    // modifier onlyHubController() {
+    //     if (msg.sender != hubController) revert OnlyHubController();
+    //     _;
+    // }
 
-    modifier onlyRiskEngine() {
-        if (msg.sender != riskEngine) revert OnlyRiskEngine();
-        _;
-    }
+    // modifier onlyRiskEngine() {
+    //     if (msg.sender != riskEngine) revert OnlyRiskEngine();
+    //     _;
+    // }
 
-    modifier onlyLiquidationEngine() {
-        if (msg.sender != liquidationEngine) revert OnlyLiquidationEngine();
-        _;
-    }
+    // modifier onlyLiquidationEngine() {
+    //     if (msg.sender != liquidationEngine) revert OnlyLiquidationEngine();
+    //     _;
+    // }
 
-    constructor(address _owner) Ownable(_owner) {
-        if (_owner == address(0)) revert InvalidAddress();
-    }
+    // constructor(address _owner) Ownable(_owner) {
+    //     if (_owner == address(0)) revert InvalidAddress();
+    // }
 
-    function setOwner(address _newOwner) external onlyOwner {
-        if (_newOwner == address(0)) revert InvalidAddress();
-        _transferOwnership(_newOwner);
-    }
-
-    function setHubController(address a) external onlyOwner {
-        if (a == address(0)) revert InvalidAddress();
-        hubController = a;
-        emit HubControllerSet(a);
-    }
-
-    function setRiskEngine(address a) external onlyOwner {
-        if (a == address(0)) revert InvalidAddress();
-        riskEngine = a;
-        emit RiskEngineSet(a);
-    }
-
-    function setLiquidationEngine(address a) external onlyOwner {
-        if (a == address(0)) revert InvalidAddress();
-        liquidationEngine = a;
-        emit LiquidationEngineSet(a);
+    constructor(address _authority) AccessManaged(_authority) {
+        if (_authority == address(0)) revert InvalidAddress();
     }
 
     // ---------------------------------------------------------------------
@@ -142,7 +123,7 @@ contract PositionBook is Ownable, ReentrancyGuard {
 
     /// @notice Credit collateral after a spoke deposit receipt.
     /// Called by HubController upon receiving DEPOSIT_CREDITED.
-    function creditCollateral(address user, uint32 eid, address asset, uint256 amount) external onlyHubController {
+    function creditCollateral(address user, uint32 eid, address asset, uint256 amount) external restricted {
         if (user == address(0) || asset == address(0)) revert InvalidAddress();
         if (eid == 0) revert InvalidEid();
         if (amount == 0) revert InvalidAmount();
@@ -161,8 +142,8 @@ contract PositionBook is Ownable, ReentrancyGuard {
     }
 
     /// @notice Reserve collateral for a pending withdraw.
-    /// Typically invoked by a router after RiskEngine approves withdraw intent.
-    function reserveCollateral(address user, uint32 eid, address asset, uint256 amount) external onlyRiskEngine {
+    /// Invoked by RiskEngine after it approves withdraw intent.
+    function reserveCollateral(address user, uint32 eid, address asset, uint256 amount) external restricted {
         if (user == address(0) || asset == address(0)) revert InvalidAddress();
         if (eid == 0) revert InvalidEid();
         if (amount == 0) revert InvalidAmount();
@@ -173,7 +154,7 @@ contract PositionBook is Ownable, ReentrancyGuard {
     }
 
     /// @notice Release collateral reservation (on failure or cancellation).
-    function unreserveCollateral(address user, uint32 eid, address asset, uint256 amount) external onlyHubController {
+    function unreserveCollateral(address user, uint32 eid, address asset, uint256 amount) external restricted {
         if (user == address(0) || asset == address(0)) revert InvalidAddress();
         if (eid == 0) revert InvalidEid();
         if (amount == 0) revert InvalidAmount();
@@ -215,7 +196,7 @@ contract PositionBook is Ownable, ReentrancyGuard {
         address debtAsset,
         uint256 amount,
         address receiver
-    ) external onlyRiskEngine {
+    ) external restricted {
         if (borrowId == bytes32(0)) revert InvalidAmount();
         if (user == address(0) || debtAsset == address(0) || receiver == address(0)) revert InvalidAddress();
         if (dstEid == 0) revert InvalidEid();
@@ -244,7 +225,7 @@ contract PositionBook is Ownable, ReentrancyGuard {
     /// On failure: releases reservation and marks finalized.
     ///
     /// Called by HubController upon BORROW_RELEASED receipt.
-    function finalizePendingBorrow(bytes32 borrowId, bool success) external onlyHubController returns (PendingBorrow memory p) {
+    function finalizePendingBorrow(bytes32 borrowId, bool success) external restricted returns (PendingBorrow memory p) {
         PendingBorrow storage s = pendingBorrow[borrowId];
         if (!s.exists) revert UnknownPending(borrowId);
         if (s.finalized) revert AlreadyFinalized(borrowId);
@@ -264,7 +245,7 @@ contract PositionBook is Ownable, ReentrancyGuard {
 
     /// @notice After DebtManager mints the real debt (on success), clear the reservation.
     /// You can call this from the same finalize handler in HubController.
-    function clearBorrowReservation(bytes32 borrowId) external onlyHubController {
+    function clearBorrowReservation(bytes32 borrowId) external restricted {
         PendingBorrow storage s = pendingBorrow[borrowId];
         if (!s.exists) revert UnknownPending(borrowId);
         if (!s.finalized) revert NotPending(borrowId); // must be finalized first
@@ -299,7 +280,7 @@ contract PositionBook is Ownable, ReentrancyGuard {
         address asset,
         uint256 amount,
         address receiver
-    ) external onlyRiskEngine {
+    ) external restricted {
         if (withdrawId == bytes32(0)) revert InvalidAmount();
         if (user == address(0) || asset == address(0) || receiver == address(0)) revert InvalidAddress();
         if (srcEid == 0) revert InvalidEid();
@@ -330,7 +311,7 @@ contract PositionBook is Ownable, ReentrancyGuard {
     /// On failure: just reduce reservation.
     ///
     /// Called by HubController upon WITHDRAW_RELEASED receipt.
-    function finalizePendingWithdraw(bytes32 withdrawId, bool success) external onlyHubController returns (PendingWithdraw memory w) {
+    function finalizePendingWithdraw(bytes32 withdrawId, bool success) external restricted returns (PendingWithdraw memory w) {
         PendingWithdraw storage s = pendingWithdraw[withdrawId];
         if (!s.exists) revert UnknownPending(withdrawId);
         if (s.finalized) revert AlreadyFinalized(withdrawId);
@@ -374,7 +355,7 @@ contract PositionBook is Ownable, ReentrancyGuard {
         address seizeAsset,
         uint256 seizeAmount,
         address liquidator
-    ) external onlyLiquidationEngine {
+    ) external restricted {
         if (liqId == bytes32(0)) revert InvalidAmount();
         if (user == address(0) || seizeAsset == address(0) || liquidator == address(0)) revert InvalidAddress();
         if (seizeEid == 0) revert InvalidEid();
@@ -406,7 +387,7 @@ contract PositionBook is Ownable, ReentrancyGuard {
     /// On failure: just drop reservation.
     ///
     /// Called by HubController upon COLLATERAL_SEIZED receipt.
-    function finalizePendingLiquidation(bytes32 liqId, bool success) external onlyHubController returns (PendingLiquidation memory l) {
+    function finalizePendingLiquidation(bytes32 liqId, bool success) external restricted returns (PendingLiquidation memory l) {
         PendingLiquidation storage s = pendingLiquidation[liqId];
         if (!s.exists) revert UnknownPending(liqId);
         if (s.finalized) revert AlreadyFinalized(liqId);
