@@ -77,15 +77,15 @@ contract AssetRegistry is AccessManaged {
         bool isSupported;
 
         // Risk params in basis points (bps)
-        uint16 ltvBps;          // max borrow power contribution
+        uint16 ltvBps; // max borrow power contribution
         uint16 liqThresholdBps; // liquidation threshold contribution
-        uint16 liqBonusBps;     // bonus paid to liquidator (LiquidationEngine uses)
+        uint16 liqBonusBps; // bonus paid to liquidator (LiquidationEngine uses)
 
         // Token decimals (for value calculations)
         uint8 decimals;
 
         // Optional caps (in token units)
-        uint256 supplyCap;      // max total collateral allowed for this asset on this eid
+        uint256 supplyCap; // max total collateral allowed for this asset on this eid
     }
 
     struct DebtConfig {
@@ -93,7 +93,7 @@ contract AssetRegistry is AccessManaged {
         uint8 decimals;
 
         // Optional caps (in token units)
-        uint256 borrowCap;      // max total debt allowed for this asset
+        uint256 borrowCap; // max total debt allowed for this asset
     }
 
     // ---------------------------------------------------------------------
@@ -135,11 +135,12 @@ contract AssetRegistry is AccessManaged {
     /**
      * @notice Configure (or update) a collateral asset for a specific chain EID.
      */
-    function setCollateralConfig(
-        uint32 eid,
-        address asset,
-        CollateralConfig calldata cfg
-    ) external restricted validEid(eid) validAsset(asset) {
+    function setCollateralConfig(uint32 eid, address asset, CollateralConfig calldata cfg)
+        external
+        restricted
+        validEid(eid)
+        validAsset(asset)
+    {
         _validateCollateralConfig(cfg);
         _collateralConfig[eid][asset] = cfg;
         emit CollateralConfigured(eid, asset, cfg);
@@ -171,7 +172,12 @@ contract AssetRegistry is AccessManaged {
     /**
      * @notice Configure (or update) a debt asset for a specific chain EID.
      */
-    function setDebtConfig(uint32 eid, address asset, DebtConfig calldata cfg) external restricted validEid(eid) validAsset(asset) {
+    function setDebtConfig(uint32 eid, address asset, DebtConfig calldata cfg)
+        external
+        restricted
+        validEid(eid)
+        validAsset(asset)
+    {
         _validateDebtConfig(cfg);
         _debtConfig[eid][asset] = cfg;
         emit DebtConfigured(eid, asset, cfg);
@@ -200,9 +206,14 @@ contract AssetRegistry is AccessManaged {
      *  - 5% APR = 500 bps
      *
      */
-    function setBorrowRateApr(uint32 eid, address asset, uint256 aprBps) external restricted validEid(eid) validAsset(asset) {
-        if (aprBps > 50000) revert RateTooHigh(aprBps);  // Cap at 500%
-        
+    function setBorrowRateApr(uint32 eid, address asset, uint256 aprBps)
+        external
+        restricted
+        validEid(eid)
+        validAsset(asset)
+    {
+        if (aprBps > 50000) revert RateTooHigh(aprBps); // Cap at 500%
+
         uint256 ratePerSecondRay = (aprBps * RAY) / (10000 * SECONDS_PER_YEAR);
         _borrowRatePerSecondRay[eid][asset] = ratePerSecondRay;
         emit BorrowRateSet(eid, asset, ratePerSecondRay);

@@ -57,13 +57,34 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
     event CollateralCredited(address indexed user, uint32 indexed eid, address indexed asset, uint256 amount);
     event CollateralDebited(address indexed user, uint32 indexed eid, address indexed asset, uint256 amount);
 
-    event BorrowPendingCreated(bytes32 indexed borrowId, address indexed user, uint32 indexed dstEid, address asset, uint256 amount, address receiver);
+    event BorrowPendingCreated(
+        bytes32 indexed borrowId,
+        address indexed user,
+        uint32 indexed dstEid,
+        address asset,
+        uint256 amount,
+        address receiver
+    );
     event BorrowPendingFinalized(bytes32 indexed borrowId, bool success);
 
-    event WithdrawPendingCreated(bytes32 indexed withdrawId, address indexed user, uint32 indexed srcEid, address asset, uint256 amount, address receiver);
+    event WithdrawPendingCreated(
+        bytes32 indexed withdrawId,
+        address indexed user,
+        uint32 indexed srcEid,
+        address asset,
+        uint256 amount,
+        address receiver
+    );
     event WithdrawPendingFinalized(bytes32 indexed withdrawId, bool success);
 
-    event LiquidationPendingCreated(bytes32 indexed liqId, address indexed user, uint32 indexed seizeEid, address seizeAsset, uint256 seizeAmount, address liquidator);
+    event LiquidationPendingCreated(
+        bytes32 indexed liqId,
+        address indexed user,
+        uint32 indexed seizeEid,
+        address seizeAsset,
+        uint256 seizeAmount,
+        address liquidator
+    );
     event LiquidationPendingFinalized(bytes32 indexed liqId, bool success);
 
     // ---------------------------------------------------------------------
@@ -171,9 +192,9 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
     struct PendingBorrow {
         address user;
         uint32 dstEid;
-        address asset;     // debt asset (on destination chain)
-        uint256 amount;    // nominal amount (token units)
-        address receiver;  // where spoke releases funds
+        address asset; // debt asset (on destination chain)
+        uint256 amount; // nominal amount (token units)
+        address receiver; // where spoke releases funds
         bool exists;
         bool finalized;
     }
@@ -225,7 +246,11 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
     /// On failure: releases reservation and marks finalized.
     ///
     /// Called by HubController upon BORROW_RELEASED receipt.
-    function finalizePendingBorrow(bytes32 borrowId, bool success) external restricted returns (PendingBorrow memory p) {
+    function finalizePendingBorrow(bytes32 borrowId, bool success)
+        external
+        restricted
+        returns (PendingBorrow memory p)
+    {
         PendingBorrow storage s = pendingBorrow[borrowId];
         if (!s.exists) revert UnknownPending(borrowId);
         if (s.finalized) revert AlreadyFinalized(borrowId);
@@ -261,7 +286,7 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
 
     struct PendingWithdraw {
         address user;
-        uint32 srcEid;     // chain where collateral is held / to be released from
+        uint32 srcEid; // chain where collateral is held / to be released from
         address asset;
         uint256 amount;
         address receiver;
@@ -294,13 +319,7 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
         if (res < amount) revert ReservationUnderflow();
 
         pendingWithdraw[withdrawId] = PendingWithdraw({
-            user: user,
-            srcEid: srcEid,
-            asset: asset,
-            amount: amount,
-            receiver: receiver,
-            exists: true,
-            finalized: false
+            user: user, srcEid: srcEid, asset: asset, amount: amount, receiver: receiver, exists: true, finalized: false
         });
 
         emit WithdrawPendingCreated(withdrawId, user, srcEid, asset, amount, receiver);
@@ -311,7 +330,11 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
     /// On failure: just reduce reservation.
     ///
     /// Called by HubController upon WITHDRAW_RELEASED receipt.
-    function finalizePendingWithdraw(bytes32 withdrawId, bool success) external restricted returns (PendingWithdraw memory w) {
+    function finalizePendingWithdraw(bytes32 withdrawId, bool success)
+        external
+        restricted
+        returns (PendingWithdraw memory w)
+    {
         PendingWithdraw storage s = pendingWithdraw[withdrawId];
         if (!s.exists) revert UnknownPending(withdrawId);
         if (s.finalized) revert AlreadyFinalized(withdrawId);
@@ -335,8 +358,8 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
     // ---------------------------------------------------------------------
 
     struct PendingLiquidation {
-        address user;          // account being liquidated
-        uint32 seizeEid;       // chain where collateral is seized
+        address user; // account being liquidated
+        uint32 seizeEid; // chain where collateral is seized
         address seizeAsset;
         uint256 seizeAmount;
         address liquidator;
@@ -387,7 +410,11 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
     /// On failure: just drop reservation.
     ///
     /// Called by HubController upon COLLATERAL_SEIZED receipt.
-    function finalizePendingLiquidation(bytes32 liqId, bool success) external restricted returns (PendingLiquidation memory l) {
+    function finalizePendingLiquidation(bytes32 liqId, bool success)
+        external
+        restricted
+        returns (PendingLiquidation memory l)
+    {
         PendingLiquidation storage s = pendingLiquidation[liqId];
         if (!s.exists) revert UnknownPending(liqId);
         if (s.finalized) revert AlreadyFinalized(liqId);
@@ -411,11 +438,11 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
     // ---------------------------------------------------------------------
 
     /// @notice Read multiple collateral balances in one call (for off-chain / RiskEngine convenience).
-    function batchCollateralOf(
-        address user,
-        uint32[] calldata eids,
-        address[] calldata assets
-    ) external view returns (uint256[] memory balances, uint256[] memory reserved, uint256[] memory available) {
+    function batchCollateralOf(address user, uint32[] calldata eids, address[] calldata assets)
+        external
+        view
+        returns (uint256[] memory balances, uint256[] memory reserved, uint256[] memory available)
+    {
         if (eids.length != assets.length) revert InvalidAmount();
         uint256 n = eids.length;
         balances = new uint256[](n);

@@ -71,8 +71,12 @@ contract DebtManager is AccessManaged, ReentrancyGuard {
     event AssetRegistrySet(address indexed registry);
 
     event Accrued(address indexed asset, uint256 prevIndex, uint256 newIndex, uint256 dt, uint256 ratePerSecondRay);
-    event DebtMinted(address indexed user, uint256 indexed eid, address indexed asset, uint256 amount, uint256 scaledAdded);
-    event DebtBurned(address indexed user, uint256 indexed eid, address indexed asset, uint256 amount, uint256 scaledRemoved);
+    event DebtMinted(
+        address indexed user, uint256 indexed eid, address indexed asset, uint256 amount, uint256 scaledAdded
+    );
+    event DebtBurned(
+        address indexed user, uint256 indexed eid, address indexed asset, uint256 amount, uint256 scaledRemoved
+    );
 
     /// @notice authorized caller for mint/burn (usually HubController, or a Router/Facade)
     address public minter;
@@ -190,13 +194,13 @@ contract DebtManager is AccessManaged, ReentrancyGuard {
         if (dt == 0) return;
 
         uint256 ratePerSecondRay = assetRegistry.borrowRatePerSecondRay(eid, asset);
-        
+
         // Defensive overflow check: ratePerSecondRay * dt
         if (ratePerSecondRay != 0 && dt > type(uint256).max / ratePerSecondRay) {
             revert AccrualOverflow();
         }
         uint256 rateTimesDt = ratePerSecondRay * dt;
-        
+
         // Defensive overflow check: RAY + rateTimesDt
         if (rateTimesDt > type(uint256).max - RAY) {
             revert AccrualOverflow();
@@ -229,7 +233,11 @@ contract DebtManager is AccessManaged, ReentrancyGuard {
      *
      * scaledAdded = amount * RAY / index
      */
-    function mintDebt(address user, uint32 eid, address asset, uint256 amount) external onlyMinter returns (uint256 scaledAdded) {
+    function mintDebt(address user, uint32 eid, address asset, uint256 amount)
+        external
+        onlyMinter
+        returns (uint256 scaledAdded)
+    {
         if (user == address(0) || asset == address(0)) revert InvalidAddress();
         if (amount == 0) revert InvalidAmount();
 
@@ -265,7 +273,11 @@ contract DebtManager is AccessManaged, ReentrancyGuard {
      *
      * If user repays more than they owe, we clamp to their full debt (common UX behavior).
      */
-    function burnDebt(address user, uint32 eid, address asset, uint256 amount) external onlyMinter returns (uint256 scaledRemoved, uint256 nominalBurned) {
+    function burnDebt(address user, uint32 eid, address asset, uint256 amount)
+        external
+        onlyMinter
+        returns (uint256 scaledRemoved, uint256 nominalBurned)
+    {
         if (user == address(0) || asset == address(0)) revert InvalidAddress();
         if (amount == 0) revert InvalidAmount();
 

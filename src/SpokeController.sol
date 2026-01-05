@@ -7,23 +7,27 @@ import {OApp, Origin} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract SpokeController is OApp, ReentrancyGuard {  
+contract SpokeController is OApp, ReentrancyGuard {
     /// @notice Initialize with Endpoint V2 and owner address
     /// @param _lzEndpoint The local chain's LayerZero Endpoint V2 address
     /// @param _owner    The address permitted to configure this OApp
-    constructor(address _lzEndpoint, address _owner)
-        OApp(_lzEndpoint, _owner)
-        Ownable(_owner)
-    {}
+    constructor(address _lzEndpoint, address _owner) OApp(_lzEndpoint, _owner) Ownable(_owner) {}
 
     /// @dev Required by OApp - handles incoming LayerZero messages
     function _lzReceive(
-        Origin calldata /*_origin*/,
-        bytes32 /*_guid*/,
-        bytes calldata /*_message*/,
-        address /*_executor*/,
+        Origin calldata,
+        /*_origin*/
+        bytes32,
+        /*_guid*/
+        bytes calldata,
+        /*_message*/
+        address,
+        /*_executor*/
         bytes calldata /*_extraData*/
-    ) internal override {
+    )
+        internal
+        override
+    {
         // TODO: Implement cross-chain message handling
     }
 

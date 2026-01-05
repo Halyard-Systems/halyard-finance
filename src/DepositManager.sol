@@ -62,10 +62,7 @@ contract DepositManager is OApp, OAppOptionsType3, ReentrancyGuard {
     error InsufficientBalance(bytes32 tokenId, address user, uint256 requested, uint256 available);
     error TransferFailed();
 
-    constructor(address _lzEndpoint, address _owner)
-        OApp(_lzEndpoint, _owner)
-        Ownable(_owner)
-    {
+    constructor(address _lzEndpoint, address _owner) OApp(_lzEndpoint, _owner) Ownable(_owner) {
         //owner = msg.sender;
     }
 

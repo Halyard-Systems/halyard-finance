@@ -86,15 +86,15 @@ contract LiquidationEngine {
         bool isSupported;
 
         // Risk params in basis points (bps)
-        uint16 ltvBps;          // max borrow power contribution
+        uint16 ltvBps; // max borrow power contribution
         uint16 liqThresholdBps; // liquidation threshold contribution
-        uint16 liqBonusBps;     // bonus paid to liquidator (LiquidationEngine uses)
+        uint16 liqBonusBps; // bonus paid to liquidator (LiquidationEngine uses)
 
         // Token decimals (for value calculations)
         uint8 decimals;
 
         // Optional caps (in token units)
-        uint256 supplyCap;      // max total collateral allowed for this asset on this eid
+        uint256 supplyCap; // max total collateral allowed for this asset on this eid
     }
 
     struct DebtConfig {
@@ -102,7 +102,7 @@ contract LiquidationEngine {
         uint8 decimals;
 
         // Optional caps (in token units)
-        uint256 borrowCap;      // max total debt allowed for this asset
+        uint256 borrowCap; // max total debt allowed for this asset
     }
 
     // ---------------------------------------------------------------------
@@ -157,11 +157,7 @@ contract LiquidationEngine {
     /**
      * @notice Configure (or update) a collateral asset for a specific chain EID.
      */
-    function setCollateralConfig(
-        uint32 eid,
-        address asset,
-        CollateralConfig calldata cfg
-    ) external onlyOwner {
+    function setCollateralConfig(uint32 eid, address asset, CollateralConfig calldata cfg) external onlyOwner {
         if (eid == 0) revert InvalidEid();
         if (asset == address(0)) revert InvalidAddress();
         _validateCollateralConfig(cfg);
@@ -268,7 +264,7 @@ contract LiquidationEngine {
         _borrowRatePerSecondRay[asset] = ratePerSecondRay_;
         emit BorrowRateSet(asset, ratePerSecondRay_);
     }
-    
+
     function isSupportedCollateral(uint32 eid, address asset) external view returns (bool) {
         return _collateralConfig[eid][asset].isSupported;
     }

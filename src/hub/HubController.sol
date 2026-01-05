@@ -27,14 +27,11 @@ contract HubController is OApp, OAppOptionsType3, ReentrancyGuard {
     // trusted remote OApp address per source eid
     mapping(uint32 => bytes32) public spoke;
     uint32[] public spokeEids;
-    mapping(uint32 => uint256) private spokeEidIndex;  // eid => index+1 (0 means not present)
+    mapping(uint32 => uint256) private spokeEidIndex; // eid => index+1 (0 means not present)
 
     bool public paused;
 
-    constructor(address _owner, address _lzEndpoint)
-        OApp(_lzEndpoint, _owner)
-        Ownable(_owner)
-    {}
+    constructor(address _owner, address _lzEndpoint) OApp(_lzEndpoint, _owner) Ownable(_owner) {}
 
     /// -----------------------------------------------------------------------
     /// Admin / config
@@ -48,7 +45,7 @@ contract HubController is OApp, OAppOptionsType3, ReentrancyGuard {
         if (spokeEidIndex[_eid] == 0) {
             // New spoke - add to array
             spokeEids.push(_eid);
-            spokeEidIndex[_eid] = spokeEids.length;  // Store index+1
+            spokeEidIndex[_eid] = spokeEids.length; // Store index+1
         }
         spoke[_eid] = _spoke;
         emit SpokeSet(_eid, _spoke);
@@ -106,11 +103,16 @@ contract HubController is OApp, OAppOptionsType3, ReentrancyGuard {
     /// @dev   _extraData Additional data from the Executor (unused here)
     function _lzReceive(
         Origin calldata _origin,
-        bytes32 /*_guid*/,
+        bytes32,
+        /*_guid*/
         bytes calldata _message,
-        address /*_executor*/,
+        address,
+        /*_executor*/
         bytes calldata /*_extraData*/
-    ) internal override {
+    )
+        internal
+        override
+    {
         // Validate that the sender is a registered spoke before any message decoding or state changes
         bytes32 expectedSpoke = spoke[_origin.srcEid];
         if (expectedSpoke == bytes32(0) || expectedSpoke != _origin.sender) {

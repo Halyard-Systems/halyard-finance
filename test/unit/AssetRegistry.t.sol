@@ -10,15 +10,10 @@ import {console} from "forge-std/console.sol";
 contract AssetRegistryTest is BaseTest {
     function test_SetCollateralConfig() public {
         AssetRegistry.CollateralConfig memory config = AssetRegistry.CollateralConfig({
-            isSupported: true,
-            ltvBps: 8000,
-            liqThresholdBps: 8500,
-            liqBonusBps: 500,
-            decimals: 18,
-            supplyCap: 0
+            isSupported: true, ltvBps: 8000, liqThresholdBps: 8500, liqBonusBps: 500, decimals: 18, supplyCap: 0
         });
         assetRegistry.setCollateralConfig(1, address(0x123), config);
-        
+
         AssetRegistry.CollateralConfig memory result = assetRegistry.collateralConfig(1, address(0x123));
         assertEq(result.ltvBps, 8000);
         assertEq(result.liqThresholdBps, 8500);
@@ -29,14 +24,9 @@ contract AssetRegistryTest is BaseTest {
 
     function test_SetCollateralConfig_OnlyRestricted() public {
         AssetRegistry.CollateralConfig memory config = AssetRegistry.CollateralConfig({
-            isSupported: true,
-            ltvBps: 8000,
-            liqThresholdBps: 8500,
-            liqBonusBps: 500,
-            decimals: 18,
-            supplyCap: 0
+            isSupported: true, ltvBps: 8000, liqThresholdBps: 8500, liqBonusBps: 500, decimals: 18, supplyCap: 0
         });
-        
+
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, alice));
         assetRegistry.setCollateralConfig(1, address(0x123), config);
@@ -45,15 +35,10 @@ contract AssetRegistryTest is BaseTest {
     function test_DisableCollateral() public {
         // First set a config
         AssetRegistry.CollateralConfig memory config = AssetRegistry.CollateralConfig({
-            isSupported: true,
-            ltvBps: 8000,
-            liqThresholdBps: 8500,
-            liqBonusBps: 500,
-            decimals: 18,
-            supplyCap: 0
+            isSupported: true, ltvBps: 8000, liqThresholdBps: 8500, liqBonusBps: 500, decimals: 18, supplyCap: 0
         });
         assetRegistry.setCollateralConfig(1, address(0x123), config);
-        
+
         // Now disable it
         assetRegistry.disableCollateral(1, address(0x123));
         assertEq(assetRegistry.collateralConfig(1, address(0x123)).isSupported, false);
@@ -66,13 +51,10 @@ contract AssetRegistryTest is BaseTest {
     }
 
     function test_SetDebtConfig() public {
-        AssetRegistry.DebtConfig memory config = AssetRegistry.DebtConfig({
-            isSupported: true,
-            decimals: 18,
-            borrowCap: 0
-        });
+        AssetRegistry.DebtConfig memory config =
+            AssetRegistry.DebtConfig({isSupported: true, decimals: 18, borrowCap: 0});
         assetRegistry.setDebtConfig(1, address(0x123), config);
-        
+
         AssetRegistry.DebtConfig memory result = assetRegistry.debtConfig(1, address(0x123));
         assertEq(result.isSupported, true);
         assertEq(result.decimals, 18);
@@ -80,24 +62,18 @@ contract AssetRegistryTest is BaseTest {
     }
 
     function test_SetDebtConfig_OnlyRestricted() public {
-        AssetRegistry.DebtConfig memory config = AssetRegistry.DebtConfig({
-            isSupported: true,
-            decimals: 18,
-            borrowCap: 0
-        });
+        AssetRegistry.DebtConfig memory config =
+            AssetRegistry.DebtConfig({isSupported: true, decimals: 18, borrowCap: 0});
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, alice));
         assetRegistry.setDebtConfig(1, address(0x123), config);
     }
 
     function test_DisableDebt() public {
-        AssetRegistry.DebtConfig memory config = AssetRegistry.DebtConfig({
-            isSupported: true,
-            decimals: 18,
-            borrowCap: 0
-        });
+        AssetRegistry.DebtConfig memory config =
+            AssetRegistry.DebtConfig({isSupported: true, decimals: 18, borrowCap: 0});
         assetRegistry.setDebtConfig(1, address(0x123), config);
-        
+
         assetRegistry.disableDebt(1, address(0x123));
         assertEq(assetRegistry.debtConfig(1, address(0x123)).isSupported, false);
     }

@@ -4,8 +4,6 @@ pragma solidity ^0.8.23;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-
-
 /**
  * RiskEngine (Hub-side)
  *
@@ -69,17 +67,17 @@ interface IDebtManager {
 interface IAssetRegistry {
     struct CollateralConfig {
         bool isSupported;
-        uint16 ltvBps;              // e.g. 8000 = 80%
-        uint16 liqThresholdBps;     // e.g. 8500 = 85%
-        uint16 liqBonusBps;         // not used by RiskEngine (LiquidationEngine uses it)
-        uint8 decimals;             // token decimals
-        uint256 supplyCap;          // optional, not enforced here
+        uint16 ltvBps; // e.g. 8000 = 80%
+        uint16 liqThresholdBps; // e.g. 8500 = 85%
+        uint16 liqBonusBps; // not used by RiskEngine (LiquidationEngine uses it)
+        uint8 decimals; // token decimals
+        uint256 supplyCap; // optional, not enforced here
     }
 
     struct DebtConfig {
         bool isSupported;
-        uint8 decimals;             // token decimals
-        uint256 borrowCap;          // optional
+        uint8 decimals; // token decimals
+        uint256 borrowCap; // optional
     }
 
     function collateralConfig(uint32 eid, address asset) external view returns (CollateralConfig memory);
@@ -123,7 +121,9 @@ contract RiskEngine is Ownable, ReentrancyGuard {
     // -----------------------------
     event OwnerSet(address indexed owner);
     event RouterSet(address indexed router);
-    event DependenciesSet(address indexed positionBook, address indexed debtManager, address indexed assetRegistry, address oracle);
+    event DependenciesSet(
+        address indexed positionBook, address indexed debtManager, address indexed assetRegistry, address oracle
+    );
 
     // -----------------------------
     // Admin / pointers
@@ -155,13 +155,14 @@ contract RiskEngine is Ownable, ReentrancyGuard {
         emit RouterSet(_router);
     }
 
-    function setDependencies(
-        address _positionBook,
-        address _debtManager,
-        address _assetRegistry,
-        address _oracle
-    ) external onlyOwner {
-        if (_positionBook == address(0) || _debtManager == address(0) || _assetRegistry == address(0) || _oracle == address(0)) {
+    function setDependencies(address _positionBook, address _debtManager, address _assetRegistry, address _oracle)
+        external
+        onlyOwner
+    {
+        if (
+            _positionBook == address(0) || _debtManager == address(0) || _assetRegistry == address(0)
+                || _oracle == address(0)
+        ) {
             revert InvalidAddress();
         }
         positionBook = IPositionBook(_positionBook);
@@ -175,13 +176,13 @@ contract RiskEngine is Ownable, ReentrancyGuard {
     // Types for “asset set” input
     // -----------------------------
     struct CollateralSlot {
-        uint32 eid;       // chain EID where collateral is custodied
-        address asset;    // collateral token address (canonical registry key)
+        uint32 eid; // chain EID where collateral is custodied
+        address asset; // collateral token address (canonical registry key)
     }
 
     struct DebtSlot {
-        uint32 eid;       // chain EID where debt was borrowed to
-        address asset;    // debt token address (canonical registry key)
+        uint32 eid; // chain EID where debt was borrowed to
+        address asset; // debt token address (canonical registry key)
     }
 
     // -----------------------------
@@ -195,11 +196,7 @@ contract RiskEngine is Ownable, ReentrancyGuard {
      * `collateralSlots` must include every collateral position you want considered.
      * `debtSlots` should include every possible debt slot the user may have borrowed (or you track this elsewhere).
      */
-    function accountData(
-        address user,
-        CollateralSlot[] calldata collateralSlots,
-        DebtSlot[] calldata debtSlots
-    )
+    function accountData(address user, CollateralSlot[] calldata collateralSlots, DebtSlot[] calldata debtSlots)
         external
         view
         returns (
@@ -264,7 +261,8 @@ contract RiskEngine is Ownable, ReentrancyGuard {
         if (withdrawAmount == 0) revert InvalidAmount();
 
         // Start from current sums
-        (uint256 collateralValueE18, uint256 borrowPowerE18, uint256 liqValueE18) = _collateralSums(user, collateralSlots);
+        (uint256 collateralValueE18, uint256 borrowPowerE18, uint256 liqValueE18) =
+            _collateralSums(user, collateralSlots);
         uint256 debtValueE18 = _debtSum(user, debtSlots);
 
         // Remove withdrawAmount from that slot’s contribution (using its config)
@@ -274,15 +272,18 @@ contract RiskEngine is Ownable, ReentrancyGuard {
         uint256 withdrawValueE18 = _valueE18Token(collateralAsset, withdrawAmount, cc.decimals);
 
         // subtract from totals (guard underflow)
-        if (withdrawValueE18 > collateralValueE18) collateralValueE18 = 0; else collateralValueE18 -= withdrawValueE18;
+        if (withdrawValueE18 > collateralValueE18) collateralValueE18 = 0;
+        else collateralValueE18 -= withdrawValueE18;
 
         // Borrow power uses LTV
         uint256 withdrawBorrowPowerE18 = (withdrawValueE18 * cc.ltvBps) / 10_000;
-        if (withdrawBorrowPowerE18 > borrowPowerE18) borrowPowerE18 = 0; else borrowPowerE18 -= withdrawBorrowPowerE18;
+        if (withdrawBorrowPowerE18 > borrowPowerE18) borrowPowerE18 = 0;
+        else borrowPowerE18 -= withdrawBorrowPowerE18;
 
         // Liquidation value uses liq threshold
         uint256 withdrawLiqValueE18 = (withdrawValueE18 * cc.liqThresholdBps) / 10_000;
-        if (withdrawLiqValueE18 > liqValueE18) liqValueE18 = 0; else liqValueE18 -= withdrawLiqValueE18;
+        if (withdrawLiqValueE18 > liqValueE18) liqValueE18 = 0;
+        else liqValueE18 -= withdrawLiqValueE18;
 
         // If debt exists, must stay safe at liquidation threshold
         if (debtValueE18 == 0) {
@@ -387,17 +388,10 @@ contract RiskEngine is Ownable, ReentrancyGuard {
     ///      in collateralSlots. This prevents double-counting collateral. Uses an in-memory array
     ///      to track seen pairs (O(n²) but acceptable for typical small slot counts) to avoid
     ///      storage writes.
-    function _collateralSums(
-        address user,
-        CollateralSlot[] calldata collateralSlots
-    )
+    function _collateralSums(address user, CollateralSlot[] calldata collateralSlots)
         internal
         view
-        returns (
-            uint256 collateralValueE18,
-            uint256 borrowPowerE18,
-            uint256 liquidationValueE18
-        )
+        returns (uint256 collateralValueE18, uint256 borrowPowerE18, uint256 liquidationValueE18)
     {
         uint256 n = collateralSlots.length;
 

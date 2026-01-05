@@ -20,7 +20,7 @@ contract HubControllerTest is BaseTest {
     }
 
     function test_SetSpoke() public {
-        bytes32 spokeAddr = bytes32(uint256(uint160(alice)));  // Convert address to bytes32
+        bytes32 spokeAddr = bytes32(uint256(uint160(alice))); // Convert address to bytes32
         hubController.setSpoke(1, spokeAddr);
         assertEq(hubController.getSpoke(1), spokeAddr);
     }
@@ -55,7 +55,7 @@ contract HubControllerTest is BaseTest {
         bytes32 spokeAddr = bytes32(uint256(uint160(alice)));
         hubController.setSpoke(1, spokeAddr);
         hubController.setSpoke(2, spokeAddr);
-        
+
         uint32[] memory eids = hubController.getSpokeEids();
         assertEq(eids.length, 2);
         assertEq(eids[0], 1);

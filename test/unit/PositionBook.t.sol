@@ -28,7 +28,7 @@ contract PositionBookTest is BaseTest {
     //     vm.expectRevert(PositionBook.InvalidEid.selector);
     //     positionBook.reservedCollateralOf(alice, 0, address(0x123));
     // }
-    
+
     // function test_ReservedCollateralOf_InvalidAmount() public {
     //     vm.expectRevert(PositionBook.InvalidAmount.selector);
     //     positionBook.reservedCollateralOf(alice, 1, address(0x123), 0);
@@ -51,7 +51,7 @@ contract PositionBookTest is BaseTest {
     //     vm.expectRevert(PositionBook.InvalidEid.selector);
     //     positionBook.availableCollateralOf(alice, 0, address(0x123));
     // }
-    
+
     // function test_AvailableCollateralOf_InvalidAmount() public {
     //     vm.expectRevert(PositionBook.InvalidAmount.selector);
     //     positionBook.availableCollateralOf(alice, 1, address(0x123), 0);
