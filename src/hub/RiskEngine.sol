@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+import "forge-std/console.sol";
 
 /**
  * RiskEngine (Hub-side)
@@ -82,9 +84,6 @@ interface IAssetRegistry {
 
     function collateralConfig(uint32 eid, address asset) external view returns (CollateralConfig memory);
     function debtConfig(uint32 eid, address asset) external view returns (DebtConfig memory);
-
-    /// @notice Optional: staleness settings per asset, or a global default.
-    function maxPriceAgeSeconds(address asset) external view returns (uint256);
 }
 
 interface IOracle {
@@ -100,17 +99,15 @@ interface IOracle {
 /// -----------------------------------------------------------------------
 /// RiskEngine
 /// -----------------------------------------------------------------------
-contract RiskEngine is Ownable, ReentrancyGuard {
+contract RiskEngine is AccessManaged, ReentrancyGuard {
     // -----------------------------
     // Errors
     // -----------------------------
-    error OnlyRouter();
     error InvalidAddress();
     error InvalidAmount();
     error UnsupportedCollateral(uint32 eid, address asset);
     error UnsupportedDebtAsset(address asset);
     error PriceUnavailable(address asset);
-    error PriceStale(address asset, uint256 lastUpdatedAt, uint256 maxAge);
     error InsufficientBorrowPower(uint256 borrowPowerE18, uint256 nextDebtValueE18);
     error WouldBeUndercollateralized(uint256 liqValueE18, uint256 nextDebtValueE18);
     error InsufficientAvailableCollateral(uint256 available, uint256 requested);
@@ -119,8 +116,6 @@ contract RiskEngine is Ownable, ReentrancyGuard {
     // -----------------------------
     // Events
     // -----------------------------
-    event OwnerSet(address indexed owner);
-    event RouterSet(address indexed router);
     event DependenciesSet(
         address indexed positionBook, address indexed debtManager, address indexed assetRegistry, address oracle
     );
@@ -128,36 +123,22 @@ contract RiskEngine is Ownable, ReentrancyGuard {
     // -----------------------------
     // Admin / pointers
     // -----------------------------
-    address public router;
-
     IPositionBook public positionBook;
     IDebtManager public debtManager;
     IAssetRegistry public assetRegistry;
     IOracle public oracle;
 
-    modifier onlyRouter() {
-        if (msg.sender != router) revert OnlyRouter();
-        _;
+    constructor(address _authority) AccessManaged(_authority) {
+        if (_authority == address(0)) revert InvalidAddress();
     }
 
-    constructor(address _owner) Ownable(_owner) {
-        if (_owner == address(0)) revert InvalidAddress();
-    }
-
-    function setOwner(address _newOwner) external onlyOwner {
-        if (_newOwner == address(0)) revert InvalidAddress();
-        _transferOwnership(_newOwner);
-    }
-
-    function setRouter(address _router) external onlyOwner {
-        if (_router == address(0)) revert InvalidAddress();
-        router = _router;
-        emit RouterSet(_router);
-    }
-
+    /**
+     * @notice Set the dependencies for the RiskEngine.
+     * - Restricted to default ADMIN role
+     */
     function setDependencies(address _positionBook, address _debtManager, address _assetRegistry, address _oracle)
         external
-        onlyOwner
+        restricted
     {
         if (
             _positionBook == address(0) || _debtManager == address(0) || _assetRegistry == address(0)
@@ -304,6 +285,7 @@ contract RiskEngine is Ownable, ReentrancyGuard {
      * @notice Validate and create a pending borrow.
      * - Reserves debt headroom via PositionBook.createPendingBorrow (which increments reservedDebt).
      * - Your Router should then instruct HubController to send CMD_RELEASE_BORROW to the spoke.
+     * - Restricted to ROLE_ROUTER
      *
      * `debtSlots` should include debtAsset (and any other assets user might already owe).
      */
@@ -316,7 +298,7 @@ contract RiskEngine is Ownable, ReentrancyGuard {
         address receiver,
         CollateralSlot[] calldata collateralSlots,
         DebtSlot[] calldata debtSlots
-    ) external onlyRouter {
+    ) external restricted {
         if (borrowId == bytes32(0)) revert InvalidAmount();
         if (user == address(0) || receiver == address(0) || debtAsset == address(0)) revert InvalidAddress();
         if (amount == 0) revert InvalidAmount();
@@ -346,6 +328,7 @@ contract RiskEngine is Ownable, ReentrancyGuard {
      * - Reserves collateral (PositionBook.reserveCollateral)
      * - Creates pending withdraw (PositionBook.createPendingWithdraw)
      * - Router then asks HubController to send CMD_RELEASE_WITHDRAW to the spoke.
+     * - Restricted to ROLE_ROUTER
      */
     function validateAndCreateWithdraw(
         bytes32 withdrawId,
@@ -356,7 +339,7 @@ contract RiskEngine is Ownable, ReentrancyGuard {
         address receiver,
         CollateralSlot[] calldata collateralSlots,
         DebtSlot[] calldata debtSlots
-    ) external onlyRouter {
+    ) external restricted {
         if (withdrawId == bytes32(0)) revert InvalidAmount();
         if (user == address(0) || receiver == address(0) || collateralAsset == address(0)) revert InvalidAddress();
         if (amount == 0) revert InvalidAmount();
@@ -449,26 +432,14 @@ contract RiskEngine is Ownable, ReentrancyGuard {
         }
     }
 
-    // -----------------------------
-    // Internal: value conversion helpers
-    // -----------------------------
-
-    function _checkedPriceE18(address asset) internal view returns (uint256 priceE18) {
+    // TODO: implement against actual oracle
+    function _valueE18Token(address asset, uint256 amount, uint8 decimals) internal view returns (uint256) {
         uint256 ts;
+        uint256 priceE18;
+
         (priceE18, ts) = oracle.getPriceE18(asset);
         if (priceE18 == 0) revert PriceUnavailable(asset);
-
-        uint256 maxAge = assetRegistry.maxPriceAgeSeconds(asset);
-        if (maxAge != 0) {
-            // ts == 0 is treated as unavailable (adapter bug)
-            if (ts == 0) revert PriceUnavailable(asset);
-            // If ts is too old, revert
-            if (block.timestamp > ts + maxAge) revert PriceStale(asset, ts, maxAge);
-        }
-    }
-
-    function _valueE18Token(address asset, uint256 amount, uint8 decimals) internal view returns (uint256) {
-        uint256 priceE18 = _checkedPriceE18(asset);
+        
         return (amount * priceE18) / (10 ** uint256(decimals));
     }
 }

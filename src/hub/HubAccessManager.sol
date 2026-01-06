@@ -10,6 +10,7 @@ contract HubAccessManager is AccessManager {
     uint64 public constant ROLE_LIQUIDATION_ENGINE = 4;
     uint64 public constant ROLE_ASSET_REGISTRY = 5;
     uint64 public constant ROLE_RISK_ENGINE = 6;
+    uint64 public constant ROLE_ROUTER = 7;
 
     constructor(address _owner) AccessManager(_owner) {}
 }

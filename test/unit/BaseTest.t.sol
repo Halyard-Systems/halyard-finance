@@ -9,6 +9,7 @@ import {AssetRegistry} from "../../src/hub/AssetRegistry.sol";
 import {HubAccessManager} from "../../src/hub/HubAccessManager.sol";
 import {HubController} from "../../src/hub/HubController.sol";
 import {PositionBook} from "../../src/hub/PositionBook.sol";
+import {RiskEngine} from "../../src/hub/RiskEngine.sol";
 import {MockERC20} from "../../src/mocks/MockERC20.sol";
 
 contract BaseTest is Test {
@@ -20,11 +21,18 @@ contract BaseTest is Test {
     HubController public hubController;
     AssetRegistry public assetRegistry;
     PositionBook public positionBook;
+    RiskEngine public riskEngine;
 
     address public alice = address(0x1);
     address public bob = address(0x2);
     address public charlie = address(0x3);
     address public mockLzEndpoint = makeAddr("lzEndpoint");
+
+    address public tempDebtManager = makeAddr("debtManager");
+    address public mockOracle = makeAddr("oracle");
+
+    // TODO: replace with a router implementation
+    address public router = address(this);
     //address public mockPyth = address(0x456);
 
     // uint256 public constant RAY = 1e27;
@@ -93,6 +101,15 @@ contract BaseTest is Test {
         // Deploy PositionBook
         positionBook = new PositionBook(address(hubAccessManager));
 
+        // Deploy RiskEngine
+        riskEngine = new RiskEngine(address(hubAccessManager));
+        riskEngine.setDependencies(
+            address(positionBook),
+            address(tempDebtManager), // or mock address if DebtManager not deployed
+            address(assetRegistry),
+            mockOracle
+        );
+
         // Set permissions for the contracts
         hubAccessManager.setTargetFunctionRole(
             address(positionBook),
@@ -124,6 +141,14 @@ contract BaseTest is Test {
             buildFunctionSelector(positionBook.finalizePendingWithdraw.selector),
             hubAccessManager.ROLE_HUB_CONTROLLER()
         );
+        // TODO: should be router? verify that router calls validateAndCreateBorrow and createPendingBorrow
+        hubAccessManager.setTargetFunctionRole(
+            address(positionBook),
+            buildFunctionSelector(positionBook.createPendingBorrow.selector),
+            //hubAccessManager.ROLE_ROUTER()
+            hubAccessManager.ROLE_RISK_ENGINE()
+            //hubAccessManager.ROLE_HUB_CONTROLLER()
+        );
         hubAccessManager.setTargetFunctionRole(
             address(positionBook),
             buildFunctionSelector(positionBook.createPendingLiquidation.selector),
@@ -136,10 +161,24 @@ contract BaseTest is Test {
             hubAccessManager.ROLE_HUB_CONTROLLER()
         );
 
+        hubAccessManager.setTargetFunctionRole(
+            address(riskEngine),
+            buildFunctionSelector(riskEngine.validateAndCreateBorrow.selector),
+            hubAccessManager.ROLE_ROUTER()
+        );
+
+        hubAccessManager.setTargetFunctionRole(
+            address(riskEngine),
+            buildFunctionSelector(riskEngine.validateAndCreateWithdraw.selector),
+            hubAccessManager.ROLE_ROUTER()
+        );
+
         // Grant roles to the contracts
         hubAccessManager.grantRole(hubAccessManager.ROLE_HUB_CONTROLLER(), address(hubController), 0);
         hubAccessManager.grantRole(hubAccessManager.ROLE_ASSET_REGISTRY(), address(assetRegistry), 0);
-
+        hubAccessManager.grantRole(hubAccessManager.ROLE_RISK_ENGINE(), address(riskEngine), 0);
+        // TODO: implement router solution
+        hubAccessManager.grantRole(hubAccessManager.ROLE_ROUTER(), router, 0);
         // Mock Stargate router address and pool ID for testing
         //uint256 mockPoolId = 1;
         //depositManager = new DepositManager(mockStargateRouter, mockPoolId, mockLzEndpoint, address(this));

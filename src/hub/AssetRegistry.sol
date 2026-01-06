@@ -62,7 +62,6 @@ contract AssetRegistry is AccessManaged {
     event DebtDisabled(uint32 indexed eid, address indexed asset);
 
     event SpokeTokenSet(uint32 indexed eid, address indexed canonicalAsset, address indexed spokeToken);
-    event MaxPriceAgeSet(address indexed asset, uint256 maxAgeSeconds);
     event BorrowRateSet(uint32 indexed eid, address indexed asset, uint256 ratePerSecondRay);
 
     constructor(address _authority) AccessManaged(_authority) {
