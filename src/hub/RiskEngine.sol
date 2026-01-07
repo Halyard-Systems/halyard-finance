@@ -439,7 +439,7 @@ contract RiskEngine is AccessManaged, ReentrancyGuard {
 
         (priceE18, ts) = oracle.getPriceE18(asset);
         if (priceE18 == 0) revert PriceUnavailable(asset);
-        
+
         return (amount * priceE18) / (10 ** uint256(decimals));
     }
 }
