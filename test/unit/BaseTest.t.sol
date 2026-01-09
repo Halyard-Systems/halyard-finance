@@ -6,8 +6,10 @@ import {Test, console} from "lib/forge-std/src/Test.sol";
 import {BorrowManager} from "../../src/BorrowManager.sol";
 import {DepositManager} from "../../src/DepositManager.sol";
 import {AssetRegistry} from "../../src/hub/AssetRegistry.sol";
+import {DebtManager} from "../../src/hub/DebtManager.sol";
 import {HubAccessManager} from "../../src/hub/HubAccessManager.sol";
 import {HubController} from "../../src/hub/HubController.sol";
+import {LiquidationEngine} from "../../src/hub/LiquidationEngine.sol";
 import {PositionBook} from "../../src/hub/PositionBook.sol";
 import {RiskEngine} from "../../src/hub/RiskEngine.sol";
 import {MockERC20} from "../../src/mocks/MockERC20.sol";
@@ -22,6 +24,8 @@ contract BaseTest is Test {
     AssetRegistry public assetRegistry;
     PositionBook public positionBook;
     RiskEngine public riskEngine;
+    LiquidationEngine public liquidationEngine;
+    DebtManager public debtManager;
 
     address public alice = address(0x1);
     address public bob = address(0x2);
@@ -109,6 +113,33 @@ contract BaseTest is Test {
             address(assetRegistry),
             mockOracle
         );
+
+        liquidationEngine = new LiquidationEngine(address(hubAccessManager));
+        liquidationEngine.setCollateralConfig(
+            1,
+            address(0x123),
+            LiquidationEngine.CollateralConfig({
+                isSupported: true, ltvBps: 8000, liqThresholdBps: 8500, liqBonusBps: 500, decimals: 18, supplyCap: 0
+            })
+        );
+        liquidationEngine.setCollateralConfig(
+            2,
+            address(0x124),
+            LiquidationEngine.CollateralConfig({
+                isSupported: true, ltvBps: 8000, liqThresholdBps: 8500, liqBonusBps: 500, decimals: 18, supplyCap: 0
+            })
+        );
+        liquidationEngine.setDebtConfig(
+            address(0x123), LiquidationEngine.DebtConfig({isSupported: true, decimals: 18, borrowCap: 0})
+        );
+        liquidationEngine.setDebtConfig(
+            address(0x124), LiquidationEngine.DebtConfig({isSupported: true, decimals: 18, borrowCap: 0})
+        );
+
+        debtManager = new DebtManager(address(hubAccessManager), address(assetRegistry));
+        debtManager.setAssetRegistry(address(assetRegistry));
+        // debtManager.setBorrowRatePerSecondRay(address(0x123), 1000);
+        // debtManager.setBorrowRatePerSecondRay(address(0x124), 500);
 
         // Set permissions for the contracts
         hubAccessManager.setTargetFunctionRole(

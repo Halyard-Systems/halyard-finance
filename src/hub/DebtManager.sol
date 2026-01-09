@@ -3,7 +3,6 @@ pragma solidity ^0.8.23;
 
 import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * DebtManager (Hub-side)
@@ -54,8 +53,6 @@ contract DebtManager is AccessManaged, ReentrancyGuard {
     // -----------------------------
     // Errors
     // -----------------------------
-    error OnlyMinter();
-    error OnlyOwner();
     error InvalidAddress();
     error UnsupportedDebtAsset(address asset);
     error InvalidAmount();
@@ -66,8 +63,6 @@ contract DebtManager is AccessManaged, ReentrancyGuard {
     // -----------------------------
     // Events
     // -----------------------------
-    event OwnerSet(address indexed owner);
-    event MinterSet(address indexed minter);
     event AssetRegistrySet(address indexed registry);
 
     event Accrued(address indexed asset, uint256 prevIndex, uint256 newIndex, uint256 dt, uint256 ratePerSecondRay);
@@ -85,35 +80,13 @@ contract DebtManager is AccessManaged, ReentrancyGuard {
 
     IAssetRegistryDebtRates public assetRegistry;
 
-    modifier onlyMinter() {
-        if (msg.sender != minter) revert OnlyMinter();
-        _;
-    }
-
-    modifier onlyOwner() {
-        if (msg.sender != owner) revert OnlyOwner();
-        _;
-    }
-
     constructor(address _owner, address _assetRegistry) AccessManaged(_owner) {
         if (_owner == address(0) || _assetRegistry == address(0)) revert InvalidAddress();
         assetRegistry = IAssetRegistryDebtRates(_assetRegistry);
         emit AssetRegistrySet(_assetRegistry);
     }
 
-    function setOwner(address newOwner) external onlyOwner {
-        if (newOwner == address(0)) revert InvalidAddress();
-        owner = newOwner;
-        emit OwnerSet(newOwner);
-    }
-
-    function setMinter(address _minter) external onlyOwner {
-        if (_minter == address(0)) revert InvalidAddress();
-        minter = _minter;
-        emit MinterSet(_minter);
-    }
-
-    function setAssetRegistry(address _assetRegistry) external onlyOwner {
+    function setAssetRegistry(address _assetRegistry) external restricted {
         if (_assetRegistry == address(0)) revert InvalidAddress();
         assetRegistry = IAssetRegistryDebtRates(_assetRegistry);
         emit AssetRegistrySet(_assetRegistry);
@@ -235,7 +208,7 @@ contract DebtManager is AccessManaged, ReentrancyGuard {
      */
     function mintDebt(address user, uint32 eid, address asset, uint256 amount)
         external
-        onlyMinter
+        restricted
         returns (uint256 scaledAdded)
     {
         if (user == address(0) || asset == address(0)) revert InvalidAddress();
@@ -275,7 +248,7 @@ contract DebtManager is AccessManaged, ReentrancyGuard {
      */
     function burnDebt(address user, uint32 eid, address asset, uint256 amount)
         external
-        onlyMinter
+        restricted
         returns (uint256 scaledRemoved, uint256 nominalBurned)
     {
         if (user == address(0) || asset == address(0)) revert InvalidAddress();

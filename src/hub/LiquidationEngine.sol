@@ -1,29 +1,30 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
+import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
 /**
- * AssetRegistry (Hub-side) — in the 6-contract hub design.
+ * LiquidationEngine (Hub-side)
  *
  * Purpose:
- * - Single source of truth for what assets are supported
- * - Risk params for collateral (LTV, liquidation threshold/bonus, caps)
- * - Config for debt assets (decimals, borrow caps)
- * - Oracle staleness settings (max price age)
- * - Interest-rate settings for DebtManager (borrowRatePerSecondRay)
- * - Cross-chain token mapping: (eid, canonicalAsset) -> spokeTokenAddress
+ * - Validate liquidation eligibility using oracle prices + risk params
+ * - Create liquidation pendings (because PositionBook restricts these to RiskEngine)
  *
- * Notes:
- * - This registry uses "canonicalAsset" addresses as keys. In a pure multi-chain system you may
- *   define canonical assets as Ethereum addresses (home chain) and map each chain’s token address to that.
- * - For MVP, assume the canonical asset address is the L1 (Ethereum) token address. For non-L1 chains,
- *   the spoke token address can be a bridged representation. The mapping lives here.
+ * NOT responsible for:
+ * - LayerZero receive/send (HubController)
+ * - Debt interest accrual / borrowIndex (DebtManager)
+ * - Position storage (PositionBook)
+ * - Parameter storage (AssetRegistry) beyond reading configs
  *
- * Governance / admin:
- * - For now, simple owner-based access control.
- * - In production, put this behind a timelock / governor.
+ * IMPORTANT PRACTICAL NOTE (asset iteration):
+ * Solidity can’t iterate a user’s mapping holdings on-chain. So this RiskEngine expects the caller
+ * (your Router / UI / Keeper) to provide the set of collateral slots and debt assets to consider.
+ * In production you typically maintain per-user “asset lists” in the ledger, or you restrict to
+ * a small known set so the router can always supply a complete set.
  */
 
-contract LiquidationEngine {
+contract LiquidationEngine is AccessManaged, ReentrancyGuard {
     // ---------------------------------------------------------------------
     // Constants
     // ---------------------------------------------------------------------
@@ -32,20 +33,16 @@ contract LiquidationEngine {
     // ---------------------------------------------------------------------
     // Errors
     // ---------------------------------------------------------------------
-    error OnlyOwner();
     error InvalidAddress();
     error InvalidEid();
     error InvalidBps();
     error InvalidDecimals();
     error UnsupportedAsset();
     error RateTooHigh(uint256 ratePerSecondRay);
-    error InvalidMaxAge();
 
     // ---------------------------------------------------------------------
     // Events
     // ---------------------------------------------------------------------
-    event OwnerSet(address indexed owner);
-
     event CollateralConfigured(uint32 indexed eid, address indexed asset, CollateralConfig config);
     event CollateralDisabled(uint32 indexed eid, address indexed asset);
 
@@ -59,24 +56,8 @@ contract LiquidationEngine {
     // ---------------------------------------------------------------------
     // Ownership
     // ---------------------------------------------------------------------
-    address public owner;
 
-    modifier onlyOwner() {
-        if (msg.sender != owner) revert OnlyOwner();
-        _;
-    }
-
-    constructor(address _owner) {
-        if (_owner == address(0)) revert InvalidAddress();
-        owner = _owner;
-        emit OwnerSet(_owner);
-    }
-
-    function setOwner(address newOwner) external onlyOwner {
-        if (newOwner == address(0)) revert InvalidAddress();
-        owner = newOwner;
-        emit OwnerSet(newOwner);
-    }
+    constructor(address _authority) AccessManaged(_authority) {}
 
     // ---------------------------------------------------------------------
     // Config structs
@@ -157,7 +138,7 @@ contract LiquidationEngine {
     /**
      * @notice Configure (or update) a collateral asset for a specific chain EID.
      */
-    function setCollateralConfig(uint32 eid, address asset, CollateralConfig calldata cfg) external onlyOwner {
+    function setCollateralConfig(uint32 eid, address asset, CollateralConfig calldata cfg) external restricted {
         if (eid == 0) revert InvalidEid();
         if (asset == address(0)) revert InvalidAddress();
         _validateCollateralConfig(cfg);
@@ -166,7 +147,7 @@ contract LiquidationEngine {
         emit CollateralConfigured(eid, asset, cfg);
     }
 
-    function disableCollateral(uint32 eid, address asset) external onlyOwner {
+    function disableCollateral(uint32 eid, address asset) external restricted {
         if (eid == 0) revert InvalidEid();
         if (asset == address(0)) revert InvalidAddress();
 
@@ -187,7 +168,7 @@ contract LiquidationEngine {
     // Admin: debt configs (global)
     // ---------------------------------------------------------------------
 
-    function setDebtConfig(address asset, DebtConfig calldata cfg) external onlyOwner {
+    function setDebtConfig(address asset, DebtConfig calldata cfg) external restricted {
         if (asset == address(0)) revert InvalidAddress();
         _validateDebtConfig(cfg);
 
@@ -195,7 +176,7 @@ contract LiquidationEngine {
         emit DebtConfigured(asset, cfg);
     }
 
-    function disableDebt(address asset) external onlyOwner {
+    function disableDebt(address asset) external restricted {
         if (asset == address(0)) revert InvalidAddress();
         DebtConfig storage d = _debtConfig[asset];
         d.isSupported = false;
@@ -215,28 +196,12 @@ contract LiquidationEngine {
      * @notice Set the spoke token address for a canonical asset on a given chain EID.
      * Example: eid=Arbitrum, canonicalAsset=USDC (Ethereum), spokeToken=USDC.e on Arbitrum.
      */
-    function setSpokeTokenAddress(uint32 eid, address canonicalAsset, address spokeToken) external onlyOwner {
+    function setSpokeTokenAddress(uint32 eid, address canonicalAsset, address spokeToken) external restricted {
         if (eid == 0) revert InvalidEid();
         if (canonicalAsset == address(0) || spokeToken == address(0)) revert InvalidAddress();
 
         _spokeTokenAddress[eid][canonicalAsset] = spokeToken;
         emit SpokeTokenSet(eid, canonicalAsset, spokeToken);
-    }
-
-    // ---------------------------------------------------------------------
-    // Admin: oracle staleness policy
-    // ---------------------------------------------------------------------
-
-    /**
-     * @notice Set max price age for an asset in seconds. 0 disables staleness checks.
-     */
-    function setMaxPriceAgeSeconds(address asset, uint256 maxAgeSeconds_) external onlyOwner {
-        if (asset == address(0)) revert InvalidAddress();
-        // prevent silly max values (optional)
-        if (maxAgeSeconds_ > 365 days) revert InvalidMaxAge();
-
-        _maxPriceAgeSeconds[asset] = maxAgeSeconds_;
-        emit MaxPriceAgeSet(asset, maxAgeSeconds_);
     }
 
     // ---------------------------------------------------------------------
@@ -252,7 +217,7 @@ contract LiquidationEngine {
      *
      * We guard against absurd rates.
      */
-    function setBorrowRatePerSecondRay(address asset, uint256 ratePerSecondRay_) external onlyOwner {
+    function setBorrowRatePerSecondRay(address asset, uint256 ratePerSecondRay_) external restricted {
         if (asset == address(0)) revert InvalidAddress();
 
         // Arbitrary safety limit: <= 500% APR.
