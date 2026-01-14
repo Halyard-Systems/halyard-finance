@@ -3,7 +3,7 @@ pragma solidity ^0.8.26;
 
 import {BaseTest} from "./BaseTest.t.sol";
 import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
-import {LiquidationEngine} from "../../src/hub/LiquidationEngine.sol";
+import {LiquidationEngine} from "../../../src/hub/LiquidationEngine.sol";
 
 contract LiquidationEngineTest is BaseTest {
     function test_setCollateralConfig() public {

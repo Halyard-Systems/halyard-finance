@@ -3,7 +3,7 @@ pragma solidity ^0.8.26;
 
 import {BaseTest} from "./BaseTest.t.sol";
 import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
-import {AssetRegistry} from "../../src/hub/AssetRegistry.sol";
+import {AssetRegistry} from "../../../src/hub/AssetRegistry.sol";
 
 import {console} from "forge-std/console.sol";
 
