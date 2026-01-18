@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.26;
+pragma solidity ^0.8.23;
 
-import {BaseTest} from "./BaseTest.t.sol";
+import {BaseHubTest} from "./BaseHubTest.t.sol";
 import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import {LiquidationEngine} from "../../../src/hub/LiquidationEngine.sol";
 
-contract LiquidationEngineTest is BaseTest {
+contract LiquidationEngineTest is BaseHubTest {
     function test_setCollateralConfig() public {
         liquidationEngine.setCollateralConfig(
             1,

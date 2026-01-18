@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.26;
+pragma solidity ^0.8.23;
 
 import {Test, console} from "lib/forge-std/src/Test.sol";
 
@@ -12,7 +12,7 @@ import {PositionBook} from "../../../src/hub/PositionBook.sol";
 import {RiskEngine} from "../../../src/hub/RiskEngine.sol";
 import {MockERC20} from "../../../src/mocks/MockERC20.sol";
 
-contract BaseTest is Test {
+contract BaseHubTest is Test {
     // MockERC20 public mockUSDC;
     // MockERC20 public mockUSDT;
     HubAccessManager public hubAccessManager;
@@ -46,8 +46,6 @@ contract BaseTest is Test {
     // bytes32 public constant USDT_TOKEN_ID = keccak256(abi.encodePacked("USDT"));
 
     function setUp() public virtual {
-        console.log("BaseTest setUp");
-
         // Deploy HubAccessManager
         hubAccessManager = new HubAccessManager(address(this));
         console.log("HubAccessManager deployed at:", address(hubAccessManager));
@@ -65,11 +63,9 @@ contract BaseTest is Test {
         vm.mockCall(mockLzEndpoint, abi.encodeWithSignature("setDelegate(address)"), abi.encode());
 
         hubController = new HubController(address(this), mockLzEndpoint);
-        console.log("HubController deployed at:", address(hubController));
 
         // Deploy AssetRegistry
         assetRegistry = new AssetRegistry(address(hubAccessManager));
-        //hubAccessManager.grantAccess(address(hubController), address(assetRegistry));
 
         assetRegistry.setCollateralConfig(
             1,

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.26;
+pragma solidity ^0.8.23;
 
-import {BaseTest} from "./BaseTest.t.sol";
+import {BaseHubTest} from "./BaseHubTest.t.sol";
 import {RiskEngine} from "../../../src/hub/RiskEngine.sol";
 
 import {console} from "forge-std/console.sol";
 
 // TODO: need more tests, and the tests here need review
-contract RiskEngineTest is BaseTest {
+contract RiskEngineTest is BaseHubTest {
     function test_AccountData() public {
         // Create a mock oracle address
         address mockOracle = makeAddr("oracle");

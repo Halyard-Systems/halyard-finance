@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.26;
+pragma solidity ^0.8.23;
 
-import {BaseTest} from "./BaseTest.t.sol";
+import {BaseHubTest} from "./BaseHubTest.t.sol";
 
-import {console} from "forge-std/console.sol";
-
-contract PositionBookTest is BaseTest {
+contract PositionBookTest is BaseHubTest {
     function test_CollateralOf() public {
         vm.prank(address(hubController));
         positionBook.creditCollateral(alice, 1, address(0x123), 100);

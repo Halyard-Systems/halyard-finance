@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.26;
+pragma solidity ^0.8.23;
 
-import {BaseTest} from "./BaseTest.t.sol";
+import {BaseHubTest} from "./BaseHubTest.t.sol";
 import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import {DebtManager} from "../../../src/hub/DebtManager.sol";
 import {IAssetRegistryDebtRates} from "../../../src/hub/DebtManager.sol";
 
-contract DebtManagerTest is BaseTest {
+contract DebtManagerTest is BaseHubTest {
     function test_setAssetRegistry() public {
         debtManager.setAssetRegistry(address(assetRegistry));
     }

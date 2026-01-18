@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
-import "@openzeppelin/contracts/access/manager/AccessManager.sol";
+import {AccessManager} from "@openzeppelin/contracts/access/manager/AccessManager.sol";
 
 contract HubAccessManager is AccessManager {
     uint64 public constant ROLE_HUB_CONTROLLER = 1;

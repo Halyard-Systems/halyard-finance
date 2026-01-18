@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.26;
+pragma solidity ^0.8.23;
 
-import {BaseTest} from "./BaseTest.t.sol";
+import {BaseHubTest} from "./BaseHubTest.t.sol";
 import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import {AssetRegistry} from "../../../src/hub/AssetRegistry.sol";
 
 import {console} from "forge-std/console.sol";
 
-contract AssetRegistryTest is BaseTest {
+contract AssetRegistryTest is BaseHubTest {
     function test_SetCollateralConfig() public {
         AssetRegistry.CollateralConfig memory config = AssetRegistry.CollateralConfig({
             isSupported: true, ltvBps: 8000, liqThresholdBps: 8500, liqBonusBps: 500, decimals: 18, supplyCap: 0

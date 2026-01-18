@@ -2,7 +2,6 @@
 pragma solidity ^0.8.23;
 
 import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
-
 import {HubAccessManager} from "./HubAccessManager.sol";
 
 /**

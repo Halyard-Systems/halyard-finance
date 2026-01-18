@@ -6,8 +6,6 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {OApp, Origin, MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {OAppOptionsType3} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OAppOptionsType3.sol";
 
-import "forge-std/console.sol";
-
 /**
  * HubController
  *
@@ -125,9 +123,9 @@ contract HubController is OApp, OAppOptionsType3, ReentrancyGuard {
         // Decode the incoming bytes into a string
         // You can use abi.decode, abi.decodePacked, or directly splice bytes
         // if you know the format of your data structures
-        string memory _string = abi.decode(_message, (string));
+        //string memory _string = abi.decode(_message, (string));
 
         // Custom logic goes here
-        console.log("Received message:", _string);
+        //console.log("Received message:", _string);
     }
 }

@@ -4,8 +4,6 @@ pragma solidity ^0.8.23;
 import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-import "forge-std/console.sol";
-
 /**
  * PositionBook (Hub-side) - storage for user positions.
  *
