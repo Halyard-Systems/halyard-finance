@@ -4,6 +4,10 @@
 
 <img width="1071" height="430" alt="Screenshot from 2025-08-20 01-11-57" src="https://github.com/user-attachments/assets/f5f651e3-0bef-431f-94d2-d8923c915a98" />
 
+## Architecture
+
+Halyard Finance operates with a hub and spoke design. Spokes manage liquidity and collateral on their respective networks, while the hub maintains an accounting ledger across spokes. Actions (deposit, borrow, repay, withdraw, liquidate) take place on a spoke, require a LayerZero message to be processed on the hub before they can be executed.
+
 ## Development
 
 The local development environment is based on a node with a mainnet fork; see the Makefile for more details.

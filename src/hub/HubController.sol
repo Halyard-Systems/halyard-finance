@@ -5,6 +5,10 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {OApp, Origin, MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {OAppOptionsType3} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OAppOptionsType3.sol";
+import {IMessageTypes} from "../interfaces/IMessageTypes.sol";
+import {IPositionBook} from "../interfaces/IPositionBook.sol";
+
+import {console} from "forge-std/console.sol";
 
 /**
  * HubController
@@ -16,11 +20,17 @@ import {OAppOptionsType3} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OApp
  */
 contract HubController is OApp, OAppOptionsType3, ReentrancyGuard {
     error Paused();
+    error InvalidAddress();
+    error InvalidMessageType(uint8 msgType, Origin origin);
     error InvalidSpoke(address expected, address actual);
 
+    event DepositCredited(bytes32 indexed depositId, uint32 indexed srcEid);
     event PausedSet(bool paused);
     event SpokeSet(uint32 indexed eid, bytes32 spoke);
     event SpokeRemoved(uint32 indexed eid);
+    event PositionBookSet(address indexed positionBook);
+
+    IPositionBook public positionBook;
 
     // trusted remote OApp address per source eid
     mapping(uint32 => bytes32) public spoke;
@@ -37,6 +47,12 @@ contract HubController is OApp, OAppOptionsType3, ReentrancyGuard {
     function setPaused(bool _paused) external onlyOwner {
         paused = _paused;
         emit PausedSet(_paused);
+    }
+
+    function setPositionBook(address _positionBook) external onlyOwner {
+        if (_positionBook == address(0)) revert InvalidAddress();
+        positionBook = IPositionBook(_positionBook);
+        emit PositionBookSet(_positionBook);
     }
 
     function setSpoke(uint32 _eid, bytes32 _spoke) external onlyOwner {
@@ -100,7 +116,7 @@ contract HubController is OApp, OAppOptionsType3, ReentrancyGuard {
     /// @dev   _executor  Executor address that delivered the message
     /// @dev   _extraData Additional data from the Executor (unused here)
     function _lzReceive(
-        Origin calldata _origin,
+        Origin calldata origin,
         bytes32,
         /*_guid*/
         bytes calldata _message,
@@ -112,20 +128,28 @@ contract HubController is OApp, OAppOptionsType3, ReentrancyGuard {
         override
     {
         // Validate that the sender is a registered spoke before any message decoding or state changes
-        bytes32 expectedSpoke = spoke[_origin.srcEid];
-        if (expectedSpoke == bytes32(0) || expectedSpoke != _origin.sender) {
+        bytes32 expectedSpoke = spoke[origin.srcEid];
+        if (expectedSpoke == bytes32(0) || expectedSpoke != origin.sender) {
             address expectedAddr = address(uint160(uint256(expectedSpoke)));
-            address actualAddr = address(uint160(uint256(_origin.sender)));
+            address actualAddr = address(uint160(uint256(origin.sender)));
             revert InvalidSpoke(expectedAddr, actualAddr);
         }
 
         if (paused) revert Paused();
-        // Decode the incoming bytes into a string
-        // You can use abi.decode, abi.decodePacked, or directly splice bytes
-        // if you know the format of your data structures
-        //string memory _string = abi.decode(_message, (string));
 
-        // Custom logic goes here
-        //console.log("Received message:", _string);
+        (uint8 msgType, bytes memory payload) = abi.decode(_message, (uint8, bytes));
+        if (msgType == uint8(IMessageTypes.MsgType.DEPOSIT_CREDITED)) {
+            _handleDepositCredited(payload);
+        } else {
+            revert InvalidMessageType(msgType, origin);
+        }
+    }
+
+    function _handleDepositCredited(bytes memory payload) internal {
+        (bytes32 depositId, address user, uint32 srcEid, address canonicalAsset, uint256 amount) =
+            abi.decode(payload, (bytes32, address, uint32, address, uint256));
+
+        positionBook.creditCollateral(user, srcEid, canonicalAsset, amount);
+        emit DepositCredited(depositId, srcEid);
     }
 }

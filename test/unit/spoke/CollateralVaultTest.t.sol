@@ -50,8 +50,7 @@ contract CollateralVaultTest is BaseSpokeTest {
     }
 
     function test_DepositSuccess() public {
-        // Alice has tokens
-        vm.prank(alice);
+        vm.prank(address(spokeController));
         collateralVault.deposit(address(mockToken), 100, alice);
         assertEq(collateralVault.lockedBalanceOf(alice, address(mockToken)), 100);
     }

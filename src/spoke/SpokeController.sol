@@ -3,8 +3,10 @@ pragma solidity ^0.8.23;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {OApp, Origin, MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
+import {OApp, Origin, MessagingFee, MessagingReceipt} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {OAppOptionsType3} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OAppOptionsType3.sol";
+import {IMessageTypes} from "../interfaces/IMessageTypes.sol";
+import {ICollateralVault, ILiquidityVault, ISpokeRepayController} from "../interfaces/IVaults.sol";
 
 /**
  * SpokeController (Spoke-side) — LayerZero receiver/sender + orchestrator for:
@@ -49,25 +51,6 @@ interface ILayerZeroEndpointV2 {
 }
 
 /// -----------------------------------------------------------------------
-/// Vault interfaces
-/// -----------------------------------------------------------------------
-
-interface ICollateralVault {
-    function deposit(address asset, uint256 amount, address onBehalfOf) external;
-    function withdrawByController(address user, address to, address asset, uint256 amount) external;
-    function seizeByController(address user, address to, address asset, uint256 amount) external;
-}
-
-interface ILiquidityVault {
-    function releaseBorrow(bytes32 borrowId, address user, address receiver, address asset, uint256 amount) external;
-}
-
-/// Push-driven hook from LiquidityVault
-interface ISpokeRepayController {
-    function onRepayNotified(bytes32 repayId, address payer, address onBehalfOf, address asset, uint256 amount) external;
-}
-
-/// -----------------------------------------------------------------------
 /// SpokeController
 /// -----------------------------------------------------------------------
 contract SpokeController is ISpokeRepayController, OApp, OAppOptionsType3, ReentrancyGuard {
@@ -97,6 +80,7 @@ contract SpokeController is ISpokeRepayController, OApp, OAppOptionsType3, Reent
     event MessageProcessed(
         bytes32 indexed msgId, uint32 indexed srcEid, bytes32 indexed sender, uint64 nonce, uint8 msgType
     );
+    event MessageSent(uint8 indexed msgType, MessagingReceipt receipt);
 
     event ReceiptSent(uint8 indexed msgType, bytes32 indexed requestId);
 
@@ -163,21 +147,9 @@ contract SpokeController is ISpokeRepayController, OApp, OAppOptionsType3, Reent
     }
 
     // -----------------------------
-    // Message types (must match hub)
+    // Message types (shared with hub via IMessageTypes interface)
     // -----------------------------
-    enum MsgType {
-        // spoke -> hub receipts
-        DEPOSIT_CREDITED,
-        BORROW_RELEASED,
-        WITHDRAW_RELEASED,
-        REPAY_RECEIVED,
-        COLLATERAL_SEIZED,
-
-        // hub -> spoke commands
-        CMD_RELEASE_BORROW,
-        CMD_RELEASE_WITHDRAW,
-        CMD_SEIZE_COLLATERAL
-    }
+    // Import MsgType from IMessageTypes - no local definition needed
 
     // -----------------------------
     // LayerZero inbound: hub -> spoke commands
@@ -204,11 +176,11 @@ contract SpokeController is ISpokeRepayController, OApp, OAppOptionsType3, Reent
 
         (uint8 msgType, bytes memory payload) = abi.decode(message, (uint8, bytes));
 
-        if (msgType == uint8(MsgType.CMD_RELEASE_BORROW)) {
+        if (msgType == uint8(IMessageTypes.MsgType.CMD_RELEASE_BORROW)) {
             _handleReleaseBorrow(payload);
-        } else if (msgType == uint8(MsgType.CMD_RELEASE_WITHDRAW)) {
+        } else if (msgType == uint8(IMessageTypes.MsgType.CMD_RELEASE_WITHDRAW)) {
             _handleReleaseWithdraw(payload);
-        } else if (msgType == uint8(MsgType.CMD_SEIZE_COLLATERAL)) {
+        } else if (msgType == uint8(IMessageTypes.MsgType.CMD_SEIZE_COLLATERAL)) {
             _handleSeizeCollateral(payload);
         } else {
             revert InvalidPayload();
@@ -253,7 +225,7 @@ contract SpokeController is ISpokeRepayController, OApp, OAppOptionsType3, Reent
             canonicalAsset,
             amount
         );
-        _sendReceipt(uint8(MsgType.BORROW_RELEASED), receiptPayload, borrowId);
+        _sendReceipt(uint8(IMessageTypes.MsgType.BORROW_RELEASED), receiptPayload, borrowId);
     }
 
     /**
@@ -286,7 +258,7 @@ contract SpokeController is ISpokeRepayController, OApp, OAppOptionsType3, Reent
             canonicalAsset,
             amount
         );
-        _sendReceipt(uint8(MsgType.WITHDRAW_RELEASED), receiptPayload, withdrawId);
+        _sendReceipt(uint8(IMessageTypes.MsgType.WITHDRAW_RELEASED), receiptPayload, withdrawId);
     }
 
     /**
@@ -322,7 +294,7 @@ contract SpokeController is ISpokeRepayController, OApp, OAppOptionsType3, Reent
             amount,
             liquidator
         );
-        _sendReceipt(uint8(MsgType.COLLATERAL_SEIZED), receiptPayload, liqId);
+        _sendReceipt(uint8(IMessageTypes.MsgType.COLLATERAL_SEIZED), receiptPayload, liqId);
     }
 
     // -----------------------------
@@ -353,7 +325,7 @@ contract SpokeController is ISpokeRepayController, OApp, OAppOptionsType3, Reent
         if (spokeEid_ == 0) revert InvalidAmount();
 
         bytes memory receiptPayload = abi.encode(repayId, onBehalfOf, spokeEid_, canonicalAsset, amount);
-        _sendReceipt(uint8(MsgType.REPAY_RECEIVED), receiptPayload, repayId);
+        _sendReceipt(uint8(IMessageTypes.MsgType.REPAY_RECEIVED), receiptPayload, repayId);
     }
 
     // -----------------------------
@@ -366,47 +338,43 @@ contract SpokeController is ISpokeRepayController, OApp, OAppOptionsType3, Reent
         spokeEid = _spokeEid;
     }
 
-    // -----------------------------
-    // Optional: helper to deposit + send DEPOSIT_CREDITED receipt (push-driven deposit)
-    // -----------------------------
     /**
-     * If you prefer, users can just call CollateralVault.deposit directly and then separately
-     * call a router to message the hub. This helper bundles it.
+     *  This is the primary way to deposit; it transfer the tokens to the collateral
+     *  vault and then sends the DEPOSIT_CREDITED message to the hub.
      *
-     * Payload to hub:
+     *  Payload to hub:
      *   (bytes32 depositId, address user, uint32 srcEid, address canonicalAsset, uint256 amount)
      */
     function depositAndNotify(
         bytes32 depositId,
         address canonicalAsset,
         uint256 amount,
-        address onBehalfOf,
         bytes calldata options,
-        MessagingFee calldata fee,
-        address refundAddress
+        MessagingFee calldata fee
     ) external payable {
         if (depositId == bytes32(0)) revert InvalidAmount();
-        if (canonicalAsset == address(0) || onBehalfOf == address(0)) revert InvalidAddress();
+        if (canonicalAsset == address(0)) revert InvalidAddress();
         if (amount == 0) revert InvalidAmount();
         if (spokeEid == 0) revert InvalidAmount();
         if (address(collateralVault) == address(0)) revert InvalidAddress();
 
         address spokeToken = _requireMappedCanonical(canonicalAsset);
 
-        // User must have approved CollateralVault, not SpokeController, because vault pulls tokens.
-        // So we call vault.deposit; vault will transferFrom(msg.sender -> vault).
-        collateralVault.deposit(spokeToken, amount, onBehalfOf);
+        // User must have approved CollateralVault, because vault pulls tokens directly from user.
+        // Pass msg.sender as the 'from' address so vault knows who to pull tokens from.
+        collateralVault.deposit(spokeToken, amount, msg.sender);
 
-        bytes memory payload = abi.encode(depositId, onBehalfOf, spokeEid, canonicalAsset, amount);
-        _sendMessageToHub(uint8(MsgType.DEPOSIT_CREDITED), payload, options, fee, refundAddress);
+        bytes memory payload = abi.encode(depositId, msg.sender, spokeEid, canonicalAsset, amount);
+        _sendMessageToHub(uint8(IMessageTypes.MsgType.DEPOSIT_CREDITED), payload, options, fee, msg.sender);
 
-        emit ReceiptSent(uint8(MsgType.DEPOSIT_CREDITED), depositId);
+        emit ReceiptSent(uint8(IMessageTypes.MsgType.DEPOSIT_CREDITED), depositId);
     }
 
     // -----------------------------
     // Outbound messaging helpers
     // -----------------------------
 
+    /// TODO: Replace with _sendMessageToHub, separate lzSend receipt term from payback receipt term
     /// @dev Send a receipt to hub using stored hub config; uses empty options by default.
     function _sendReceipt(uint8 msgType, bytes memory payload, bytes32 requestId) internal {
         // For receipts we often keep options empty and require caller to prepay msg.value to cover fees.
@@ -432,7 +400,7 @@ contract SpokeController is ISpokeRepayController, OApp, OAppOptionsType3, Reent
         address refundAddress
     ) internal {
         bytes memory envelope = abi.encode(msgType, payload);
-        _lzSend(hubEid, envelope, options, fee, refundAddress);
-        //send{value: msg.value}(hubEid, trustedRemoteHub, envelope, options, fee, refundAddress);
+        MessagingReceipt memory receipt = _lzSend(hubEid, envelope, options, fee, refundAddress);
+        emit MessageSent(msgType, receipt);
     }
 }

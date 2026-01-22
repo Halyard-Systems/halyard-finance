@@ -40,9 +40,10 @@ contract SpokeControllerTest is BaseSpokeTest {
 
     function test_depositAndNotify() public {
         MessagingFee memory fee = MessagingFee({nativeFee: 0, lzTokenFee: 0});
-        spokeController.depositAndNotify(
-            bytes32("test"), canonicalToken, 100, address(this), bytes(""), fee, address(this)
-        );
-        //  TODO: assertion
+
+        vm.prank(alice);
+        spokeController.depositAndNotify(bytes32("test"), canonicalToken, 100, bytes(""), fee);
+
+        assertEq(collateralVault.lockedBalanceOf(alice, address(mockToken)), 100);
     }
 }
