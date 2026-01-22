@@ -2,7 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {Test, console} from "lib/forge-std/src/Test.sol";
-import {MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
+import {MessagingFee} from "lib/devtools/packages/oapp-evm/contracts/oapp/OApp.sol";
 
 import {HubAccessManager} from "../../src/hub/HubAccessManager.sol";
 import {HubController} from "../../src/hub/HubController.sol";
