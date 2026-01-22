@@ -366,39 +366,34 @@ contract SpokeController is ISpokeRepayController, OApp, OAppOptionsType3, Reent
         spokeEid = _spokeEid;
     }
 
-    // -----------------------------
-    // Optional: helper to deposit + send DEPOSIT_CREDITED receipt (push-driven deposit)
-    // -----------------------------
     /**
-     * If you prefer, users can just call CollateralVault.deposit directly and then separately
-     * call a router to message the hub. This helper bundles it.
+     *  This is the primary way to deposit; it transfer the tokens to the collateral
+     *  vault and then sends the DEPOSIT_CREDITED message to the hub.
      *
-     * Payload to hub:
+     *  Payload to hub:
      *   (bytes32 depositId, address user, uint32 srcEid, address canonicalAsset, uint256 amount)
      */
     function depositAndNotify(
         bytes32 depositId,
         address canonicalAsset,
         uint256 amount,
-        address onBehalfOf,
         bytes calldata options,
-        MessagingFee calldata fee,
-        address refundAddress
+        MessagingFee calldata fee
     ) external payable {
         if (depositId == bytes32(0)) revert InvalidAmount();
-        if (canonicalAsset == address(0) || onBehalfOf == address(0)) revert InvalidAddress();
+        if (canonicalAsset == address(0)) revert InvalidAddress();
         if (amount == 0) revert InvalidAmount();
         if (spokeEid == 0) revert InvalidAmount();
         if (address(collateralVault) == address(0)) revert InvalidAddress();
 
         address spokeToken = _requireMappedCanonical(canonicalAsset);
 
-        // User must have approved CollateralVault, not SpokeController, because vault pulls tokens.
-        // So we call vault.deposit; vault will transferFrom(msg.sender -> vault).
-        collateralVault.deposit(spokeToken, amount, onBehalfOf);
+        // User must have approved CollateralVault, because vault pulls tokens directly from user.
+        // Pass msg.sender as the 'from' address so vault knows who to pull tokens from.
+        collateralVault.deposit(spokeToken, amount, msg.sender);
 
-        bytes memory payload = abi.encode(depositId, onBehalfOf, spokeEid, canonicalAsset, amount);
-        _sendMessageToHub(uint8(MsgType.DEPOSIT_CREDITED), payload, options, fee, refundAddress);
+        bytes memory payload = abi.encode(depositId, msg.sender, spokeEid, canonicalAsset, amount);
+        _sendMessageToHub(uint8(MsgType.DEPOSIT_CREDITED), payload, options, fee, msg.sender);
 
         emit ReceiptSent(uint8(MsgType.DEPOSIT_CREDITED), depositId);
     }

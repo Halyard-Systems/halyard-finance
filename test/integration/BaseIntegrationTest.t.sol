@@ -2,6 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {Test, console} from "lib/forge-std/src/Test.sol";
+import {MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 
 import {HubAccessManager} from "../../src/hub/HubAccessManager.sol";
 import {HubController} from "../../src/hub/HubController.sol";
@@ -14,6 +15,8 @@ import {DebtManager} from "../../src/hub/DebtManager.sol";
 import {CollateralVault} from "../../src/spoke/CollateralVault.sol";
 import {LiquidityVault} from "../../src/spoke/LiquidityVault.sol";
 import {SpokeController} from "../../src/spoke/SpokeController.sol";
+import {MockERC20} from "../../src/mocks/MockERC20.sol";
+import {MockLZEndpoint} from "../mocks/MockLZEndpoint.sol";
 
 contract BaseIntegrationTest is Test {
     // Hub contracts
@@ -29,6 +32,7 @@ contract BaseIntegrationTest is Test {
     CollateralVault public collateralVault;
     LiquidityVault public liquidityVault;
     SpokeController public spokeController;
+    MockERC20 public mockToken;
 
     // Test accounts
     address public alice = address(0x1);
@@ -37,23 +41,43 @@ contract BaseIntegrationTest is Test {
     address public david = address(0x4);
     address public admin = address(0x5);
 
-    address public mockLzEndpoint = makeAddr("lzEndpoint");
+    MockLZEndpoint public mockLzEndpoint;
     address public mockOracle = makeAddr("oracle");
     // TODO: replace with a router implementation
     address public router = address(this);
 
-    function setUp() public virtual {
-        // Put bytecode at mock addresses so calls don't fail with "non-contract address"
-        vm.etch(mockLzEndpoint, hex"00");
+    // Token addresses
+    address public canonicalToken = makeAddr("canonical_token");
+    address public spokeToken = makeAddr("spoke_token");
 
-        // Mock LZ endpoint setDelegate (called in OAppCore constructor)
-        vm.mockCall(mockLzEndpoint, abi.encodeWithSignature("setDelegate(address)"), abi.encode());
+    uint32 public hubEid = 1;
+    uint32 public spokeEid = 10;
+
+    function setUp() public virtual {
+        // Deploy mock LayerZero endpoint (must happen before other contracts)
+        mockLzEndpoint = new MockLZEndpoint();
+
+        // Mock the LayerZero endpoint setDelegate function (called in OAppCore constructor)
+        vm.mockCall(address(mockLzEndpoint), abi.encodeWithSignature("setDelegate(address)"), abi.encode());
+
+        vm.mockCall(
+            address(mockLzEndpoint),
+            abi.encodeWithSignature("send((uint32,bytes32,bytes,bytes,bool),address)"),
+            abi.encode(
+                bytes32(uint256(1)), // guid
+                uint64(1), // nonce
+                MessagingFee({nativeFee: 0, lzTokenFee: 0}) // Correct struct
+            )
+        );
+
+        // Deploy mock token (before prank so test contract is owner)
+        mockToken = new MockERC20("Mock Token", "MTK", 18);
 
         vm.startPrank(admin);
 
         // Deploy Hub contracts
         hubAccessManager = new HubAccessManager(admin);
-        hubController = new HubController(admin, mockLzEndpoint);
+        hubController = new HubController(admin, address(mockLzEndpoint));
         assetRegistry = new AssetRegistry(address(hubAccessManager));
         _setupDefaultAssets(assetRegistry);
 
@@ -71,27 +95,35 @@ contract BaseIntegrationTest is Test {
         _setupPermissions(hubAccessManager);
 
         // Deploy Spoke contracts
-        spokeController = new SpokeController(admin, mockLzEndpoint);
+        spokeController = new SpokeController(admin, address(mockLzEndpoint));
         collateralVault = new CollateralVault(admin, address(spokeController));
         liquidityVault = new LiquidityVault(admin, address(spokeController));
 
         // Configure spokeController
         spokeController.setCollateralVault(address(collateralVault));
         spokeController.setLiquidityVault(address(liquidityVault));
-
-        address canonicalToken = makeAddr("canonical_token");
-        address spokeToken = makeAddr("spoke_token");
-        uint32 hubEid = 1;
-        uint32 spokeEid = 10;
-
-        spokeController.setCollateralVault(address(collateralVault));
-        spokeController.setLiquidityVault(address(liquidityVault));
         spokeController.configureHub(hubEid, bytes32("test_hub"));
         spokeController.configureSpokeEid(spokeEid);
-        spokeController.setTokenMapping(canonicalToken, spokeToken);
-        spokeController.setPeer(hubEid, bytes32("test_hub"));
+        // Map canonical token to actual mock token
+        spokeController.setTokenMapping(canonicalToken, address(mockToken));
+        //spokeController.setPeer(hubEid, bytes32("test_hub"));
+        spokeController.setPeer(hubEid, bytes32(uint256(uint160(address(hubController)))));
 
         vm.stopPrank();
+
+        // Give users ETH for gas/fees
+        vm.deal(alice, 100 ether);
+        vm.deal(bob, 100 ether);
+
+        // Setup test tokens and ETH for users
+        mockToken.mint(alice, 1_000_000e18);
+        mockToken.mint(bob, 1_000_000e18);
+
+        // Users approve the vault for deposits
+        vm.prank(alice);
+        mockToken.approve(address(collateralVault), type(uint256).max);
+        vm.prank(bob);
+        mockToken.approve(address(collateralVault), type(uint256).max);
     }
 
     function buildFunctionSelector(bytes4 selector) internal pure returns (bytes4[] memory) {

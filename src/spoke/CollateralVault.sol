@@ -2,6 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * CollateralVault (Spoke-side)
@@ -27,7 +28,7 @@ interface IERC20 {
     function balanceOf(address who) external view returns (uint256);
 }
 
-contract CollateralVault is Ownable {
+contract CollateralVault is Ownable, ReentrancyGuard {
     // -----------------------------
     // Errors
     // -----------------------------
@@ -116,23 +117,26 @@ contract CollateralVault is Ownable {
     // -----------------------------
 
     /**
-     * @notice Deposit collateral. Tokens are transferred into the vault and credited to `onBehalfOf`.
+     * @notice Called by SpokeController to deposit collateral. Tokens are transferred into the vault
+     *  and credited to `onBehalfOf`.
      * @param asset ERC20 token address
      * @param amount Amount in token units
-     * @param onBehalfOf The user whose locked balance is credited
+     * @param onBehalfOf The user whose locked balance is credited and tokens transferred from
      */
-    function deposit(address asset, uint256 amount, address onBehalfOf) external notPaused {
-        if (asset == address(0) || onBehalfOf == address(0)) revert InvalidAddress();
+    function deposit(address asset, uint256 amount, address onBehalfOf) external onlyController nonReentrant notPaused {
+        if (asset == address(0) || onBehalfOf == address(0)) {
+            revert InvalidAddress();
+        }
         if (amount == 0) revert InvalidAmount();
         if (useAllowlist && !isAssetAllowed[asset]) revert InvalidAddress(); // keep errors simple; customize if you want
 
-        // Pull tokens
-        if (!IERC20(asset).transferFrom(msg.sender, address(this), amount)) revert TransferFailed();
+        // Pull tokens from the specified address
+        if (!IERC20(asset).transferFrom(onBehalfOf, address(this), amount)) revert TransferFailed();
 
         // Credit locked balance
         locked[onBehalfOf][asset] += amount;
 
-        emit Deposited(msg.sender, onBehalfOf, asset, amount);
+        emit Deposited(onBehalfOf, onBehalfOf, asset, amount);
     }
 
     // -----------------------------
