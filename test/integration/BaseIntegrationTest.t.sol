@@ -50,6 +50,7 @@ contract BaseIntegrationTest is Test {
     address public canonicalToken = makeAddr("canonical_token");
     address public spokeToken = makeAddr("spoke_token");
 
+    //  LayerZero Infra
     uint32 public hubEid = 1;
     uint32 public spokeEid = 10;
 
@@ -60,16 +61,6 @@ contract BaseIntegrationTest is Test {
         // Mock the LayerZero endpoint setDelegate function (called in OAppCore constructor)
         vm.mockCall(address(mockLzEndpoint), abi.encodeWithSignature("setDelegate(address)"), abi.encode());
 
-        vm.mockCall(
-            address(mockLzEndpoint),
-            abi.encodeWithSignature("send((uint32,bytes32,bytes,bytes,bool),address)"),
-            abi.encode(
-                bytes32(uint256(1)), // guid
-                uint64(1), // nonce
-                MessagingFee({nativeFee: 0, lzTokenFee: 0}) // Correct struct
-            )
-        );
-
         // Deploy mock token (before prank so test contract is owner)
         mockToken = new MockERC20("Mock Token", "MTK", 18);
 
@@ -78,10 +69,12 @@ contract BaseIntegrationTest is Test {
         // Deploy Hub contracts
         hubAccessManager = new HubAccessManager(admin);
         hubController = new HubController(admin, address(mockLzEndpoint));
+
         assetRegistry = new AssetRegistry(address(hubAccessManager));
         _setupDefaultAssets(assetRegistry);
 
         positionBook = new PositionBook(address(hubAccessManager));
+        hubController.setPositionBook(address(positionBook));
 
         debtManager = new DebtManager(address(hubAccessManager), address(assetRegistry));
         debtManager.setAssetRegistry(address(assetRegistry));
@@ -96,6 +89,7 @@ contract BaseIntegrationTest is Test {
 
         // Deploy Spoke contracts
         spokeController = new SpokeController(admin, address(mockLzEndpoint));
+
         collateralVault = new CollateralVault(admin, address(spokeController));
         liquidityVault = new LiquidityVault(admin, address(spokeController));
 
@@ -106,8 +100,10 @@ contract BaseIntegrationTest is Test {
         spokeController.configureSpokeEid(spokeEid);
         // Map canonical token to actual mock token
         spokeController.setTokenMapping(canonicalToken, address(mockToken));
-        //spokeController.setPeer(hubEid, bytes32("test_hub"));
         spokeController.setPeer(hubEid, bytes32(uint256(uint160(address(hubController)))));
+
+        hubController.setSpoke(spokeEid, bytes32(uint256(uint160(address(spokeController)))));
+        hubController.setPeer(spokeEid, bytes32(uint256(uint160(address(spokeController)))));
 
         vm.stopPrank();
 
