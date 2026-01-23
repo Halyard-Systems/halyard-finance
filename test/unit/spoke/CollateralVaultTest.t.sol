@@ -2,10 +2,11 @@
 pragma solidity ^0.8.23;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {BaseSpokeTest} from "./BaseSpokeTest.t.sol";
+import {BaseTest} from "../../BaseTest.t.sol";
 
-contract CollateralVaultTest is BaseSpokeTest {
+contract CollateralVaultTest is BaseTest {
     function test_SetController() public {
+        vm.prank(admin);
         collateralVault.setController(address(spokeController));
         assertEq(collateralVault.controller(), address(spokeController));
     }
@@ -17,6 +18,7 @@ contract CollateralVaultTest is BaseSpokeTest {
     }
 
     function test_SetPaused() public {
+        vm.prank(admin);
         collateralVault.setPaused(true);
         assertTrue(collateralVault.paused());
     }
@@ -28,6 +30,7 @@ contract CollateralVaultTest is BaseSpokeTest {
     }
 
     function test_SetUseAllowlist() public {
+        vm.prank(admin);
         collateralVault.setUseAllowlist(true);
         assertTrue(collateralVault.useAllowlist());
     }
@@ -39,6 +42,7 @@ contract CollateralVaultTest is BaseSpokeTest {
     }
 
     function test_SetAssetAllowed() public {
+        vm.prank(admin);
         collateralVault.setAssetAllowed(address(mockToken), true);
         assertTrue(collateralVault.isAssetAllowed(address(mockToken)));
     }

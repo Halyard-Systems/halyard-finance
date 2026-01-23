@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
-import {BaseHubTest} from "./BaseHubTest.t.sol";
+import {BaseTest} from "../../BaseTest.t.sol";
 import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import {LiquidationEngine} from "../../../src/hub/LiquidationEngine.sol";
 
-contract LiquidationEngineTest is BaseHubTest {
+contract LiquidationEngineTest is BaseTest {
     function test_setCollateralConfig() public {
+        vm.prank(admin);
         liquidationEngine.setCollateralConfig(
             1,
             address(0x123),
@@ -29,6 +30,7 @@ contract LiquidationEngineTest is BaseHubTest {
     }
 
     function test_disableCollateral() public {
+        vm.prank(admin);
         liquidationEngine.disableCollateral(1, address(0x123));
     }
 
@@ -39,6 +41,7 @@ contract LiquidationEngineTest is BaseHubTest {
     }
 
     function test_setDebtConfig() public {
+        vm.prank(admin);
         liquidationEngine.setDebtConfig(
             address(0x123), LiquidationEngine.DebtConfig({isSupported: true, decimals: 18, borrowCap: 0})
         );
@@ -53,6 +56,7 @@ contract LiquidationEngineTest is BaseHubTest {
     }
 
     function test_disableDebt() public {
+        vm.prank(admin);
         liquidationEngine.disableDebt(address(0x123));
     }
 
@@ -63,6 +67,7 @@ contract LiquidationEngineTest is BaseHubTest {
     }
 
     function test_setSpokeTokenAddress() public {
+        vm.prank(admin);
         liquidationEngine.setSpokeTokenAddress(1, address(0x123), address(0x124));
     }
 
@@ -73,6 +78,7 @@ contract LiquidationEngineTest is BaseHubTest {
     }
 
     function test_setBorrowRatePerSecondRay() public {
+        vm.prank(admin);
         liquidationEngine.setBorrowRatePerSecondRay(address(0x123), 1000);
     }
 

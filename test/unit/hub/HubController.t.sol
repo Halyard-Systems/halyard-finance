@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
-import {BaseHubTest} from "./BaseHubTest.t.sol";
+import {BaseTest} from "../../BaseTest.t.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 import {console} from "forge-std/console.sol";
 
-contract HubControllerTest is BaseHubTest {
+contract HubControllerTest is BaseTest {
     function test_SetPaused() public {
+        vm.prank(admin);
         hubController.setPaused(true);
         assertTrue(hubController.paused());
     }
@@ -21,6 +22,7 @@ contract HubControllerTest is BaseHubTest {
 
     function test_SetSpoke() public {
         bytes32 spokeAddr = bytes32(uint256(uint160(alice))); // Convert address to bytes32
+        vm.prank(admin);
         hubController.setSpoke(1, spokeAddr);
         assertEq(hubController.getSpoke(1), spokeAddr);
     }
@@ -34,8 +36,10 @@ contract HubControllerTest is BaseHubTest {
 
     function test_RemoveSpoke() public {
         bytes32 spokeAddr = bytes32(uint256(uint160(alice)));
+        vm.startPrank(admin);
         hubController.setSpoke(1, spokeAddr);
         hubController.removeSpoke(1);
+        vm.stopPrank();
         assertEq(hubController.getSpoke(1), bytes32(0));
     }
 
@@ -47,18 +51,19 @@ contract HubControllerTest is BaseHubTest {
 
     function test_GetSpoke() public {
         bytes32 spokeAddr = bytes32(uint256(uint160(alice)));
+        vm.prank(admin);
         hubController.setSpoke(1, spokeAddr);
         assertEq(hubController.getSpoke(1), spokeAddr);
     }
 
     function test_GetSpokeEids() public {
         bytes32 spokeAddr = bytes32(uint256(uint160(alice)));
-        hubController.setSpoke(1, spokeAddr);
-        hubController.setSpoke(2, spokeAddr);
+        vm.prank(admin);
+        hubController.setSpoke(11, spokeAddr);
 
         uint32[] memory eids = hubController.getSpokeEids();
         assertEq(eids.length, 2);
-        assertEq(eids[0], 1);
-        assertEq(eids[1], 2);
+        assertEq(eids[0], 10);
+        assertEq(eids[1], 11);
     }
 }

@@ -1,32 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
-import {BaseHubTest} from "./BaseHubTest.t.sol";
+import {BaseTest} from "../../BaseTest.t.sol";
 import {RiskEngine} from "../../../src/hub/RiskEngine.sol";
 
 import {console} from "forge-std/console.sol";
 
 // TODO: need more tests, and the tests here need review
-contract RiskEngineTest is BaseHubTest {
+contract RiskEngineTest is BaseTest {
     function test_AccountData() public {
-        // Create a mock oracle address
-        address mockOracle = makeAddr("oracle");
-        // TODO: replace with real DebtManager
-        address tempDebManager = makeAddr("debtManager");
-
         // Mock the oracle's getPriceE18 function to return a price
         vm.mockCall(
             mockOracle,
             abi.encodeWithSignature("getPriceE18(address)"),
             abi.encode(1e18, block.timestamp) // price = 1e18 (1 USD), timestamp = now
-        );
-
-        // Set RiskEngine dependencies
-        riskEngine.setDependencies(
-            address(positionBook),
-            address(tempDebManager), // or mock address if DebtManager not deployed
-            address(assetRegistry),
-            mockOracle
         );
 
         RiskEngine.CollateralSlot[] memory collateralSlots = new RiskEngine.CollateralSlot[](1);
@@ -52,24 +39,11 @@ contract RiskEngineTest is BaseHubTest {
     }
 
     function test_canBorrow() public {
-        // Create a mock oracle address
-        address mockOracle = makeAddr("oracle");
-        // TODO: replace with real DebtManager
-        address tempDebManager = makeAddr("debtManager");
-
         // Mock the oracle's getPriceE18 function to return a price
         vm.mockCall(
             mockOracle,
             abi.encodeWithSignature("getPriceE18(address)"),
             abi.encode(1000e18, block.timestamp) // price = 1e18 (1 USD), timestamp = now
-        );
-
-        // Set RiskEngine dependencies
-        riskEngine.setDependencies(
-            address(positionBook),
-            address(tempDebManager), // or mock address if DebtManager not deployed
-            address(assetRegistry),
-            mockOracle
         );
 
         // Credit collateral to alice (must prank as hubController which has ROLE_HUB_CONTROLLER)
@@ -99,14 +73,6 @@ contract RiskEngineTest is BaseHubTest {
             abi.encode(1000e18, block.timestamp) // price = 1e18 (1 USD), timestamp = now
         );
 
-        // Set RiskEngine dependencies
-        // riskEngine.setDependencies(
-        //     address(positionBook),
-        //     address(tempDebtManager), // or mock address if DebtManager not deployed
-        //     address(assetRegistry),
-        //     mockOracle
-        // );
-
         // Credit collateral to alice (must prank as hubController which has ROLE_HUB_CONTROLLER)
         vm.prank(address(hubController));
         positionBook.creditCollateral(alice, 1, address(0x123), 10e18); // 10 tokens
@@ -133,14 +99,6 @@ contract RiskEngineTest is BaseHubTest {
             abi.encode(1000e18, block.timestamp) // price = 1e18 (1 USD), timestamp = now
         );
 
-        // Set RiskEngine dependencies
-        riskEngine.setDependencies(
-            address(positionBook),
-            address(tempDebtManager), // or mock address if DebtManager not deployed
-            address(assetRegistry),
-            mockOracle
-        );
-
         // Credit collateral to alice (must prank as hubController which has ROLE_HUB_CONTROLLER)
         vm.prank(address(hubController));
         positionBook.creditCollateral(alice, 1, address(0x123), 100000e18); // 100000 tokens
@@ -151,7 +109,7 @@ contract RiskEngineTest is BaseHubTest {
         // Create debt slots array (empty for this test)
         RiskEngine.DebtSlot[] memory debtSlots = new RiskEngine.DebtSlot[](0);
 
-        vm.prank(router);
+        vm.prank(address(hubRouter));
         riskEngine.validateAndCreateBorrow(
             bytes32(keccak256("test_validateAndCreateBorrow")),
             alice,
@@ -174,14 +132,6 @@ contract RiskEngineTest is BaseHubTest {
             abi.encode(1000e18, block.timestamp) // price = 1000 USD, timestamp = now
         );
 
-        // Set RiskEngine dependencies
-        // riskEngine.setDependencies(
-        //     address(positionBook),
-        //     address(tempDebtManager),
-        //     address(assetRegistry),
-        //     mockOracle
-        // );
-
         // Credit collateral to alice (must prank as hubController which has ROLE_HUB_CONTROLLER)
         vm.prank(address(hubController));
         positionBook.creditCollateral(alice, 1, address(0x123), 100000e18); // 100000 tokens
@@ -192,7 +142,7 @@ contract RiskEngineTest is BaseHubTest {
         // Create debt slots array (empty for this test)
         RiskEngine.DebtSlot[] memory debtSlots = new RiskEngine.DebtSlot[](0);
 
-        vm.prank(router);
+        vm.prank(address(hubRouter));
         riskEngine.validateAndCreateWithdraw(
             bytes32(keccak256("test_validateAndCreateWithdraw")),
             alice,
