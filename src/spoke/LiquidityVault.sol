@@ -2,7 +2,6 @@
 pragma solidity ^0.8.23;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * LiquidityVault (Spoke-side, PUSH-DRIVEN repay)
@@ -42,7 +41,7 @@ interface ISpokeRepayController {
     function onRepayNotified(bytes32 repayId, address payer, address onBehalfOf, address asset, uint256 amount) external;
 }
 
-contract LiquidityVault is Ownable, ReentrancyGuard {
+contract LiquidityVault is Ownable {
     // -----------------------------
     // Errors
     // -----------------------------
@@ -125,7 +124,7 @@ contract LiquidityVault is Ownable, ReentrancyGuard {
     // Owner: seed / withdraw liquidity
     // -----------------------------
 
-    function addLiquidity(address asset, uint256 amount) external notPaused nonReentrant {
+    function addLiquidity(address asset, uint256 amount) external notPaused {
         if (asset == address(0)) revert InvalidAddress();
         if (amount == 0) revert InvalidAmount();
         if (useAllowlist && !isAssetAllowed[asset]) revert InvalidAddress();
@@ -134,7 +133,7 @@ contract LiquidityVault is Ownable, ReentrancyGuard {
         emit LiquidityAdded(msg.sender, asset, amount);
     }
 
-    function removeLiquidity(address asset, address to, uint256 amount) external onlyOwner notPaused nonReentrant {
+    function removeLiquidity(address asset, address to, uint256 amount) external onlyOwner notPaused {
         if (asset == address(0) || to == address(0)) revert InvalidAddress();
         if (amount == 0) revert InvalidAmount();
         if (useAllowlist && !isAssetAllowed[asset]) revert InvalidAddress();
@@ -151,7 +150,6 @@ contract LiquidityVault is Ownable, ReentrancyGuard {
         external
         onlyController
         notPaused
-        nonReentrant
     {
         if (borrowId == bytes32(0)) revert InvalidAmount();
         if (user == address(0) || receiver == address(0) || asset == address(0)) revert InvalidAddress();
@@ -176,7 +174,7 @@ contract LiquidityVault is Ownable, ReentrancyGuard {
      * repayId should be unique. A common pattern is:
      *   repayId = keccak256(abi.encodePacked(block.chainid, msg.sender, onBehalfOf, asset, amount, userNonce))
      */
-    function repay(bytes32 repayId, address asset, uint256 amount, address onBehalfOf) external notPaused nonReentrant {
+    function repay(bytes32 repayId, address asset, uint256 amount, address onBehalfOf) external notPaused {
         if (repayId == bytes32(0)) revert InvalidAmount();
         if (asset == address(0) || onBehalfOf == address(0)) revert InvalidAddress();
         if (amount == 0) revert InvalidAmount();
@@ -200,7 +198,7 @@ contract LiquidityVault is Ownable, ReentrancyGuard {
     // -----------------------------
     // Admin: rescue tokens (dust / wrong transfers)
     // -----------------------------
-    function rescueERC20(address token, address to, uint256 amount) external onlyOwner nonReentrant {
+    function rescueERC20(address token, address to, uint256 amount) external onlyOwner {
         if (token == address(0) || to == address(0)) revert InvalidAddress();
         if (amount == 0) revert InvalidAmount();
         if (!IERC20(token).transfer(to, amount)) revert TransferFailed();

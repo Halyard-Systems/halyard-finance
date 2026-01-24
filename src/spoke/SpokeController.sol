@@ -2,7 +2,6 @@
 pragma solidity ^0.8.23;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {OApp, Origin, MessagingFee, MessagingReceipt} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {OAppOptionsType3} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OAppOptionsType3.sol";
 import {IMessageTypes} from "../interfaces/IMessageTypes.sol";
@@ -53,7 +52,7 @@ interface ILayerZeroEndpointV2 {
 /// -----------------------------------------------------------------------
 /// SpokeController
 /// -----------------------------------------------------------------------
-contract SpokeController is ISpokeRepayController, OApp, OAppOptionsType3, ReentrancyGuard {
+contract SpokeController is ISpokeRepayController, OApp, OAppOptionsType3 {
     // -----------------------------
     // Errors
     // -----------------------------

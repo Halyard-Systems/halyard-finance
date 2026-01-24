@@ -2,7 +2,6 @@
 pragma solidity ^0.8.23;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {IHubController} from "../interfaces/IHubController.sol";
@@ -27,7 +26,7 @@ import {IPositionBook} from "../interfaces/IPositionBook.sol";
  * 3. Upgrade velocity - change UX without touching message receiver
  * 4. Operational safety - can pause user actions while keeping cross-chain receipts flowing
  */
-contract HubRouter is Ownable, ReentrancyGuard, Pausable {
+contract HubRouter is Ownable, Pausable {
     // ──────────────────────────────────────────────────────────────────────────────
     // Errors
     // ──────────────────────────────────────────────────────────────────────────────
@@ -126,7 +125,7 @@ contract HubRouter is Ownable, ReentrancyGuard, Pausable {
         uint256 amount,
         bytes calldata options,
         MessagingFee calldata fee
-    ) external payable nonReentrant whenNotPaused {
+    ) external payable whenNotPaused {
         if (withdrawId == bytes32(0)) revert InvalidAmount();
         if (asset == address(0)) revert InvalidAddress();
         if (amount == 0) revert InvalidAmount();
@@ -134,13 +133,6 @@ contract HubRouter is Ownable, ReentrancyGuard, Pausable {
         if (address(hubController) == address(0)) revert InvalidAddress();
 
         address user = msg.sender;
-
-        // TODO: Validate with RiskEngine
-        // - Check user has sufficient collateral on dstEid
-        // - Check health factor remains above threshold after withdrawal
-        // if (!IRiskEngine(riskEngine).validateWithdraw(user, dstEid, asset, amount)) {
-        //     revert WithdrawNotAllowed();
-        // }
 
         // Mark as pending (will be finalized when HubController receives WITHDRAW_RELEASED)
         if (pendingWithdraws[withdrawId]) revert InvalidAmount(); // Already pending
@@ -187,7 +179,7 @@ contract HubRouter is Ownable, ReentrancyGuard, Pausable {
         address receiver,
         bytes calldata options,
         MessagingFee calldata fee
-    ) external payable nonReentrant whenNotPaused {
+    ) external payable whenNotPaused {
         if (borrowId == bytes32(0)) revert InvalidAmount();
         if (asset == address(0)) revert InvalidAddress();
         if (amount == 0) revert InvalidAmount();

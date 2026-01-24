@@ -4,10 +4,6 @@
 
 <img width="1071" height="430" alt="Screenshot from 2025-08-20 01-11-57" src="https://github.com/user-attachments/assets/f5f651e3-0bef-431f-94d2-d8923c915a98" />
 
-## Architecture
-
-Halyard Finance operates with a hub and spoke design. Spokes manage liquidity and collateral on their respective networks, while the hub maintains an accounting ledger across spokes. Actions (deposit, borrow, repay, withdraw, liquidate) take place on a spoke, require a LayerZero message to be processed on the hub before they can be executed.
-
 ## Development
 
 The local development environment is based on a node with a mainnet fork; see the Makefile for more details.
@@ -128,3 +124,28 @@ If you wish to add your own Mock ERC20 contracts:
 
 The tokens that Halyard Finance supports must be added to the contract.
 To add a new token, run `make add-token-testnet` with the `ADD_TOKEN_*` DepositManager environment variables set.
+
+## Architecture
+
+Halyard Finance operates with a hub and spoke design. Spokes manage liquidity and collateral on their respective networks, while the hub maintains an accounting ledger across spokes. Actions (deposit, borrow, repay, withdraw, liquidate) take place on a spoke, require a LayerZero message to be processed on the hub before they can be executed.
+
+### Deposit
+
+    1. User calls SpokeController#depositAndNotify
+    2. Spoke pulls tokens from msg.sender
+    3. Spoke updates user's local balance via CollaterVault#deposit
+    4. Spoke sends a DEPOSIT_CREDITED message to the HubController
+    5. User's total balance is updated in PositionBook#creditCollateral
+
+### Withdraw
+
+    1. User calls HubRouter#withdrawAndNotify
+    2. HubRouter calls HubController#sendWithdrawCommand
+    3. HubController calls RiskEngine#checkWithdrawAllowed
+    4. RiskEngine calls PositionBook#totalPosition
+    5. RiskEngine calls Pyth for pricing
+    6. If position * pricing allows withdrawal, hubController calls PositionBook#reserveCollateral
+    7. HubController send CMD_RELEASE_WITHDRAW message to spoke
+    8. On CMD_RELEASE_WITHDRAW message receipt, SpokeController calls CollateralVault.withdrawByController
+    9. SpokeController sends WITHDRAW_RELEASE msg to HubController
+    10. When WITHDRAW_RELEASE is received, HubController calls PositionBook#debitCollateral
