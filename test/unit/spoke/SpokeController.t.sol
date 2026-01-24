@@ -1,28 +1,32 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
-import {BaseSpokeTest} from "./BaseSpokeTest.t.sol";
+import {BaseTest} from "../../BaseTest.t.sol";
 import {SpokeController} from "../../../src/spoke/SpokeController.sol";
 import {MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 
-contract SpokeControllerTest is BaseSpokeTest {
+contract SpokeControllerTest is BaseTest {
     function test_ConfigureHub() public {
+        vm.prank(admin);
         spokeController.configureHub(1, bytes32("test"));
         assertEq(spokeController.hubEid(), 1);
         assertEq(spokeController.trustedRemoteHub(), bytes32("test"));
     }
 
     function test_SetCollateralVault() public {
+        vm.prank(admin);
         spokeController.setCollateralVault(address(0x1));
         assertEq(address(spokeController.collateralVault()), address(0x1));
     }
 
     function test_SetLiquidityVault() public {
+        vm.prank(admin);
         spokeController.setLiquidityVault(address(0x1));
         assertEq(address(spokeController.liquidityVault()), address(0x1));
     }
 
     function test_SetTokenMapping() public {
+        vm.prank(admin);
         spokeController.setTokenMapping(address(0x1), address(0x1));
         assertEq(address(spokeController.canonicalToSpoke(address(0x1))), address(0x1));
     }
@@ -34,6 +38,7 @@ contract SpokeControllerTest is BaseSpokeTest {
     }
 
     function test_configureSpokeEid() public {
+        vm.prank(admin);
         spokeController.configureSpokeEid(1);
         assertEq(spokeController.spokeEid(), 1);
     }

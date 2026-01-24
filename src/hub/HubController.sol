@@ -2,6 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {OApp, Origin, MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {OAppOptionsType3} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OAppOptionsType3.sol";
@@ -13,12 +14,15 @@ import {console} from "forge-std/console.sol";
 /**
  * HubController
  *
+ * Uses Ownable (required for OApp) for admin functions and AccessManaged for restricted functions.
+ *
  * Purpose:
  * - Receives and handles incoming LayerZero messages from trusted spoke controllers.
+ * - Handles calls from HubRouter to send commands to spokes.
  * - Registers and manages spoke controllers.
  * - Pauses the HubController to prevent further messages from being processed.
  */
-contract HubController is OApp, OAppOptionsType3, ReentrancyGuard {
+contract HubController is AccessManaged, OApp, OAppOptionsType3 {
     error Paused();
     error InvalidAddress();
     error InvalidMessageType(uint8 msgType, Origin origin);
@@ -39,7 +43,11 @@ contract HubController is OApp, OAppOptionsType3, ReentrancyGuard {
 
     bool public paused;
 
-    constructor(address _owner, address _lzEndpoint) OApp(_lzEndpoint, _owner) Ownable(_owner) {}
+    constructor(address _owner, address _lzEndpoint, address _authority)
+        AccessManaged(_authority)
+        OApp(_lzEndpoint, _owner)
+        Ownable(_owner)
+    {}
 
     /// -----------------------------------------------------------------------
     /// Admin / config
@@ -151,5 +159,51 @@ contract HubController is OApp, OAppOptionsType3, ReentrancyGuard {
 
         positionBook.creditCollateral(user, srcEid, canonicalAsset, amount);
         emit DepositCredited(depositId, srcEid);
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────────
+    // Command Functions (called by HubRouter to send commands to spokes)
+    // ──────────────────────────────────────────────────────────────────────────────
+
+    /**
+     * @notice Send CMD_RELEASE_WITHDRAW command to spoke
+     * @dev Called by HubRouter after validating user's withdrawal request
+     */
+    function sendWithdrawCommand(
+        uint32 dstEid,
+        bytes32 withdrawId,
+        address user,
+        address receiver,
+        address asset,
+        uint256 amount,
+        bytes calldata options,
+        MessagingFee calldata fee,
+        address refundAddress
+    ) external payable restricted {
+        bytes memory payload = abi.encode(withdrawId, user, receiver, asset, amount);
+        bytes memory message = abi.encode(uint8(IMessageTypes.MsgType.CMD_RELEASE_WITHDRAW), payload);
+
+        _lzSend(dstEid, message, options, fee, refundAddress);
+    }
+
+    /**
+     * @notice Send CMD_RELEASE_BORROW command to spoke
+     * @dev Called by HubRouter after validating user's borrow request
+     */
+    function sendBorrowCommand(
+        uint32 dstEid,
+        bytes32 borrowId,
+        address user,
+        address receiver,
+        address asset,
+        uint256 amount,
+        bytes calldata options,
+        MessagingFee calldata fee,
+        address refundAddress
+    ) external payable restricted {
+        bytes memory payload = abi.encode(borrowId, user, receiver, asset, amount);
+        bytes memory message = abi.encode(uint8(IMessageTypes.MsgType.CMD_RELEASE_BORROW), payload);
+
+        _lzSend(dstEid, message, options, fee, refundAddress);
     }
 }

@@ -2,7 +2,6 @@
 pragma solidity ^0.8.23;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * CollateralVault (Spoke-side)
@@ -28,7 +27,7 @@ interface IERC20 {
     function balanceOf(address who) external view returns (uint256);
 }
 
-contract CollateralVault is Ownable, ReentrancyGuard {
+contract CollateralVault is Ownable {
     // -----------------------------
     // Errors
     // -----------------------------
@@ -123,7 +122,7 @@ contract CollateralVault is Ownable, ReentrancyGuard {
      * @param amount Amount in token units
      * @param onBehalfOf The user whose locked balance is credited and tokens transferred from
      */
-    function deposit(address asset, uint256 amount, address onBehalfOf) external onlyController nonReentrant notPaused {
+    function deposit(address asset, uint256 amount, address onBehalfOf) external onlyController notPaused {
         if (asset == address(0) || onBehalfOf == address(0)) {
             revert InvalidAddress();
         }

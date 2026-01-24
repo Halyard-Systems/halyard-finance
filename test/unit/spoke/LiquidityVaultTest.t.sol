@@ -2,11 +2,12 @@
 pragma solidity ^0.8.23;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {BaseSpokeTest} from "./BaseSpokeTest.t.sol";
+import {BaseTest} from "../../BaseTest.t.sol";
 import {LiquidityVault} from "../../../src/spoke/LiquidityVault.sol";
 
-contract LiquidityVaultTest is BaseSpokeTest {
+contract LiquidityVaultTest is BaseTest {
     function test_SetController() public {
+        vm.prank(admin);
         liquidityVault.setController(address(spokeController));
         assertEq(liquidityVault.controller(), address(spokeController));
     }
@@ -18,6 +19,7 @@ contract LiquidityVaultTest is BaseSpokeTest {
     }
 
     function test_SetPaused() public {
+        vm.prank(admin);
         liquidityVault.setPaused(true);
         assertTrue(liquidityVault.paused());
     }
@@ -29,6 +31,7 @@ contract LiquidityVaultTest is BaseSpokeTest {
     }
 
     function test_SetUseAllowlist() public {
+        vm.prank(admin);
         liquidityVault.setUseAllowlist(true);
         assertTrue(liquidityVault.useAllowlist());
     }
@@ -40,6 +43,7 @@ contract LiquidityVaultTest is BaseSpokeTest {
     }
 
     function test_SetAssetAllowed() public {
+        vm.prank(admin);
         liquidityVault.setAssetAllowed(address(mockToken), true);
         assertTrue(liquidityVault.isAssetAllowed(address(mockToken)));
     }
@@ -60,6 +64,7 @@ contract LiquidityVaultTest is BaseSpokeTest {
     }
 
     function test_AddLiquidity_Paused() public {
+        vm.prank(admin);
         liquidityVault.setPaused(true);
         vm.startPrank(alice);
         mockToken.approve(address(liquidityVault), 100);
@@ -86,8 +91,11 @@ contract LiquidityVaultTest is BaseSpokeTest {
     }
 
     function test_AddLiquidity_InvalidAllowlist() public {
+        vm.startPrank(admin);
         liquidityVault.setUseAllowlist(true);
         liquidityVault.setAssetAllowed(address(mockToken), false);
+        vm.stopPrank();
+
         vm.startPrank(alice);
         mockToken.approve(address(liquidityVault), 100);
         vm.expectRevert(abi.encodeWithSelector(LiquidityVault.InvalidAddress.selector));
@@ -104,6 +112,7 @@ contract LiquidityVaultTest is BaseSpokeTest {
         liquidityVault.addLiquidity(address(mockToken), 100);
         vm.stopPrank();
 
+        vm.prank(admin);
         liquidityVault.removeLiquidity(address(mockToken), alice, 70);
 
         assertEq(mockToken.balanceOf(address(liquidityVault)), 30);
@@ -111,27 +120,34 @@ contract LiquidityVaultTest is BaseSpokeTest {
     }
 
     function test_RemoveLiquidity_Paused() public {
+        vm.prank(admin);
         liquidityVault.setPaused(true);
         vm.prank(alice);
         mockToken.approve(address(liquidityVault), 100);
+        vm.prank(admin);
         vm.expectRevert(abi.encodeWithSelector(LiquidityVault.Paused.selector));
         liquidityVault.removeLiquidity(address(mockToken), alice, 70);
     }
 
     function test_RemoveLiquidity_InvalidAddress() public {
+        vm.prank(admin);
         vm.expectRevert(abi.encodeWithSelector(LiquidityVault.InvalidAddress.selector));
         liquidityVault.removeLiquidity(address(0), alice, 70);
     }
 
     function test_RemoveLiquidity_InvalidAmount() public {
+        vm.prank(admin);
         vm.expectRevert(abi.encodeWithSelector(LiquidityVault.InvalidAmount.selector));
         liquidityVault.removeLiquidity(address(mockToken), alice, 0);
     }
 
     function test_RemoveLiquidity_InvalidAllowlist() public {
+        vm.startPrank(admin);
         liquidityVault.setUseAllowlist(true);
         liquidityVault.setAssetAllowed(address(mockToken), false);
+        vm.stopPrank();
 
+        vm.prank(admin);
         vm.expectRevert(abi.encodeWithSelector(LiquidityVault.InvalidAddress.selector));
         liquidityVault.removeLiquidity(address(mockToken), alice, 70);
     }
@@ -187,8 +203,10 @@ contract LiquidityVaultTest is BaseSpokeTest {
         liquidityVault.addLiquidity(address(mockToken), 100);
         vm.stopPrank();
 
+        vm.startPrank(admin);
         liquidityVault.setUseAllowlist(true);
         liquidityVault.setAssetAllowed(address(mockToken), false);
+        vm.stopPrank();
 
         vm.expectRevert(abi.encodeWithSelector(LiquidityVault.InvalidAddress.selector));
         vm.prank(address(spokeController));
@@ -239,8 +257,10 @@ contract LiquidityVaultTest is BaseSpokeTest {
     function test_Repay_InvalidAllowlist() public {
         uint256 aliceBalanceBefore = mockToken.balanceOf(alice);
 
+        vm.startPrank(admin);
         liquidityVault.setUseAllowlist(true);
         liquidityVault.setAssetAllowed(address(mockToken), false);
+        vm.stopPrank();
 
         vm.startPrank(alice);
         mockToken.approve(address(liquidityVault), 100);
@@ -261,6 +281,7 @@ contract LiquidityVaultTest is BaseSpokeTest {
         uint256 aliceBalanceBefore = mockToken.balanceOf(alice);
         uint256 liquidityVaultBalanceBefore = mockToken.balanceOf(address(liquidityVault));
 
+        vm.prank(admin);
         liquidityVault.rescueERC20(address(mockToken), alice, 70);
 
         assertEq(mockToken.balanceOf(address(alice)), aliceBalanceBefore + 70);
@@ -271,6 +292,7 @@ contract LiquidityVaultTest is BaseSpokeTest {
         uint256 aliceBalanceBefore = mockToken.balanceOf(alice);
         uint256 liquidityVaultBalanceBefore = mockToken.balanceOf(address(liquidityVault));
 
+        vm.prank(admin);
         vm.expectRevert(abi.encodeWithSelector(LiquidityVault.InvalidAddress.selector));
         liquidityVault.rescueERC20(address(0), alice, 70);
 
@@ -282,6 +304,7 @@ contract LiquidityVaultTest is BaseSpokeTest {
         uint256 aliceBalanceBefore = mockToken.balanceOf(alice);
         uint256 liquidityVaultBalanceBefore = mockToken.balanceOf(address(liquidityVault));
 
+        vm.prank(admin);
         vm.expectRevert(abi.encodeWithSelector(LiquidityVault.InvalidAmount.selector));
         liquidityVault.rescueERC20(address(mockToken), alice, 0);
 
