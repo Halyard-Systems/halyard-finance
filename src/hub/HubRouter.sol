@@ -33,7 +33,7 @@ contract HubRouter is Ownable, Pausable {
     error InvalidAddress();
     error InvalidAmount();
     error InsufficientCollateral();
-    error WithdrawNotAllowed();
+    error WithdrawAlreadyPending();
     error BorrowNotAllowed();
 
     // ──────────────────────────────────────────────────────────────────────────────
@@ -43,9 +43,7 @@ contract HubRouter is Ownable, Pausable {
     event PositionBookSet(address indexed positionBook);
     event RiskEngineSet(address indexed riskEngine);
 
-    event WithdrawRequested(
-        bytes32 indexed withdrawId, address indexed user, uint32 indexed dstEid, address asset, uint256 amount
-    );
+    event WithdrawRequested(address indexed user, uint32 indexed dstEid, address asset, uint256 amount);
 
     event BorrowRequested(
         bytes32 indexed borrowId, address indexed user, uint32 indexed dstEid, address asset, uint256 amount
@@ -59,7 +57,7 @@ contract HubRouter is Ownable, Pausable {
     address public riskEngine; // Will be interface once implemented
 
     // Track pending operations to prevent replay
-    mapping(bytes32 => bool) public pendingWithdraws;
+    mapping(address => bool) public pendingWithdraws;
     mapping(bytes32 => bool) public pendingBorrows;
 
     // ──────────────────────────────────────────────────────────────────────────────
@@ -111,7 +109,6 @@ contract HubRouter is Ownable, Pausable {
      *   4. Send CMD_RELEASE_WITHDRAW to spoke
      *   5. Wait for WITHDRAW_RELEASED receipt from spoke (handled by HubController)
      *
-     * @param withdrawId Unique identifier for this withdrawal
      * @param dstEid Destination spoke chain EID where collateral is held
      * @param asset Canonical asset address
      * @param amount Amount to withdraw
@@ -119,35 +116,31 @@ contract HubRouter is Ownable, Pausable {
      * @param fee LayerZero messaging fee
      */
     function withdrawAndNotify(
-        bytes32 withdrawId,
         uint32 dstEid,
         address asset,
         uint256 amount,
         bytes calldata options,
         MessagingFee calldata fee
     ) external payable whenNotPaused {
-        if (withdrawId == bytes32(0)) revert InvalidAmount();
-        if (asset == address(0)) revert InvalidAddress();
-        if (amount == 0) revert InvalidAmount();
         if (address(positionBook) == address(0)) revert InvalidAddress();
         if (address(hubController) == address(0)) revert InvalidAddress();
+        if (asset == address(0)) revert InvalidAddress();
+        if (amount == 0) revert InvalidAmount();
 
         address user = msg.sender;
 
         // Mark as pending (will be finalized when HubController receives WITHDRAW_RELEASED)
-        if (pendingWithdraws[withdrawId]) revert InvalidAmount(); // Already pending
-        pendingWithdraws[withdrawId] = true;
+        // if (pendingWithdraws[user]) revert WithdrawAlreadyPending();
+        // pendingWithdraws[user] = true;
 
         // Reserve the collateral in PositionBook (prevents double-withdrawal)
         // TODO: Add reserveCollateral to PositionBook
         // positionBook.reserveCollateral(user, dstEid, asset, amount);
 
         // Ask HubController to send CMD_RELEASE_WITHDRAW command to spoke
-        hubController.sendWithdrawCommand{value: msg.value}(
-            dstEid, withdrawId, user, user, asset, amount, options, fee, msg.sender
-        );
+        hubController.processWithdraw{value: msg.value}(dstEid, user, asset, amount, options, fee);
 
-        emit WithdrawRequested(withdrawId, user, dstEid, asset, amount);
+        emit WithdrawRequested(user, dstEid, asset, amount);
     }
 
     // ──────────────────────────────────────────────────────────────────────────────
@@ -225,7 +218,7 @@ contract HubRouter is Ownable, Pausable {
         // if (msg.sender != address(hubController)) revert Unauthorized();
 
         // Clear pending state
-        delete pendingWithdraws[withdrawId];
+        delete pendingWithdraws[user];
 
         // Finalize in PositionBook (debit collateral, unreserve)
         // TODO: positionBook.finalizeWithdraw(user, srcEid, asset, amount);

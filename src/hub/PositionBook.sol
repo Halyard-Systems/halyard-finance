@@ -33,16 +33,21 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
     //error OnlyHubController();
     //error OnlyRiskEngine();
     //error OnlyLiquidationEngine();
+    error BorrowAlreadyPending();
+    error BorrowNotFinalized();
     error InvalidAddress();
     error InvalidAmount();
     error InvalidEid();
     error UnknownPending(bytes32 id);
     error AlreadyFinalized(bytes32 id);
+    error NotEnoughCollateral(uint256 available, uint256 required);
     error NotPending(bytes32 id);
     error ReservationUnderflow();
     error CollateralUnderflow();
     error CollateralOverflow(); // (rare) included for completeness
     error DebtAssetNotConfigured(); // if you choose to store allowed debt assets here (optional)
+    error WithdrawAlreadyPending();
+    error WithdrawNotFinalized();
 
     // ---------------------------------------------------------------------
     // Events
@@ -52,28 +57,14 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
     // event RiskEngineSet(address indexed riskEngine);
     // event LiquidationEngineSet(address indexed liquidationEngine);
 
-    event CollateralCredited(address indexed user, uint32 indexed eid, address indexed asset, uint256 amount);
-    event CollateralDebited(address indexed user, uint32 indexed eid, address indexed asset, uint256 amount);
+    event CollateralCredited(address user, uint32 indexed eid, address indexed asset, uint256 amount);
+    event CollateralDebited(address user, uint32 indexed eid, address indexed asset, uint256 amount);
 
-    event BorrowPendingCreated(
-        bytes32 indexed borrowId,
-        address indexed user,
-        uint32 indexed dstEid,
-        address asset,
-        uint256 amount,
-        address receiver
-    );
-    event BorrowPendingFinalized(bytes32 indexed borrowId, bool success);
+    event BorrowPendingCreated(address user, uint32 indexed dstEid, address asset, uint256 amount, address receiver);
+    event BorrowPendingFinalized(address user, bool success);
 
-    event WithdrawPendingCreated(
-        bytes32 indexed withdrawId,
-        address indexed user,
-        uint32 indexed srcEid,
-        address asset,
-        uint256 amount,
-        address receiver
-    );
-    event WithdrawPendingFinalized(bytes32 indexed withdrawId, bool success);
+    event WithdrawPendingCreated(address indexed user, uint32 indexed srcEid, address asset, uint256 amount);
+    event WithdrawPendingFinalized(address user, bool success);
 
     event LiquidationPendingCreated(
         bytes32 indexed liqId,
@@ -197,7 +188,7 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
         bool finalized;
     }
 
-    mapping(bytes32 => PendingBorrow) public pendingBorrow;
+    mapping(address => PendingBorrow) public pendingBorrow;
 
     // reservedDebt[user][eid][asset] => nominal reserved while borrow is in-flight
     mapping(address => mapping(uint32 => mapping(address => uint256))) private _reservedDebt;
@@ -208,23 +199,18 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
 
     /// @notice Create a pending borrow and reserve debt headroom while the spoke releases funds.
     /// Called by a router after RiskEngine approves the borrow.
-    function createPendingBorrow(
-        bytes32 borrowId,
-        address user,
-        uint32 dstEid,
-        address debtAsset,
-        uint256 amount,
-        address receiver
-    ) external restricted {
-        if (borrowId == bytes32(0)) revert InvalidAmount();
+    function createPendingBorrow(address user, uint32 dstEid, address debtAsset, uint256 amount, address receiver)
+        external
+        restricted
+    {
         if (user == address(0) || debtAsset == address(0) || receiver == address(0)) revert InvalidAddress();
         if (dstEid == 0) revert InvalidEid();
         if (amount == 0) revert InvalidAmount();
 
-        PendingBorrow storage p = pendingBorrow[borrowId];
-        if (p.exists) revert NotPending(borrowId); // already exists
+        PendingBorrow storage p = pendingBorrow[user];
+        if (p.exists) revert BorrowAlreadyPending(); // already exists
 
-        pendingBorrow[borrowId] = PendingBorrow({
+        pendingBorrow[user] = PendingBorrow({
             user: user,
             dstEid: dstEid,
             asset: debtAsset,
@@ -236,7 +222,7 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
 
         _reservedDebt[user][dstEid][debtAsset] += amount;
 
-        emit BorrowPendingCreated(borrowId, user, dstEid, debtAsset, amount, receiver);
+        emit BorrowPendingCreated(user, dstEid, debtAsset, amount, receiver);
     }
 
     /// @notice Finalize a pending borrow after spoke receipt.
@@ -244,14 +230,10 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
     /// On failure: releases reservation and marks finalized.
     ///
     /// Called by HubController upon BORROW_RELEASED receipt.
-    function finalizePendingBorrow(bytes32 borrowId, bool success)
-        external
-        restricted
-        returns (PendingBorrow memory p)
-    {
-        PendingBorrow storage s = pendingBorrow[borrowId];
-        if (!s.exists) revert UnknownPending(borrowId);
-        if (s.finalized) revert AlreadyFinalized(borrowId);
+    function finalizePendingBorrow(address user, bool success) external restricted returns (PendingBorrow memory p) {
+        PendingBorrow storage s = pendingBorrow[user];
+        if (!s.exists) revert BorrowAlreadyPending();
+        if (s.finalized) revert BorrowNotFinalized();
 
         s.finalized = true;
 
@@ -262,16 +244,16 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
             _reservedDebt[s.user][s.dstEid][s.asset] = res - s.amount;
         }
 
-        emit BorrowPendingFinalized(borrowId, success);
+        emit BorrowPendingFinalized(user, success);
         return s;
     }
 
     /// @notice After DebtManager mints the real debt (on success), clear the reservation.
     /// You can call this from the same finalize handler in HubController.
-    function clearBorrowReservation(bytes32 borrowId) external restricted {
-        PendingBorrow storage s = pendingBorrow[borrowId];
-        if (!s.exists) revert UnknownPending(borrowId);
-        if (!s.finalized) revert NotPending(borrowId); // must be finalized first
+    function clearBorrowReservation(address user) external restricted {
+        PendingBorrow storage s = pendingBorrow[user];
+        if (!s.exists) revert BorrowAlreadyPending();
+        if (!s.finalized) revert BorrowNotFinalized();
 
         uint256 res = _reservedDebt[s.user][s.dstEid][s.asset];
         if (res < s.amount) revert ReservationUnderflow();
@@ -283,44 +265,34 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
     // ---------------------------------------------------------------------
 
     struct PendingWithdraw {
-        address user;
         uint32 srcEid; // chain where collateral is held / to be released from
         address asset;
         uint256 amount;
-        address receiver;
-        bool exists;
-        bool finalized;
     }
 
-    mapping(bytes32 => PendingWithdraw) public pendingWithdraw;
+    mapping(address => PendingWithdraw) public pendingWithdraw;
 
     /// @notice Create pending withdraw. Assumes reserveCollateral(...) was already performed.
     /// Called by router / risk engine after approval.
-    function createPendingWithdraw(
-        bytes32 withdrawId,
-        address user,
-        uint32 srcEid,
-        address asset,
-        uint256 amount,
-        address receiver
-    ) external restricted {
-        if (withdrawId == bytes32(0)) revert InvalidAmount();
-        if (user == address(0) || asset == address(0) || receiver == address(0)) revert InvalidAddress();
+    function createPendingWithdraw(address user, uint32 srcEid, address asset, uint256 amount) external restricted {
+        if (user == address(0) || asset == address(0)) revert InvalidAddress();
         if (srcEid == 0) revert InvalidEid();
         if (amount == 0) revert InvalidAmount();
 
-        PendingWithdraw storage p = pendingWithdraw[withdrawId];
-        if (p.exists) revert NotPending(withdrawId);
+        PendingBorrow storage b = pendingBorrow[user];
+        if (b.amount != 0) revert BorrowAlreadyPending();
 
-        // Ensure reservation exists
-        uint256 res = _reservedCollateral[user][srcEid][asset];
-        if (res < amount) revert ReservationUnderflow();
+        PendingWithdraw storage w = pendingWithdraw[user];
+        if (w.amount != 0) revert WithdrawAlreadyPending();
 
-        pendingWithdraw[withdrawId] = PendingWithdraw({
-            user: user, srcEid: srcEid, asset: asset, amount: amount, receiver: receiver, exists: true, finalized: false
-        });
+        // Ensure enough free collateral is available
+        // TODO: implement with asset enumeration and pyth pricing
+        //uint256 avail = availableCollateralOf(user, srcEid, asset);
+        //if (avail < amount) revert NotEnoughCollateral(avail, amount);
 
-        emit WithdrawPendingCreated(withdrawId, user, srcEid, asset, amount, receiver);
+        pendingWithdraw[user] = PendingWithdraw({srcEid: srcEid, asset: asset, amount: amount});
+
+        emit WithdrawPendingCreated(user, srcEid, asset, amount);
     }
 
     /// @notice Finalize a withdraw after spoke receipt.
@@ -328,26 +300,24 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
     /// On failure: just reduce reservation.
     ///
     /// Called by HubController upon WITHDRAW_RELEASED receipt.
-    function finalizePendingWithdraw(bytes32 withdrawId, bool success)
+    function finalizePendingWithdraw(address user, bool success)
         external
         restricted
         returns (PendingWithdraw memory w)
     {
-        PendingWithdraw storage s = pendingWithdraw[withdrawId];
-        if (!s.exists) revert UnknownPending(withdrawId);
-        if (s.finalized) revert AlreadyFinalized(withdrawId);
-        s.finalized = true;
+        PendingWithdraw storage s = pendingWithdraw[user];
+        if (s.amount != 0) revert WithdrawAlreadyPending();
 
         // Always remove the reservation for this withdraw
-        uint256 res = _reservedCollateral[s.user][s.srcEid][s.asset];
+        uint256 res = _reservedCollateral[user][s.srcEid][s.asset];
         if (res < s.amount) revert ReservationUnderflow();
-        _reservedCollateral[s.user][s.srcEid][s.asset] = res - s.amount;
+        _reservedCollateral[user][s.srcEid][s.asset] = res - s.amount;
 
         if (success) {
-            _debitCollateral(s.user, s.srcEid, s.asset, s.amount);
+            _debitCollateral(user, s.srcEid, s.asset, s.amount);
         }
 
-        emit WithdrawPendingFinalized(withdrawId, success);
+        emit WithdrawPendingFinalized(user, success);
         return s;
     }
 

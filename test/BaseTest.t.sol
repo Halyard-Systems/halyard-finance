@@ -204,7 +204,7 @@ contract BaseTest is Test {
     function _setupPermissions(HubAccessManager accessManager) internal {
         accessManager.setTargetFunctionRole(
             address(hubController),
-            buildFunctionSelector(hubController.sendWithdrawCommand.selector),
+            buildFunctionSelector(hubController.processWithdraw.selector),
             accessManager.ROLE_ROUTER()
         );
 
@@ -237,7 +237,7 @@ contract BaseTest is Test {
         accessManager.setTargetFunctionRole(
             address(positionBook),
             buildFunctionSelector(positionBook.createPendingWithdraw.selector),
-            accessManager.ROLE_RISK_ENGINE()
+            accessManager.ROLE_HUB_CONTROLLER()
         );
         accessManager.setTargetFunctionRole(
             address(positionBook),
@@ -271,12 +271,13 @@ contract BaseTest is Test {
         accessManager.setTargetFunctionRole(
             address(riskEngine),
             buildFunctionSelector(riskEngine.validateAndCreateWithdraw.selector),
-            accessManager.ROLE_ROUTER()
+            accessManager.ROLE_POSITION_BOOK()
         );
 
         accessManager.grantRole(accessManager.ROLE_ROUTER(), address(hubRouter), 0);
         accessManager.grantRole(accessManager.ROLE_HUB_CONTROLLER(), address(hubController), 0);
         accessManager.grantRole(accessManager.ROLE_ASSET_REGISTRY(), address(assetRegistry), 0);
         accessManager.grantRole(accessManager.ROLE_RISK_ENGINE(), address(riskEngine), 0);
+        accessManager.grantRole(accessManager.ROLE_POSITION_BOOK(), address(positionBook), 0);
     }
 }

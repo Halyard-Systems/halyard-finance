@@ -16,8 +16,6 @@ contract WithdrawTest is BaseIntegrationTest {
 
         // User requests withdrawal via HubRouter (not HubController)
         vm.prank(alice);
-        hubRouter.withdrawAndNotify{value: 0.1 ether}(
-            bytes32("withdraw_1"), spokeEid, canonicalToken, withdrawAmount, bytes(""), fee
-        );
+        hubRouter.withdrawAndNotify{value: 0.1 ether}(spokeEid, canonicalToken, withdrawAmount, bytes(""), fee);
     }
 }

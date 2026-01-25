@@ -27,6 +27,7 @@ contract HubController is AccessManaged, OApp, OAppOptionsType3 {
     error InvalidAddress();
     error InvalidMessageType(uint8 msgType, Origin origin);
     error InvalidSpoke(address expected, address actual);
+    error WithdrawNotAllowed();
 
     event DepositCredited(bytes32 indexed depositId, uint32 indexed srcEid);
     event PausedSet(bool paused);
@@ -166,24 +167,23 @@ contract HubController is AccessManaged, OApp, OAppOptionsType3 {
     // ──────────────────────────────────────────────────────────────────────────────
 
     /**
-     * @notice Send CMD_RELEASE_WITHDRAW command to spoke
+     * @notice If withdrawal is allowed, send CMD_RELEASE_WITHDRAW command to spoke
      * @dev Called by HubRouter after validating user's withdrawal request
      */
-    function sendWithdrawCommand(
-        uint32 dstEid,
-        bytes32 withdrawId,
+    function processWithdraw(
+        uint32 srcEid,
         address user,
-        address receiver,
         address asset,
         uint256 amount,
         bytes calldata options,
-        MessagingFee calldata fee,
-        address refundAddress
+        MessagingFee calldata fee
     ) external payable restricted {
-        bytes memory payload = abi.encode(withdrawId, user, receiver, asset, amount);
+        positionBook.createPendingWithdraw(user, srcEid, asset, amount);
+
+        bytes memory payload = abi.encode(user, asset, amount);
         bytes memory message = abi.encode(uint8(IMessageTypes.MsgType.CMD_RELEASE_WITHDRAW), payload);
 
-        _lzSend(dstEid, message, options, fee, refundAddress);
+        _lzSend(srcEid, message, options, fee, user);
     }
 
     /**
