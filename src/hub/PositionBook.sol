@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.23;
+pragma solidity ^0.8.24;
 
 import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-
 /**
  * PositionBook (Hub-side) - storage for user positions.
  *
@@ -26,7 +24,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
  * likely move to OpenZeppelin AccessControl, but this is deliberately dependency-light.
  */
 
-contract PositionBook is AccessManaged, ReentrancyGuard {
+contract PositionBook is AccessManaged {
     // ---------------------------------------------------------------------
     // Errors
     // ---------------------------------------------------------------------
@@ -106,17 +104,30 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
         if (_authority == address(0)) revert InvalidAddress();
     }
 
+    struct ChainAsset {
+        uint32 eid;
+        address asset;
+    }
+
     // ---------------------------------------------------------------------
     // Canonical collateral balances (hub-side book)
     // ---------------------------------------------------------------------
     // collateral[user][eid][asset] => amount
     mapping(address => mapping(uint32 => mapping(address => uint256))) private _collateral;
+    
+    // Track which (eid, asset) pairs each user has collateral in
+    mapping(address => ChainAsset[]) private _collateralAssets;
+    mapping(address => mapping(uint32 => mapping(address => bool))) private _hasCollateralAsset;
 
     // reservedCollateral[user][eid][asset] => amount reserved for pending withdraw or pending seizure
     mapping(address => mapping(uint32 => mapping(address => uint256))) private _reservedCollateral;
 
     function collateralOf(address user, uint32 eid, address asset) external view returns (uint256) {
         return _collateral[user][eid][asset];
+    }
+
+    function collateralAssetsOf(address user) external view returns (ChainAsset[] memory) {
+        return _collateralAssets[user];
     }
 
     function reservedCollateralOf(address user, uint32 eid, address asset) external view returns (uint256) {
@@ -138,8 +149,14 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
         if (eid == 0) revert InvalidEid();
         if (amount == 0) revert InvalidAmount();
 
-        // Safe math is default in ^0.8
         _collateral[user][eid][asset] += amount;
+        
+        // Track this asset if not already tracked
+        if (!_hasCollateralAsset[user][eid][asset]) {
+            _collateralAssets[user].push(ChainAsset({eid: eid, asset: asset}));
+            _hasCollateralAsset[user][eid][asset] = true;
+        }
+
         emit CollateralCredited(user, eid, asset, amount);
     }
 
@@ -148,6 +165,13 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
         uint256 bal = _collateral[user][eid][asset];
         if (bal < amount) revert CollateralUnderflow();
         _collateral[user][eid][asset] = bal - amount;
+
+        // If balance is now zero, remove from tracking
+        if (_collateral[user][eid][asset] == 0 && _hasCollateralAsset[user][eid][asset]) {
+            _removeCollateralAsset(user, eid, asset);
+            _hasCollateralAsset[user][eid][asset] = false;
+        }
+        
         emit CollateralDebited(user, eid, asset, amount);
     }
 
@@ -285,7 +309,18 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
         PendingWithdraw storage w = pendingWithdraw[user];
         if (w.amount != 0) revert WithdrawAlreadyPending();
 
-        // Ensure enough free collateral is available
+        // Get value of amount in USD
+
+        // Get the user's collateral assets
+
+        // Get the user's borrowed assets
+
+        // Get prices for collateral and borrowed assets
+
+        // Calculate the user's total collateral value in USD
+
+        // Revert if the user doesn't have enough collateral to cover the withdraw
+
         // TODO: implement with asset enumeration and pyth pricing
         //uint256 avail = availableCollateralOf(user, srcEid, asset);
         //if (avail < amount) revert NotEnoughCollateral(avail, amount);
@@ -424,6 +459,31 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
             balances[i] = b;
             reserved[i] = r;
             available[i] = b > r ? b - r : 0;
+        }
+    }
+
+    /// @notice Check if a ChainAsset exists in the array
+    function _containsChainAsset(ChainAsset[] storage assets, uint32 eid, address asset) internal view returns (bool) {
+        for (uint256 i = 0; i < assets.length; i++) {
+            if (assets[i].eid == eid && assets[i].asset == asset) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// @notice Remove a ChainAsset from the array (swap and pop for gas efficiency)
+    function _removeCollateralAsset(address user, uint32 eid, address asset) internal {
+        ChainAsset[] storage assets = _collateralAssets[user];
+        for (uint256 i = 0; i < assets.length; i++) {
+            if (assets[i].eid == eid && assets[i].asset == asset) {
+                // Swap with last element and pop
+                if (i != assets.length - 1) {
+                    assets[i] = assets[assets.length - 1];
+                }
+                assets.pop();
+                return;
+            }
         }
     }
 }

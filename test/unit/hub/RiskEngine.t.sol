@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.23;
+pragma solidity ^0.8.24;
 
 import {BaseTest} from "../../BaseTest.t.sol";
 import {RiskEngine} from "../../../src/hub/RiskEngine.sol";
-
-import {console} from "forge-std/console.sol";
 
 // TODO: need more tests, and the tests here need review
 contract RiskEngineTest is BaseTest {

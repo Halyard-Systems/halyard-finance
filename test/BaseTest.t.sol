@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.23;
+pragma solidity ^0.8.24;
 
-import {Test, console} from "lib/forge-std/src/Test.sol";
-import {MessagingFee, Origin} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
-import {MessagingFee} from "lib/devtools/packages/oapp-evm/contracts/oapp/OApp.sol";
+import {Test} from "lib/forge-std/src/Test.sol";
 
 import {HubAccessManager} from "../src/hub/HubAccessManager.sol";
 import {HubController} from "../src/hub/HubController.sol";
@@ -99,6 +97,7 @@ contract BaseTest is Test {
         // Configure spokeController
         spokeController.setCollateralVault(address(collateralVault));
         spokeController.setLiquidityVault(address(liquidityVault));
+        // forge-lint: disable-next-line(unsafe-typecast)
         spokeController.configureHub(hubEid, bytes32("test_hub"));
         spokeController.configureSpokeEid(spokeEid);
         // Map canonical token to actual mock token

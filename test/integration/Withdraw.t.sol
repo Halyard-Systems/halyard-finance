@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.23;
+pragma solidity ^0.8.24;
 
 import {BaseIntegrationTest} from "./BaseIntegrationTest.t.sol";
 import {MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
@@ -10,6 +10,7 @@ contract WithdrawTest is BaseIntegrationTest {
         uint256 withdrawAmount = 50e18;
 
         // First deposit collateral (prerequisite for withdrawal)
+        // forge-lint: disable-next-line(unsafe-typecast)
         _depositAndCredit(alice, bytes32("deposit_1"), canonicalToken, depositAmount);
 
         MessagingFee memory fee = MessagingFee({nativeFee: 0.1 ether, lzTokenFee: 0});

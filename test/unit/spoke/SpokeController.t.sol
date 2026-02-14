@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.23;
+pragma solidity ^0.8.24;
 
 import {BaseTest} from "../../BaseTest.t.sol";
-import {SpokeController} from "../../../src/spoke/SpokeController.sol";
 import {MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 
 contract SpokeControllerTest is BaseTest {
     function test_ConfigureHub() public {
         vm.prank(admin);
+        // forge-lint: disable-next-line(unsafe-typecast)
         spokeController.configureHub(1, bytes32("test"));
         assertEq(spokeController.hubEid(), 1);
+        // forge-lint: disable-next-line(unsafe-typecast)
         assertEq(spokeController.trustedRemoteHub(), bytes32("test"));
     }
 
@@ -33,6 +34,7 @@ contract SpokeControllerTest is BaseTest {
 
     function test_onRepayNotified() public {
         vm.prank(address(liquidityVault));
+        // forge-lint: disable-next-line(unsafe-typecast)
         spokeController.onRepayNotified(bytes32("test"), address(0x1), address(0x1), address(mockToken), 100);
         //  TODO: assertion
     }
@@ -47,6 +49,7 @@ contract SpokeControllerTest is BaseTest {
         MessagingFee memory fee = MessagingFee({nativeFee: 0, lzTokenFee: 0});
 
         vm.prank(alice);
+        // forge-lint: disable-next-line(unsafe-typecast)
         spokeController.depositAndNotify(bytes32("test"), canonicalToken, 100, bytes(""), fee);
 
         assertEq(collateralVault.lockedBalanceOf(alice, address(mockToken)), 100);

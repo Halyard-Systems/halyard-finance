@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.23;
+pragma solidity ^0.8.24;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {OApp, Origin, MessagingFee, MessagingReceipt} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
@@ -169,7 +169,19 @@ contract SpokeController is ISpokeRepayController, OApp, OAppOptionsType3 {
             revert UntrustedHub(origin.srcEid, origin.sender);
         }
 
-        bytes32 msgId = keccak256(abi.encodePacked(origin.srcEid, origin.sender, origin.nonce));
+        bytes32 msgId;
+        {
+            uint32 srcEid = origin.srcEid;
+            bytes32 sender = origin.sender;
+            uint64 nonce = origin.nonce;
+            assembly {
+                let ptr := mload(0x40)
+                mstore(ptr, srcEid)
+                mstore(add(ptr, 0x20), sender)
+                mstore(add(ptr, 0x40), nonce)
+                msgId := keccak256(ptr, 0x60)
+            }
+        }
         if (processed[msgId]) revert AlreadyProcessed(msgId);
         processed[msgId] = true;
 
