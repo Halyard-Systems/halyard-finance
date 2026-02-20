@@ -6,6 +6,7 @@ import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {IHubController} from "../interfaces/IHubController.sol";
 import {IPositionBook} from "../interfaces/IPositionBook.sol";
+import {IRiskEngine} from "../interfaces/IRiskEngine.sol";
 
 /**
  * @title HubRouter
@@ -54,7 +55,7 @@ contract HubRouter is Ownable, Pausable {
     // ──────────────────────────────────────────────────────────────────────────────
     IHubController public hubController;
     IPositionBook public positionBook;
-    address public riskEngine; // Will be interface once implemented
+    IRiskEngine public riskEngine;
 
     // Track pending operations to prevent replay
     mapping(address => bool) public pendingWithdraws;
@@ -84,7 +85,7 @@ contract HubRouter is Ownable, Pausable {
 
     function setRiskEngine(address _riskEngine) external onlyOwner {
         if (_riskEngine == address(0)) revert InvalidAddress();
-        riskEngine = _riskEngine;
+        riskEngine = IRiskEngine(_riskEngine);
         emit RiskEngineSet(_riskEngine);
     }
 
@@ -115,32 +116,61 @@ contract HubRouter is Ownable, Pausable {
      * @param options LayerZero options
      * @param fee LayerZero messaging fee
      */
+    /**
+     * @notice Request withdrawal of collateral from a spoke chain
+     * @dev Flow:
+     *   1. RiskEngine validates health factor using oracle prices for every asset
+     *   2. RiskEngine reserves collateral in PositionBook (prevents double-withdrawal)
+     *   3. HubController creates pending withdraw and sends CMD_RELEASE_WITHDRAW to spoke
+     *   4. Wait for WITHDRAW_RELEASED receipt from spoke (handled by HubController)
+     *
+     * If the user has outstanding loans, the withdrawal must not push their
+     * health factor below 1.0 (liquidation threshold). The RiskEngine calls
+     * the oracle (Pyth) for every collateral and debt asset to compute the
+     * account's total value before allowing the withdrawal.
+     *
+     * @param dstEid Destination spoke chain EID where collateral is held
+     * @param asset Canonical asset address
+     * @param amount Amount to withdraw
+     * @param collateralSlots All collateral positions to consider for health factor
+     * @param debtSlots All debt positions to consider for health factor
+     * @param options LayerZero options
+     * @param fee LayerZero messaging fee
+     */
     function withdrawAndNotify(
         uint32 dstEid,
         address asset,
         uint256 amount,
+        IRiskEngine.CollateralSlot[] calldata collateralSlots,
+        IRiskEngine.DebtSlot[] calldata debtSlots,
         bytes calldata options,
         MessagingFee calldata fee
     ) external payable whenNotPaused {
         if (address(positionBook) == address(0)) revert InvalidAddress();
         if (address(hubController) == address(0)) revert InvalidAddress();
+        if (address(riskEngine) == address(0)) revert InvalidAddress();
         if (asset == address(0)) revert InvalidAddress();
         if (amount == 0) revert InvalidAmount();
 
-        address user = msg.sender;
+        // Validate health factor via oracle prices and reserve collateral.
+        // This calls Pyth (via the oracle adapter) for every collateral and debt asset
+        // to compute total account value. If the user has loans, reverts if the
+        // withdrawal would push the health factor below 1.0.
+        riskEngine.validateAndCreateWithdraw(
+            keccak256(abi.encodePacked(msg.sender, dstEid, asset, amount, block.number)),
+            msg.sender,
+            dstEid,
+            asset,
+            amount,
+            msg.sender,
+            collateralSlots,
+            debtSlots
+        );
 
-        // Mark as pending (will be finalized when HubController receives WITHDRAW_RELEASED)
-        // if (pendingWithdraws[user]) revert WithdrawAlreadyPending();
-        // pendingWithdraws[user] = true;
+        // Send CMD_RELEASE_WITHDRAW command to spoke (also creates pending withdraw in PositionBook)
+        hubController.processWithdraw{value: msg.value}(dstEid, msg.sender, asset, amount, options, fee);
 
-        // Reserve the collateral in PositionBook (prevents double-withdrawal)
-        // TODO: Add reserveCollateral to PositionBook
-        // positionBook.reserveCollateral(user, dstEid, asset, amount);
-
-        // Ask HubController to send CMD_RELEASE_WITHDRAW command to spoke
-        hubController.processWithdraw{value: msg.value}(dstEid, user, asset, amount, options, fee);
-
-        emit WithdrawRequested(user, dstEid, asset, amount);
+        emit WithdrawRequested(msg.sender, dstEid, asset, amount);
     }
 
     // ──────────────────────────────────────────────────────────────────────────────

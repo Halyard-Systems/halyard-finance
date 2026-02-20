@@ -296,8 +296,9 @@ contract PositionBook is AccessManaged {
 
     mapping(address => PendingWithdraw) public pendingWithdraw;
 
-    /// @notice Create pending withdraw. Assumes reserveCollateral(...) was already performed.
-    /// Called by router / risk engine after approval.
+    /// @notice Create pending withdraw. Assumes reserveCollateral(...) was already performed
+    /// by RiskEngine after validating health factor using oracle prices.
+    /// Called by HubController after RiskEngine approval.
     function createPendingWithdraw(address user, uint32 srcEid, address asset, uint256 amount) external restricted {
         if (user == address(0) || asset == address(0)) revert InvalidAddress();
         if (srcEid == 0) revert InvalidEid();
@@ -308,22 +309,6 @@ contract PositionBook is AccessManaged {
 
         PendingWithdraw storage w = pendingWithdraw[user];
         if (w.amount != 0) revert WithdrawAlreadyPending();
-
-        // Get value of amount in USD
-
-        // Get the user's collateral assets
-
-        // Get the user's borrowed assets
-
-        // Get prices for collateral and borrowed assets
-
-        // Calculate the user's total collateral value in USD
-
-        // Revert if the user doesn't have enough collateral to cover the withdraw
-
-        // TODO: implement with asset enumeration and pyth pricing
-        //uint256 avail = availableCollateralOf(user, srcEid, asset);
-        //if (avail < amount) revert NotEnoughCollateral(avail, amount);
 
         pendingWithdraw[user] = PendingWithdraw({srcEid: srcEid, asset: asset, amount: amount});
 
@@ -341,19 +326,24 @@ contract PositionBook is AccessManaged {
         returns (PendingWithdraw memory w)
     {
         PendingWithdraw storage s = pendingWithdraw[user];
-        if (s.amount != 0) revert WithdrawAlreadyPending();
+        if (s.amount == 0) revert WithdrawNotFinalized();
+
+        // Copy to memory before clearing storage
+        w = s;
 
         // Always remove the reservation for this withdraw
-        uint256 res = _reservedCollateral[user][s.srcEid][s.asset];
-        if (res < s.amount) revert ReservationUnderflow();
-        _reservedCollateral[user][s.srcEid][s.asset] = res - s.amount;
+        uint256 res = _reservedCollateral[user][w.srcEid][w.asset];
+        if (res < w.amount) revert ReservationUnderflow();
+        _reservedCollateral[user][w.srcEid][w.asset] = res - w.amount;
 
         if (success) {
-            _debitCollateral(user, s.srcEid, s.asset, s.amount);
+            _debitCollateral(user, w.srcEid, w.asset, w.amount);
         }
 
+        // Clear pending state so user can withdraw again
+        delete pendingWithdraw[user];
+
         emit WithdrawPendingFinalized(user, success);
-        return s;
     }
 
     // ---------------------------------------------------------------------

@@ -82,6 +82,7 @@ contract BaseTest is Test {
 
         riskEngine = new RiskEngine(address(hubAccessManager));
         riskEngine.setDependencies(address(positionBook), address(debtManager), address(assetRegistry), mockOracle);
+        hubRouter.setRiskEngine(address(riskEngine));
 
         liquidationEngine = new LiquidationEngine(address(hubAccessManager));
         _setupLiquidationEngine(liquidationEngine);
@@ -188,6 +189,15 @@ contract BaseTest is Test {
             })
         );
 
+        // Register canonical token on spoke chain (used in integration tests)
+        registry.setCollateralConfig(
+            spokeEid,
+            canonicalToken,
+            AssetRegistry.CollateralConfig({
+                isSupported: true, ltvBps: 8000, liqThresholdBps: 8500, liqBonusBps: 500, decimals: 18, supplyCap: 0
+            })
+        );
+
         registry.setDebtConfig(
             1, address(0x123), AssetRegistry.DebtConfig({isSupported: true, decimals: 18, borrowCap: 0})
         );
@@ -270,7 +280,7 @@ contract BaseTest is Test {
         accessManager.setTargetFunctionRole(
             address(riskEngine),
             buildFunctionSelector(riskEngine.validateAndCreateWithdraw.selector),
-            accessManager.ROLE_POSITION_BOOK()
+            accessManager.ROLE_ROUTER()
         );
 
         accessManager.grantRole(accessManager.ROLE_ROUTER(), address(hubRouter), 0);

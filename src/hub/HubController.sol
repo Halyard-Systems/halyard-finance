@@ -27,6 +27,7 @@ contract HubController is AccessManaged, OApp, OAppOptionsType3 {
     error WithdrawNotAllowed();
 
     event DepositCredited(bytes32 indexed depositId, uint32 indexed srcEid);
+    event WithdrawReleased(bytes32 indexed withdrawId, bool success);
     event PausedSet(bool paused);
     event SpokeSet(uint32 indexed eid, bytes32 spoke);
     event SpokeRemoved(uint32 indexed eid);
@@ -146,6 +147,8 @@ contract HubController is AccessManaged, OApp, OAppOptionsType3 {
         (uint8 msgType, bytes memory payload) = abi.decode(_message, (uint8, bytes));
         if (msgType == uint8(IMessageTypes.MsgType.DEPOSIT_CREDITED)) {
             _handleDepositCredited(payload);
+        } else if (msgType == uint8(IMessageTypes.MsgType.WITHDRAW_RELEASED)) {
+            _handleWithdrawReleased(payload);
         } else {
             revert InvalidMessageType(msgType, origin);
         }
@@ -157,6 +160,14 @@ contract HubController is AccessManaged, OApp, OAppOptionsType3 {
 
         positionBook.creditCollateral(user, srcEid, canonicalAsset, amount);
         emit DepositCredited(depositId, srcEid);
+    }
+
+    function _handleWithdrawReleased(bytes memory payload) internal {
+        (bytes32 withdrawId, bool success, address user,,, ) =
+            abi.decode(payload, (bytes32, bool, address, uint32, address, uint256));
+
+        positionBook.finalizePendingWithdraw(user, success);
+        emit WithdrawReleased(withdrawId, success);
     }
 
     // ──────────────────────────────────────────────────────────────────────────────
@@ -177,7 +188,10 @@ contract HubController is AccessManaged, OApp, OAppOptionsType3 {
     ) external payable restricted {
         positionBook.createPendingWithdraw(user, srcEid, asset, amount);
 
-        bytes memory payload = abi.encode(user, asset, amount);
+        bytes32 withdrawId = keccak256(abi.encodePacked(user, srcEid, asset, amount, block.number));
+        address receiver = user;
+
+        bytes memory payload = abi.encode(withdrawId, user, receiver, asset, amount);
         bytes memory message = abi.encode(uint8(IMessageTypes.MsgType.CMD_RELEASE_WITHDRAW), payload);
 
         _lzSend(srcEid, message, options, fee, user);

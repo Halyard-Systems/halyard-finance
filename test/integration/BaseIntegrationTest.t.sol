@@ -20,6 +20,39 @@ contract BaseIntegrationTest is BaseTest {
         );
     }
 
+    /// @notice Mock the oracle price for an asset
+    /// @param asset The canonical asset address
+    /// @param priceE18 Price in 1e18 units (e.g. 1e18 = $1.00)
+    function _mockOraclePrice(address asset, uint256 priceE18) internal {
+        vm.mockCall(
+            mockOracle,
+            abi.encodeWithSignature("getPriceE18(address)", asset),
+            abi.encode(priceE18, block.timestamp)
+        );
+    }
+
+    /// @notice Simulate the hub receiving a WITHDRAW_RELEASED receipt from spoke
+    function _simulateWithdrawReceipt(address user, address asset, uint256 amount, bool success) internal {
+        uint32 srcEid = spokeController.spokeEid();
+        bytes32 spokeSender = bytes32(uint256(uint160(address(spokeController))));
+
+        bytes32 withdrawId = bytes32("test_withdraw");
+
+        // Build WITHDRAW_RELEASED message (msgType = 2)
+        bytes memory payload = abi.encode(withdrawId, success, user, srcEid, asset, amount);
+        bytes memory message = abi.encode(uint8(2), payload);
+
+        // Simulate LayerZero delivering the receipt to hub
+        vm.prank(address(mockLzEndpoint));
+        hubController.lzReceive(
+            Origin({srcEid: srcEid, sender: spokeSender, nonce: 2}),
+            bytes32(uint256(2)), // guid
+            message,
+            address(0),
+            bytes("")
+        );
+    }
+
     /// @notice Complete deposit flow: spoke deposit + hub receipt
     /// @param user The user depositing
     /// @param depositId Unique deposit identifier

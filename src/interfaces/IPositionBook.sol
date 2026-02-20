@@ -11,4 +11,7 @@ interface IPositionBook {
 
     /// @notice Request a withdraw.
     function createPendingWithdraw(address user, uint32 srcEid, address asset, uint256 amount) external;
+
+    /// @notice Finalize a pending withdraw after spoke receipt.
+    function finalizePendingWithdraw(address user, bool success) external;
 }

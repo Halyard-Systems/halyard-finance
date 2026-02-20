@@ -343,10 +343,8 @@ contract RiskEngine is AccessManaged, ReentrancyGuard {
             revert WouldBeUndercollateralized(0, 0);
         }
 
-        // Reserve collateral and create pending
-        // TODO: this happens elsewhere
-        //positionBook.reserveCollateral(user, srcEid, collateralAsset, amount);
-        //positionBook.createPendingWithdraw(user, srcEid, collateralAsset, amount);
+        // Reserve collateral (prevents double-withdrawal while cross-chain message is in-flight)
+        positionBook.reserveCollateral(user, srcEid, collateralAsset, amount);
     }
 
     // -----------------------------
