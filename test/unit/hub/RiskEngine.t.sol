@@ -185,14 +185,7 @@ contract RiskEngineTest is BaseTest {
         // Withdraw 30 tokens of asset A (leaves 20 tokens = $20,000 of A + $50,000 of B)
         vm.prank(address(hubRouter));
         riskEngine.validateAndCreateWithdraw(
-            bytes32(keccak256("test_two_assets")),
-            alice,
-            1,
-            address(0x123),
-            30e18,
-            alice,
-            collateralSlots,
-            debtSlots
+            bytes32(keccak256("test_two_assets")), alice, 1, address(0x123), 30e18, alice, collateralSlots, debtSlots
         );
 
         // Only asset A on chain 1 should be reserved

@@ -163,7 +163,7 @@ contract HubController is AccessManaged, OApp, OAppOptionsType3 {
     }
 
     function _handleWithdrawReleased(bytes memory payload) internal {
-        (bytes32 withdrawId, bool success, address user,,, ) =
+        (bytes32 withdrawId, bool success, address user,,,) =
             abi.decode(payload, (bytes32, bool, address, uint32, address, uint256));
 
         positionBook.finalizePendingWithdraw(user, success);

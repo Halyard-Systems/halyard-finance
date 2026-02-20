@@ -25,9 +25,7 @@ contract BaseIntegrationTest is BaseTest {
     /// @param priceE18 Price in 1e18 units (e.g. 1e18 = $1.00)
     function _mockOraclePrice(address asset, uint256 priceE18) internal {
         vm.mockCall(
-            mockOracle,
-            abi.encodeWithSignature("getPriceE18(address)", asset),
-            abi.encode(priceE18, block.timestamp)
+            mockOracle, abi.encodeWithSignature("getPriceE18(address)", asset), abi.encode(priceE18, block.timestamp)
         );
     }
 

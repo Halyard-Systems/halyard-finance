@@ -243,7 +243,18 @@ contract HubRouter is Ownable, Pausable {
      * @notice Finalize a withdrawal after spoke confirmation
      * @dev Called by HubController after receiving WITHDRAW_RELEASED receipt
      */
-    function finalizeWithdraw(bytes32 /* withdrawId */, address user, uint32 /* srcEid */, address /* asset */, uint256 /* amount */) external {
+    function finalizeWithdraw(
+        bytes32,
+        /* withdrawId */
+        address user,
+        uint32,
+        /* srcEid */
+        address,
+        /* asset */
+        uint256 /* amount */
+    )
+        external
+    {
         // TODO: Add access control - only HubController should call this
         // if (msg.sender != address(hubController)) revert Unauthorized();
 
@@ -258,7 +269,18 @@ contract HubRouter is Ownable, Pausable {
      * @notice Finalize a borrow after spoke confirmation
      * @dev Called by HubController after receiving BORROW_RELEASED receipt
      */
-    function finalizeBorrow(bytes32 borrowId, address /* user */, uint32 /* srcEid */, address /* asset */, uint256 /* amount */) external {
+    function finalizeBorrow(
+        bytes32 borrowId,
+        address,
+        /* user */
+        uint32,
+        /* srcEid */
+        address,
+        /* asset */
+        uint256 /* amount */
+    )
+        external
+    {
         // TODO: Add access control - only HubController should call this
         // if (msg.sender != address(hubController)) revert Unauthorized();
 

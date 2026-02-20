@@ -114,7 +114,7 @@ contract PositionBook is AccessManaged {
     // ---------------------------------------------------------------------
     // collateral[user][eid][asset] => amount
     mapping(address => mapping(uint32 => mapping(address => uint256))) private _collateral;
-    
+
     // Track which (eid, asset) pairs each user has collateral in
     mapping(address => ChainAsset[]) private _collateralAssets;
     mapping(address => mapping(uint32 => mapping(address => bool))) private _hasCollateralAsset;
@@ -150,7 +150,7 @@ contract PositionBook is AccessManaged {
         if (amount == 0) revert InvalidAmount();
 
         _collateral[user][eid][asset] += amount;
-        
+
         // Track this asset if not already tracked
         if (!_hasCollateralAsset[user][eid][asset]) {
             _collateralAssets[user].push(ChainAsset({eid: eid, asset: asset}));
@@ -171,7 +171,7 @@ contract PositionBook is AccessManaged {
             _removeCollateralAsset(user, eid, asset);
             _hasCollateralAsset[user][eid][asset] = false;
         }
-        
+
         emit CollateralDebited(user, eid, asset, amount);
     }
 
