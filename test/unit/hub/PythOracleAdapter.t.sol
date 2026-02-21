@@ -4,8 +4,8 @@ pragma solidity ^0.8.24;
 import {Test} from "lib/forge-std/src/Test.sol";
 import {PythOracleAdapter} from "../../../src/hub/PythOracleAdapter.sol";
 import {HubAccessManager} from "../../../src/hub/HubAccessManager.sol";
-import {MockPyth} from "../../../lib/pyth-sdk-solidity/MockPyth.sol";
-import {PythStructs} from "../../../lib/pyth-sdk-solidity/PythStructs.sol";
+import {MockPyth} from "@pythnetwork/pyth-sdk-solidity/MockPyth.sol";
+import {PythStructs} from "@pythnetwork/pyth-sdk-solidity/PythStructs.sol";
 
 contract PythOracleAdapterTest is Test {
     receive() external payable {}
@@ -33,7 +33,7 @@ contract PythOracleAdapterTest is Test {
     function _pushPrice(bytes32 feedId, int64 price, uint64 conf, int32 expo) internal {
         bytes[] memory updateData = new bytes[](1);
         updateData[0] = mockPyth.createPriceFeedUpdateData(
-            feedId, price, conf, expo, price, conf, uint64(block.timestamp)
+            feedId, price, conf, expo, price, conf, uint64(block.timestamp), 0
         );
         mockPyth.updatePriceFeeds{value: 1}(updateData);
     }
@@ -155,7 +155,7 @@ contract PythOracleAdapterTest is Test {
     function test_updatePriceFeeds_forwardsToPyth() public {
         bytes[] memory updateData = new bytes[](1);
         updateData[0] = mockPyth.createPriceFeedUpdateData(
-            wethFeedId, 2500_00000000, 100000, -8, 2500_00000000, 100000, uint64(block.timestamp)
+            wethFeedId, 2500_00000000, 100000, -8, 2500_00000000, 100000, uint64(block.timestamp), 0
         );
 
         adapter.updatePriceFeeds{value: 1}(updateData);
@@ -203,7 +203,7 @@ contract PythOracleAdapterTest is Test {
     function test_updatePriceFeeds_refundsExcessEth() public {
         bytes[] memory updateData = new bytes[](1);
         updateData[0] = mockPyth.createPriceFeedUpdateData(
-            wethFeedId, 2500_00000000, 100000, -8, 2500_00000000, 100000, uint64(block.timestamp)
+            wethFeedId, 2500_00000000, 100000, -8, 2500_00000000, 100000, uint64(block.timestamp), 0
         );
 
         uint256 balBefore = address(this).balance;

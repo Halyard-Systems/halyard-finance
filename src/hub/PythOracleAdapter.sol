@@ -2,8 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
-import {IPyth} from "../../lib/pyth-sdk-solidity/IPyth.sol";
-import {PythStructs} from "../../lib/pyth-sdk-solidity/PythStructs.sol";
+import {IPyth} from "@pythnetwork/pyth-sdk-solidity/IPyth.sol";
+import {PythStructs} from "@pythnetwork/pyth-sdk-solidity/PythStructs.sol";
 import {IOracle} from "../interfaces/IOracle.sol";
 
 /// @title PythOracleAdapter
