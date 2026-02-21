@@ -17,6 +17,8 @@ contract PythOracleAdapter is IOracle, AccessManaged {
     error FeedNotSet(address asset);
     error NegativePrice(address asset);
     error ConfidenceTooWide(address asset, uint64 conf, int64 price);
+    error ExponentTooLarge(int32 expo);
+    error RefundFailed();
 
     // --- Events ---
     event FeedIdSet(address indexed asset, bytes32 feedId);
@@ -72,6 +74,8 @@ contract PythOracleAdapter is IOracle, AccessManaged {
             }
         }
 
+        if (p.expo > 59 || p.expo < -18) revert ExponentTooLarge(p.expo);
+
         // Normalize to 1e18
         uint256 rawPrice = uint256(uint64(p.price));
         if (p.expo >= 0) {
@@ -86,7 +90,12 @@ contract PythOracleAdapter is IOracle, AccessManaged {
     // --- Pyth passthroughs ---
 
     function updatePriceFeeds(bytes[] calldata updateData) external payable {
-        pyth.updatePriceFeeds{value: msg.value}(updateData);
+        uint256 fee = pyth.getUpdateFee(updateData);
+        pyth.updatePriceFeeds{value: fee}(updateData);
+        if (msg.value > fee) {
+            (bool ok,) = msg.sender.call{value: msg.value - fee}("");
+            if (!ok) revert RefundFailed();
+        }
     }
 
     function getUpdateFee(bytes[] calldata updateData) external view returns (uint256) {

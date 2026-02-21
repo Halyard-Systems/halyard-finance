@@ -8,6 +8,8 @@ import {MockPyth} from "../../../lib/pyth-sdk-solidity/MockPyth.sol";
 import {PythStructs} from "../../../lib/pyth-sdk-solidity/PythStructs.sol";
 
 contract PythOracleAdapterTest is Test {
+    receive() external payable {}
+
     PythOracleAdapter public adapter;
     MockPyth public mockPyth;
     HubAccessManager public accessManager;
@@ -169,5 +171,46 @@ contract PythOracleAdapterTest is Test {
 
         uint256 fee = adapter.getUpdateFee(updateData);
         assertEq(fee, 2); // 2 updates * 1 wei per update
+    }
+
+    // --- Additional coverage ---
+
+    function test_getPriceE18_revertsIfStale() public {
+        _pushPrice(wethFeedId, 2000_00000000, 100000, -8);
+        vm.warp(block.timestamp + 61); // exceed 60s maxStaleness
+        vm.expectRevert(); // Pyth's getPriceNoOlderThan reverts on stale price
+        adapter.getPriceE18(weth);
+    }
+
+    function test_setFeedId_revertsOnZeroAddress() public {
+        vm.prank(admin);
+        vm.expectRevert(PythOracleAdapter.InvalidAddress.selector);
+        adapter.setFeedId(address(0), wethFeedId);
+    }
+
+    function test_getPriceE18_revertsIfExponentTooLarge() public {
+        _pushPrice(wethFeedId, 100, 0, 60);
+        vm.expectRevert(abi.encodeWithSelector(PythOracleAdapter.ExponentTooLarge.selector, int32(60)));
+        adapter.getPriceE18(weth);
+    }
+
+    function test_getPriceE18_revertsIfExponentTooNegative() public {
+        _pushPrice(wethFeedId, 100, 0, -19);
+        vm.expectRevert(abi.encodeWithSelector(PythOracleAdapter.ExponentTooLarge.selector, int32(-19)));
+        adapter.getPriceE18(weth);
+    }
+
+    function test_updatePriceFeeds_refundsExcessEth() public {
+        bytes[] memory updateData = new bytes[](1);
+        updateData[0] = mockPyth.createPriceFeedUpdateData(
+            wethFeedId, 2500_00000000, 100000, -8, 2500_00000000, 100000, uint64(block.timestamp)
+        );
+
+        uint256 balBefore = address(this).balance;
+        adapter.updatePriceFeeds{value: 0.1 ether}(updateData); // send way more than 1 wei fee
+        uint256 balAfter = address(this).balance;
+
+        // Should only have spent 1 wei (the MockPyth fee), rest refunded
+        assertEq(balBefore - balAfter, 1);
     }
 }
