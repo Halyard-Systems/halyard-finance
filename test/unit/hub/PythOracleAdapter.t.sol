@@ -32,9 +32,8 @@ contract PythOracleAdapterTest is Test {
     // --- Helper to push a price into MockPyth ---
     function _pushPrice(bytes32 feedId, int64 price, uint64 conf, int32 expo) internal {
         bytes[] memory updateData = new bytes[](1);
-        updateData[0] = mockPyth.createPriceFeedUpdateData(
-            feedId, price, conf, expo, price, conf, uint64(block.timestamp), 0
-        );
+        updateData[0] =
+            mockPyth.createPriceFeedUpdateData(feedId, price, conf, expo, price, conf, uint64(block.timestamp), 0);
         mockPyth.updatePriceFeeds{value: 1}(updateData);
     }
 
