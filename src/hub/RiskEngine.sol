@@ -421,7 +421,6 @@ contract RiskEngine is AccessManaged, ReentrancyGuard {
         }
     }
 
-    // TODO: implement against actual oracle
     function _valueE18Token(address asset, uint256 amount, uint8 decimals) internal view returns (uint256) {
         uint256 ts;
         uint256 priceE18;
