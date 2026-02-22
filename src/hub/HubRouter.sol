@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
 import {MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {IHubController} from "../interfaces/IHubController.sol";
 import {IPositionBook} from "../interfaces/IPositionBook.sol";
@@ -27,7 +28,7 @@ import {IRiskEngine} from "../interfaces/IRiskEngine.sol";
  * 3. Upgrade velocity - change UX without touching message receiver
  * 4. Operational safety - can pause user actions while keeping cross-chain receipts flowing
  */
-contract HubRouter is Ownable, Pausable {
+contract HubRouter is Ownable, Pausable, AccessManaged {
     // ──────────────────────────────────────────────────────────────────────────────
     // Errors
     // ──────────────────────────────────────────────────────────────────────────────
@@ -64,7 +65,7 @@ contract HubRouter is Ownable, Pausable {
     // ──────────────────────────────────────────────────────────────────────────────
     // Constructor
     // ──────────────────────────────────────────────────────────────────────────────
-    constructor(address _owner) Ownable(_owner) {
+    constructor(address _owner, address _authority) Ownable(_owner) AccessManaged(_authority) {
         if (_owner == address(0)) revert InvalidAddress();
     }
 
@@ -254,10 +255,8 @@ contract HubRouter is Ownable, Pausable {
         uint256 /* amount */
     )
         external
+        restricted
     {
-        // TODO: Add access control - only HubController should call this
-        // if (msg.sender != address(hubController)) revert Unauthorized();
-
         // Clear pending state
         delete pendingWithdraws[user];
 
@@ -280,10 +279,8 @@ contract HubRouter is Ownable, Pausable {
         uint256 /* amount */
     )
         external
+        restricted
     {
-        // TODO: Add access control - only HubController should call this
-        // if (msg.sender != address(hubController)) revert Unauthorized();
-
         // Clear pending state
         delete pendingBorrows[borrowId];
 

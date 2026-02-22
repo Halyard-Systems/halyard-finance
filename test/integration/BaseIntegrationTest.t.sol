@@ -34,7 +34,8 @@ contract BaseIntegrationTest is BaseTest {
         uint32 srcEid = spokeController.spokeEid();
         bytes32 spokeSender = bytes32(uint256(uint160(address(spokeController))));
 
-        bytes32 withdrawId = bytes32("test_withdraw");
+        // Must match the withdrawId computed in HubController.processWithdraw
+        bytes32 withdrawId = keccak256(abi.encodePacked(user, srcEid, asset, amount, block.number));
 
         // Build WITHDRAW_RELEASED message (msgType = 2)
         bytes memory payload = abi.encode(withdrawId, success, user, srcEid, asset, amount);

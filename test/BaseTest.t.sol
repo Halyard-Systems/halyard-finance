@@ -67,7 +67,7 @@ contract BaseTest is Test {
         // Deploy Hub contracts
         hubAccessManager = new HubAccessManager(admin);
         hubController = new HubController(admin, address(mockLzEndpoint), address(hubAccessManager));
-        hubRouter = new HubRouter(admin);
+        hubRouter = new HubRouter(admin, address(hubAccessManager));
 
         assetRegistry = new AssetRegistry(address(hubAccessManager));
         _setupDefaultAssets(assetRegistry);
@@ -221,6 +221,17 @@ contract BaseTest is Test {
             address(hubController),
             buildFunctionSelector(hubController.sendBorrowCommand.selector),
             accessManager.ROLE_ROUTER()
+        );
+
+        accessManager.setTargetFunctionRole(
+            address(hubRouter),
+            buildFunctionSelector(hubRouter.finalizeWithdraw.selector),
+            accessManager.ROLE_HUB_CONTROLLER()
+        );
+        accessManager.setTargetFunctionRole(
+            address(hubRouter),
+            buildFunctionSelector(hubRouter.finalizeBorrow.selector),
+            accessManager.ROLE_HUB_CONTROLLER()
         );
 
         accessManager.setTargetFunctionRole(

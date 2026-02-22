@@ -10,8 +10,9 @@ interface IPositionBook {
     function creditCollateral(address user, uint32 srcEid, address asset, uint256 amount) external;
 
     /// @notice Request a withdraw.
-    function createPendingWithdraw(address user, uint32 srcEid, address asset, uint256 amount) external;
+    function createPendingWithdraw(bytes32 withdrawId, address user, uint32 srcEid, address asset, uint256 amount)
+        external;
 
     /// @notice Finalize a pending withdraw after spoke receipt.
-    function finalizePendingWithdraw(address user, bool success) external;
+    function finalizePendingWithdraw(bytes32 withdrawId, bool success) external;
 }

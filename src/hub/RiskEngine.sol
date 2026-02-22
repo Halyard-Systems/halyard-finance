@@ -41,10 +41,17 @@ interface IPositionBook {
     // reservations & pendings (RiskEngine-only on PositionBook)
     function reserveCollateral(address user, uint32 eid, address asset, uint256 amount) external;
 
-    function createPendingBorrow(address user, uint32 srcEid, address debtAsset, uint256 amount, address receiver)
-        external;
+    function createPendingBorrow(
+        bytes32 borrowId,
+        address user,
+        uint32 srcEid,
+        address debtAsset,
+        uint256 amount,
+        address receiver
+    ) external;
 
-    function createPendingWithdraw(address user, uint32 srcEid, address asset, uint256 amount) external;
+    function createPendingWithdraw(bytes32 withdrawId, address user, uint32 srcEid, address asset, uint256 amount)
+        external;
 }
 
 interface IDebtManager {
@@ -280,23 +287,25 @@ contract RiskEngine is AccessManaged, ReentrancyGuard {
         if (amount == 0) revert InvalidAmount();
         if (srcEid == 0) revert InvalidAmount();
 
-        // Supported debt asset on destination chain
-        IAssetRegistry.DebtConfig memory dc = assetRegistry.debtConfig(srcEid, debtAsset);
-        if (!dc.isSupported) revert UnsupportedDebtAsset(debtAsset);
+        {
+            // Supported debt asset on destination chain
+            IAssetRegistry.DebtConfig memory dc = assetRegistry.debtConfig(srcEid, debtAsset);
+            if (!dc.isSupported) revert UnsupportedDebtAsset(debtAsset);
 
-        // Compute borrow power using LTV (not liquidation threshold)
-        (, uint256 borrowPowerE18,) = _collateralSums(user, collateralSlots);
+            // Compute borrow power using LTV (not liquidation threshold)
+            (, uint256 borrowPowerE18,) = _collateralSums(user, collateralSlots);
 
-        uint256 currentDebtValueE18 = _debtSum(user, debtSlots);
-        uint256 newBorrowValueE18 = _valueE18Token(debtAsset, amount, dc.decimals);
-        uint256 nextDebtValueE18 = currentDebtValueE18 + newBorrowValueE18;
+            uint256 currentDebtValueE18 = _debtSum(user, debtSlots);
+            uint256 newBorrowValueE18 = _valueE18Token(debtAsset, amount, dc.decimals);
+            uint256 nextDebtValueE18 = currentDebtValueE18 + newBorrowValueE18;
 
-        if (nextDebtValueE18 > borrowPowerE18) {
-            revert InsufficientBorrowPower(borrowPowerE18, nextDebtValueE18);
+            if (nextDebtValueE18 > borrowPowerE18) {
+                revert InsufficientBorrowPower(borrowPowerE18, nextDebtValueE18);
+            }
         }
 
         // Create pending + reserve debt in PositionBook (RiskEngine-only).
-        positionBook.createPendingBorrow(user, srcEid, debtAsset, amount, receiver);
+        positionBook.createPendingBorrow(borrowId, user, srcEid, debtAsset, amount, receiver);
     }
 
     /**

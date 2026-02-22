@@ -163,10 +163,9 @@ contract HubController is AccessManaged, OApp, OAppOptionsType3 {
     }
 
     function _handleWithdrawReleased(bytes memory payload) internal {
-        (bytes32 withdrawId, bool success, address user,,,) =
-            abi.decode(payload, (bytes32, bool, address, uint32, address, uint256));
+        (bytes32 withdrawId, bool success,,,,) = abi.decode(payload, (bytes32, bool, address, uint32, address, uint256));
 
-        positionBook.finalizePendingWithdraw(user, success);
+        positionBook.finalizePendingWithdraw(withdrawId, success);
         emit WithdrawReleased(withdrawId, success);
     }
 
@@ -186,9 +185,9 @@ contract HubController is AccessManaged, OApp, OAppOptionsType3 {
         bytes calldata options,
         MessagingFee calldata fee
     ) external payable restricted {
-        positionBook.createPendingWithdraw(user, srcEid, asset, amount);
-
         bytes32 withdrawId = keccak256(abi.encodePacked(user, srcEid, asset, amount, block.number));
+
+        positionBook.createPendingWithdraw(withdrawId, user, srcEid, asset, amount);
         address receiver = user;
 
         bytes memory payload = abi.encode(withdrawId, user, receiver, asset, amount);
