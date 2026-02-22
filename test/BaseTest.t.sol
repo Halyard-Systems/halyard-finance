@@ -254,7 +254,7 @@ contract BaseTest is Test {
             accessManager.ROLE_RISK_ENGINE()
         );
         accessManager.setTargetFunctionRole(
-            address(assetRegistry),
+            address(positionBook),
             buildFunctionSelector(positionBook.unreserveCollateral.selector),
             accessManager.ROLE_HUB_CONTROLLER()
         );
