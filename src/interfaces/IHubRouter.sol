@@ -11,5 +11,5 @@ interface IHubRouter {
     function finalizeWithdraw(bytes32 withdrawId, address user, uint32 srcEid, address asset, uint256 amount) external;
 
     /// @notice Finalize a borrow after spoke sends BORROW_RELEASED receipt
-    function finalizeBorrow(bytes32 borrowId, address user, uint32 srcEid, address asset, uint256 amount) external;
+    function finalizeBorrow(bytes32 borrowId, bool success) external;
 }

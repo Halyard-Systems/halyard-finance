@@ -26,4 +26,15 @@ interface IRiskEngine {
         CollateralSlot[] calldata collateralSlots,
         DebtSlot[] calldata debtSlots
     ) external;
+
+    function validateAndCreateBorrow(
+        bytes32 borrowId,
+        address user,
+        uint32 srcEid,
+        address debtAsset,
+        uint256 amount,
+        address receiver,
+        CollateralSlot[] calldata collateralSlots,
+        DebtSlot[] calldata debtSlots
+    ) external;
 }
