@@ -7,6 +7,7 @@ import {OApp, Origin, MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp
 import {OAppOptionsType3} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OAppOptionsType3.sol";
 import {IMessageTypes} from "../interfaces/IMessageTypes.sol";
 import {IPositionBook} from "../interfaces/IPositionBook.sol";
+import {IHubRouter} from "../interfaces/IHubRouter.sol";
 
 /**
  * HubController
@@ -32,8 +33,11 @@ contract HubController is AccessManaged, OApp, OAppOptionsType3 {
     event SpokeSet(uint32 indexed eid, bytes32 spoke);
     event SpokeRemoved(uint32 indexed eid);
     event PositionBookSet(address indexed positionBook);
+    event HubRouterSet(address indexed hubRouter);
+    event BorrowReleased(bytes32 indexed borrowId, bool success);
 
     IPositionBook public positionBook;
+    IHubRouter public hubRouter;
 
     // trusted remote OApp address per source eid
     mapping(uint32 => bytes32) public spoke;
@@ -60,6 +64,12 @@ contract HubController is AccessManaged, OApp, OAppOptionsType3 {
         if (_positionBook == address(0)) revert InvalidAddress();
         positionBook = IPositionBook(_positionBook);
         emit PositionBookSet(_positionBook);
+    }
+
+    function setHubRouter(address _hubRouter) external onlyOwner {
+        if (_hubRouter == address(0)) revert InvalidAddress();
+        hubRouter = IHubRouter(_hubRouter);
+        emit HubRouterSet(_hubRouter);
     }
 
     function setSpoke(uint32 _eid, bytes32 _spoke) external onlyOwner {
@@ -149,6 +159,8 @@ contract HubController is AccessManaged, OApp, OAppOptionsType3 {
             _handleDepositCredited(payload);
         } else if (msgType == uint8(IMessageTypes.MsgType.WITHDRAW_RELEASED)) {
             _handleWithdrawReleased(payload);
+        } else if (msgType == uint8(IMessageTypes.MsgType.BORROW_RELEASED)) {
+            _handleBorrowReleased(payload);
         } else {
             revert InvalidMessageType(msgType, origin);
         }
@@ -167,6 +179,14 @@ contract HubController is AccessManaged, OApp, OAppOptionsType3 {
 
         positionBook.finalizePendingWithdraw(withdrawId, success);
         emit WithdrawReleased(withdrawId, success);
+    }
+
+    function _handleBorrowReleased(bytes memory payload) internal {
+        (bytes32 borrowId, bool success,,,,) =
+            abi.decode(payload, (bytes32, bool, address, uint32, address, uint256));
+
+        hubRouter.finalizeBorrow(borrowId, success);
+        emit BorrowReleased(borrowId, success);
     }
 
     // ──────────────────────────────────────────────────────────────────────────────
