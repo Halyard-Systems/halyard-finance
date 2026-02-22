@@ -83,6 +83,7 @@ contract BaseTest is Test {
         riskEngine = new RiskEngine(address(hubAccessManager));
         riskEngine.setDependencies(address(positionBook), address(debtManager), address(assetRegistry), mockOracle);
         hubRouter.setRiskEngine(address(riskEngine));
+        hubRouter.setDebtManager(address(debtManager));
 
         liquidationEngine = new LiquidationEngine(address(hubAccessManager));
         _setupLiquidationEngine(liquidationEngine);
@@ -107,6 +108,7 @@ contract BaseTest is Test {
 
         hubController.setSpoke(spokeEid, bytes32(uint256(uint160(address(spokeController)))));
         hubController.setPeer(spokeEid, bytes32(uint256(uint160(address(spokeController)))));
+        hubController.setHubRouter(address(hubRouter));
 
         vm.stopPrank();
 
@@ -198,6 +200,13 @@ contract BaseTest is Test {
             })
         );
 
+        // Register canonical token as a debt asset on spoke chain (used in borrow tests)
+        registry.setDebtConfig(
+            spokeEid, canonicalToken, AssetRegistry.DebtConfig({isSupported: true, decimals: 18, borrowCap: 0})
+        );
+
+        registry.setBorrowRateApr(spokeEid, canonicalToken, 500);
+
         registry.setDebtConfig(
             1, address(0x123), AssetRegistry.DebtConfig({isSupported: true, decimals: 18, borrowCap: 0})
         );
@@ -252,7 +261,7 @@ contract BaseTest is Test {
         accessManager.setTargetFunctionRole(
             address(positionBook),
             buildFunctionSelector(positionBook.clearBorrowReservation.selector),
-            accessManager.ROLE_HUB_CONTROLLER()
+            accessManager.ROLE_ROUTER()
         );
         accessManager.setTargetFunctionRole(
             address(positionBook),
@@ -263,6 +272,11 @@ contract BaseTest is Test {
             address(positionBook),
             buildFunctionSelector(positionBook.finalizePendingWithdraw.selector),
             accessManager.ROLE_HUB_CONTROLLER()
+        );
+        accessManager.setTargetFunctionRole(
+            address(positionBook),
+            buildFunctionSelector(positionBook.finalizePendingBorrow.selector),
+            accessManager.ROLE_ROUTER()
         );
         // TODO: should be router? verify that router calls validateAndCreateBorrow and createPendingBorrow
         accessManager.setTargetFunctionRole(
@@ -291,6 +305,12 @@ contract BaseTest is Test {
         accessManager.setTargetFunctionRole(
             address(riskEngine),
             buildFunctionSelector(riskEngine.validateAndCreateWithdraw.selector),
+            accessManager.ROLE_ROUTER()
+        );
+
+        accessManager.setTargetFunctionRole(
+            address(debtManager),
+            buildFunctionSelector(debtManager.mintDebt.selector),
             accessManager.ROLE_ROUTER()
         );
 

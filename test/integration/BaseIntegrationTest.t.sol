@@ -52,6 +52,28 @@ contract BaseIntegrationTest is BaseTest {
         );
     }
 
+    /// @notice Simulate the hub receiving a BORROW_RELEASED receipt from spoke
+    function _simulateBorrowReceipt(bytes32 borrowId, address user, address asset, uint256 amount, bool success)
+        internal
+    {
+        uint32 srcEid = spokeController.spokeEid();
+        bytes32 spokeSender = bytes32(uint256(uint160(address(spokeController))));
+
+        // Build BORROW_RELEASED message (msgType = 1)
+        bytes memory payload = abi.encode(borrowId, success, user, srcEid, asset, amount);
+        bytes memory message = abi.encode(uint8(1), payload);
+
+        // Simulate LayerZero delivering the receipt to hub
+        vm.prank(address(mockLzEndpoint));
+        hubController.lzReceive(
+            Origin({srcEid: srcEid, sender: spokeSender, nonce: 3}),
+            bytes32(uint256(3)), // guid
+            message,
+            address(0),
+            bytes("")
+        );
+    }
+
     /// @notice Complete deposit flow: spoke deposit + hub receipt
     /// @param user The user depositing
     /// @param depositId Unique deposit identifier
