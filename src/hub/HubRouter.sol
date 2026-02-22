@@ -35,7 +35,6 @@ contract HubRouter is Ownable, Pausable, AccessManaged {
     error InvalidAddress();
     error InvalidAmount();
     error InsufficientCollateral();
-    error WithdrawAlreadyPending();
     error BorrowNotAllowed();
 
     // ──────────────────────────────────────────────────────────────────────────────
@@ -57,10 +56,6 @@ contract HubRouter is Ownable, Pausable, AccessManaged {
     IHubController public hubController;
     IPositionBook public positionBook;
     IRiskEngine public riskEngine;
-
-    // Track pending operations to prevent replay
-    mapping(address => bool) public pendingWithdraws;
-    mapping(bytes32 => bool) public pendingBorrows;
 
     // ──────────────────────────────────────────────────────────────────────────────
     // Constructor
@@ -220,14 +215,6 @@ contract HubRouter is Ownable, Pausable, AccessManaged {
         //     revert BorrowNotAllowed();
         // }
 
-        // Mark as pending
-        if (pendingBorrows[borrowId]) revert InvalidAmount(); // Already pending
-        pendingBorrows[borrowId] = true;
-
-        // Record the debt in PositionBook (will be finalized when receipt comes back)
-        // TODO: Add createPendingBorrow to PositionBook
-        // positionBook.createPendingBorrow(borrowId, user, dstEid, asset, amount);
-
         // Ask HubController to send CMD_RELEASE_BORROW command to spoke
         hubController.sendBorrowCommand{value: msg.value}(
             dstEid, borrowId, user, receiver, asset, amount, options, fee, msg.sender
@@ -257,9 +244,6 @@ contract HubRouter is Ownable, Pausable, AccessManaged {
         external
         restricted
     {
-        // Clear pending state
-        delete pendingWithdraws[user];
-
         // Finalize in PositionBook (debit collateral, unreserve)
         // TODO: positionBook.finalizeWithdraw(user, srcEid, asset, amount);
     }
@@ -281,9 +265,6 @@ contract HubRouter is Ownable, Pausable, AccessManaged {
         external
         restricted
     {
-        // Clear pending state
-        delete pendingBorrows[borrowId];
-
         // Finalize debt in PositionBook
         // TODO: positionBook.finalizeBorrow(borrowId, user, srcEid, asset, amount);
     }
