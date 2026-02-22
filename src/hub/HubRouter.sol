@@ -8,6 +8,7 @@ import {MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {IHubController} from "../interfaces/IHubController.sol";
 import {IPositionBook} from "../interfaces/IPositionBook.sol";
 import {IRiskEngine} from "../interfaces/IRiskEngine.sol";
+import {IDebtManager} from "../interfaces/IDebtManager.sol";
 
 /**
  * @title HubRouter
@@ -43,6 +44,7 @@ contract HubRouter is Ownable, Pausable, AccessManaged {
     event HubControllerSet(address indexed hubController);
     event PositionBookSet(address indexed positionBook);
     event RiskEngineSet(address indexed riskEngine);
+    event DebtManagerSet(address indexed debtManager);
 
     event WithdrawRequested(address indexed user, uint32 indexed dstEid, address asset, uint256 amount);
 
@@ -50,12 +52,15 @@ contract HubRouter is Ownable, Pausable, AccessManaged {
         bytes32 indexed borrowId, address indexed user, uint32 indexed dstEid, address asset, uint256 amount
     );
 
+    event BorrowFinalized(bytes32 indexed borrowId, address indexed user, bool success);
+
     // ──────────────────────────────────────────────────────────────────────────────
     // State
     // ──────────────────────────────────────────────────────────────────────────────
     IHubController public hubController;
     IPositionBook public positionBook;
     IRiskEngine public riskEngine;
+    IDebtManager public debtManager;
 
     // ──────────────────────────────────────────────────────────────────────────────
     // Constructor
@@ -83,6 +88,12 @@ contract HubRouter is Ownable, Pausable, AccessManaged {
         if (_riskEngine == address(0)) revert InvalidAddress();
         riskEngine = IRiskEngine(_riskEngine);
         emit RiskEngineSet(_riskEngine);
+    }
+
+    function setDebtManager(address _debtManager) external onlyOwner {
+        if (_debtManager == address(0)) revert InvalidAddress();
+        debtManager = IDebtManager(_debtManager);
+        emit DebtManagerSet(_debtManager);
     }
 
     function pause() external onlyOwner {
@@ -176,48 +187,51 @@ contract HubRouter is Ownable, Pausable, AccessManaged {
     /**
      * @notice Request to borrow assets from a spoke chain
      * @dev Flow:
-     *   1. Validate user has sufficient collateral
-     *   2. Check risk (health factor after borrow)
-     *   3. Mark borrow as pending
-     *   4. Send CMD_RELEASE_BORROW to spoke
-     *   5. Wait for BORROW_RELEASED receipt from spoke (handled by HubController)
+     *   1. RiskEngine validates health factor using oracle prices for every asset
+     *   2. RiskEngine creates pending borrow in PositionBook (reserves debt headroom)
+     *   3. HubController sends CMD_RELEASE_BORROW to spoke
+     *   4. Wait for BORROW_RELEASED receipt from spoke (handled by HubController)
      *
-     * @param borrowId Unique identifier for this borrow
+     * Borrowed tokens are always sent to msg.sender (no delegated borrowing).
+     * The borrowId is computed deterministically from the request parameters.
+     *
      * @param dstEid Destination spoke chain EID where liquidity is held
-     * @param asset Canonical asset address
+     * @param asset Canonical asset address (debt asset)
      * @param amount Amount to borrow
-     * @param receiver Address to receive borrowed assets
+     * @param collateralSlots All collateral positions to consider for health factor
+     * @param debtSlots All debt positions to consider for health factor
      * @param options LayerZero options
      * @param fee LayerZero messaging fee
      */
     function borrowAndNotify(
-        bytes32 borrowId,
         uint32 dstEid,
         address asset,
         uint256 amount,
-        address receiver,
+        IRiskEngine.CollateralSlot[] calldata collateralSlots,
+        IRiskEngine.DebtSlot[] calldata debtSlots,
         bytes calldata options,
         MessagingFee calldata fee
     ) external payable whenNotPaused {
-        if (borrowId == bytes32(0)) revert InvalidAmount();
+        if (address(positionBook) == address(0)) revert InvalidAddress();
+        if (address(hubController) == address(0)) revert InvalidAddress();
+        if (address(riskEngine) == address(0)) revert InvalidAddress();
         if (asset == address(0)) revert InvalidAddress();
         if (amount == 0) revert InvalidAmount();
-        if (receiver == address(0)) revert InvalidAddress();
-        if (address(hubController) == address(0)) revert InvalidAddress();
 
         address user = msg.sender;
+        bytes32 borrowId = keccak256(abi.encodePacked(user, dstEid, asset, amount, block.number));
 
-        // TODO: Validate with RiskEngine
-        // - Check user has sufficient collateral across all chains
-        // - Check health factor remains above threshold after borrow
-        // - Check borrow doesn't exceed caps
-        // if (!IRiskEngine(riskEngine).validateBorrow(user, dstEid, asset, amount)) {
-        //     revert BorrowNotAllowed();
-        // }
+        // Validate health factor via oracle prices and reserve debt headroom.
+        // RiskEngine calls Pyth for every collateral and debt asset to compute
+        // borrow power. Reverts if the new debt would exceed borrow power.
+        // Also creates the pending borrow in PositionBook.
+        riskEngine.validateAndCreateBorrow(
+            borrowId, user, dstEid, asset, amount, user, collateralSlots, debtSlots
+        );
 
-        // Ask HubController to send CMD_RELEASE_BORROW command to spoke
+        // Send CMD_RELEASE_BORROW command to spoke
         hubController.sendBorrowCommand{value: msg.value}(
-            dstEid, borrowId, user, receiver, asset, amount, options, fee, msg.sender
+            dstEid, borrowId, user, user, asset, amount, options, fee, user
         );
 
         emit BorrowRequested(borrowId, user, dstEid, asset, amount);
@@ -250,22 +264,19 @@ contract HubRouter is Ownable, Pausable, AccessManaged {
 
     /**
      * @notice Finalize a borrow after spoke confirmation
-     * @dev Called by HubController after receiving BORROW_RELEASED receipt
+     * @dev Called by HubController after receiving BORROW_RELEASED receipt.
+     *   On success: mints debt via DebtManager and clears the reservation.
+     *   On failure: PositionBook unreserves the debt headroom.
      */
-    function finalizeBorrow(
-        bytes32 borrowId,
-        address,
-        /* user */
-        uint32,
-        /* srcEid */
-        address,
-        /* asset */
-        uint256 /* amount */
-    )
-        external
-        restricted
-    {
-        // Finalize debt in PositionBook
-        // TODO: positionBook.finalizeBorrow(borrowId, user, srcEid, asset, amount);
+    function finalizeBorrow(bytes32 borrowId, bool success) external restricted {
+        (address user, uint32 dstEid, address asset, uint256 amount,,,) =
+            positionBook.finalizePendingBorrow(borrowId, success);
+
+        if (success) {
+            debtManager.mintDebt(user, dstEid, asset, amount);
+            positionBook.clearBorrowReservation(borrowId);
+        }
+
+        emit BorrowFinalized(borrowId, user, success);
     }
 }
