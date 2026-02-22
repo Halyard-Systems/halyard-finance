@@ -1,4 +1,7 @@
 {
+  "lib/LayerZero": {
+    "rev": "a1fb11a3b9c0ac449291816e71eacede4e36613e"
+  },
   "lib/forge-std": {
     "tag": {
       "name": "v1.12.0",

@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.23;
+pragma solidity ^0.8.24;
 
 import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-
 /**
  * PositionBook (Hub-side) - storage for user positions.
  *
@@ -26,23 +24,27 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
  * likely move to OpenZeppelin AccessControl, but this is deliberately dependency-light.
  */
 
-contract PositionBook is AccessManaged, ReentrancyGuard {
+contract PositionBook is AccessManaged {
     // ---------------------------------------------------------------------
     // Errors
     // ---------------------------------------------------------------------
     //error OnlyHubController();
     //error OnlyRiskEngine();
     //error OnlyLiquidationEngine();
+    error BorrowAlreadyPending();
+    error BorrowNotFinalized();
     error InvalidAddress();
     error InvalidAmount();
     error InvalidEid();
     error UnknownPending(bytes32 id);
     error AlreadyFinalized(bytes32 id);
+    error NotEnoughCollateral(uint256 available, uint256 required);
     error NotPending(bytes32 id);
     error ReservationUnderflow();
     error CollateralUnderflow();
     error CollateralOverflow(); // (rare) included for completeness
     error DebtAssetNotConfigured(); // if you choose to store allowed debt assets here (optional)
+    error WithdrawAlreadyPending();
 
     // ---------------------------------------------------------------------
     // Events
@@ -52,28 +54,14 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
     // event RiskEngineSet(address indexed riskEngine);
     // event LiquidationEngineSet(address indexed liquidationEngine);
 
-    event CollateralCredited(address indexed user, uint32 indexed eid, address indexed asset, uint256 amount);
-    event CollateralDebited(address indexed user, uint32 indexed eid, address indexed asset, uint256 amount);
+    event CollateralCredited(address user, uint32 indexed eid, address indexed asset, uint256 amount);
+    event CollateralDebited(address user, uint32 indexed eid, address indexed asset, uint256 amount);
 
-    event BorrowPendingCreated(
-        bytes32 indexed borrowId,
-        address indexed user,
-        uint32 indexed dstEid,
-        address asset,
-        uint256 amount,
-        address receiver
-    );
-    event BorrowPendingFinalized(bytes32 indexed borrowId, bool success);
+    event BorrowPendingCreated(address user, uint32 indexed dstEid, address asset, uint256 amount, address receiver);
+    event BorrowPendingFinalized(address user, bool success);
 
-    event WithdrawPendingCreated(
-        bytes32 indexed withdrawId,
-        address indexed user,
-        uint32 indexed srcEid,
-        address asset,
-        uint256 amount,
-        address receiver
-    );
-    event WithdrawPendingFinalized(bytes32 indexed withdrawId, bool success);
+    event WithdrawPendingCreated(address indexed user, uint32 indexed srcEid, address asset, uint256 amount);
+    event WithdrawPendingFinalized(address user, bool success);
 
     event LiquidationPendingCreated(
         bytes32 indexed liqId,
@@ -115,17 +103,30 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
         if (_authority == address(0)) revert InvalidAddress();
     }
 
+    struct ChainAsset {
+        uint32 eid;
+        address asset;
+    }
+
     // ---------------------------------------------------------------------
     // Canonical collateral balances (hub-side book)
     // ---------------------------------------------------------------------
     // collateral[user][eid][asset] => amount
     mapping(address => mapping(uint32 => mapping(address => uint256))) private _collateral;
 
+    // Track which (eid, asset) pairs each user has collateral in
+    mapping(address => ChainAsset[]) private _collateralAssets;
+    mapping(address => mapping(uint32 => mapping(address => bool))) private _hasCollateralAsset;
+
     // reservedCollateral[user][eid][asset] => amount reserved for pending withdraw or pending seizure
     mapping(address => mapping(uint32 => mapping(address => uint256))) private _reservedCollateral;
 
     function collateralOf(address user, uint32 eid, address asset) external view returns (uint256) {
         return _collateral[user][eid][asset];
+    }
+
+    function collateralAssetsOf(address user) external view returns (ChainAsset[] memory) {
+        return _collateralAssets[user];
     }
 
     function reservedCollateralOf(address user, uint32 eid, address asset) external view returns (uint256) {
@@ -147,8 +148,14 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
         if (eid == 0) revert InvalidEid();
         if (amount == 0) revert InvalidAmount();
 
-        // Safe math is default in ^0.8
         _collateral[user][eid][asset] += amount;
+
+        // Track this asset if not already tracked
+        if (!_hasCollateralAsset[user][eid][asset]) {
+            _collateralAssets[user].push(ChainAsset({eid: eid, asset: asset}));
+            _hasCollateralAsset[user][eid][asset] = true;
+        }
+
         emit CollateralCredited(user, eid, asset, amount);
     }
 
@@ -157,6 +164,13 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
         uint256 bal = _collateral[user][eid][asset];
         if (bal < amount) revert CollateralUnderflow();
         _collateral[user][eid][asset] = bal - amount;
+
+        // If balance is now zero, remove from tracking
+        if (_collateral[user][eid][asset] == 0 && _hasCollateralAsset[user][eid][asset]) {
+            _removeCollateralAsset(user, eid, asset);
+            _hasCollateralAsset[user][eid][asset] = false;
+        }
+
         emit CollateralDebited(user, eid, asset, amount);
     }
 
@@ -216,13 +230,14 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
         uint256 amount,
         address receiver
     ) external restricted {
-        if (borrowId == bytes32(0)) revert InvalidAmount();
-        if (user == address(0) || debtAsset == address(0) || receiver == address(0)) revert InvalidAddress();
+        if (user == address(0) || debtAsset == address(0) || receiver == address(0)) {
+            revert InvalidAddress();
+        }
         if (dstEid == 0) revert InvalidEid();
         if (amount == 0) revert InvalidAmount();
 
         PendingBorrow storage p = pendingBorrow[borrowId];
-        if (p.exists) revert NotPending(borrowId); // already exists
+        if (p.exists) revert BorrowAlreadyPending(); // already exists
 
         pendingBorrow[borrowId] = PendingBorrow({
             user: user,
@@ -236,7 +251,7 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
 
         _reservedDebt[user][dstEid][debtAsset] += amount;
 
-        emit BorrowPendingCreated(borrowId, user, dstEid, debtAsset, amount, receiver);
+        emit BorrowPendingCreated(user, dstEid, debtAsset, amount, receiver);
     }
 
     /// @notice Finalize a pending borrow after spoke receipt.
@@ -262,7 +277,7 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
             _reservedDebt[s.user][s.dstEid][s.asset] = res - s.amount;
         }
 
-        emit BorrowPendingFinalized(borrowId, success);
+        emit BorrowPendingFinalized(s.user, success);
         return s;
     }
 
@@ -271,7 +286,7 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
     function clearBorrowReservation(bytes32 borrowId) external restricted {
         PendingBorrow storage s = pendingBorrow[borrowId];
         if (!s.exists) revert UnknownPending(borrowId);
-        if (!s.finalized) revert NotPending(borrowId); // must be finalized first
+        if (!s.finalized) revert BorrowNotFinalized();
 
         uint256 res = _reservedDebt[s.user][s.dstEid][s.asset];
         if (res < s.amount) revert ReservationUnderflow();
@@ -287,40 +302,29 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
         uint32 srcEid; // chain where collateral is held / to be released from
         address asset;
         uint256 amount;
-        address receiver;
         bool exists;
-        bool finalized;
     }
 
     mapping(bytes32 => PendingWithdraw) public pendingWithdraw;
 
-    /// @notice Create pending withdraw. Assumes reserveCollateral(...) was already performed.
-    /// Called by router / risk engine after approval.
-    function createPendingWithdraw(
-        bytes32 withdrawId,
-        address user,
-        uint32 srcEid,
-        address asset,
-        uint256 amount,
-        address receiver
-    ) external restricted {
-        if (withdrawId == bytes32(0)) revert InvalidAmount();
-        if (user == address(0) || asset == address(0) || receiver == address(0)) revert InvalidAddress();
+    /// @notice Create pending withdraw. Assumes reserveCollateral(...) was already performed
+    /// by RiskEngine after validating health factor using oracle prices.
+    /// Called by HubController after RiskEngine approval.
+    function createPendingWithdraw(bytes32 withdrawId, address user, uint32 srcEid, address asset, uint256 amount)
+        external
+        restricted
+    {
+        if (user == address(0) || asset == address(0)) revert InvalidAddress();
         if (srcEid == 0) revert InvalidEid();
         if (amount == 0) revert InvalidAmount();
 
         PendingWithdraw storage p = pendingWithdraw[withdrawId];
-        if (p.exists) revert NotPending(withdrawId);
+        if (p.exists) revert WithdrawAlreadyPending();
 
-        // Ensure reservation exists
-        uint256 res = _reservedCollateral[user][srcEid][asset];
-        if (res < amount) revert ReservationUnderflow();
+        pendingWithdraw[withdrawId] =
+            PendingWithdraw({user: user, srcEid: srcEid, asset: asset, amount: amount, exists: true});
 
-        pendingWithdraw[withdrawId] = PendingWithdraw({
-            user: user, srcEid: srcEid, asset: asset, amount: amount, receiver: receiver, exists: true, finalized: false
-        });
-
-        emit WithdrawPendingCreated(withdrawId, user, srcEid, asset, amount, receiver);
+        emit WithdrawPendingCreated(user, srcEid, asset, amount);
     }
 
     /// @notice Finalize a withdraw after spoke receipt.
@@ -335,20 +339,23 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
     {
         PendingWithdraw storage s = pendingWithdraw[withdrawId];
         if (!s.exists) revert UnknownPending(withdrawId);
-        if (s.finalized) revert AlreadyFinalized(withdrawId);
-        s.finalized = true;
+
+        // Copy to memory before clearing storage
+        w = s;
 
         // Always remove the reservation for this withdraw
-        uint256 res = _reservedCollateral[s.user][s.srcEid][s.asset];
-        if (res < s.amount) revert ReservationUnderflow();
-        _reservedCollateral[s.user][s.srcEid][s.asset] = res - s.amount;
+        uint256 res = _reservedCollateral[s.user][w.srcEid][w.asset];
+        if (res < w.amount) revert ReservationUnderflow();
+        _reservedCollateral[s.user][w.srcEid][w.asset] = res - w.amount;
 
         if (success) {
-            _debitCollateral(s.user, s.srcEid, s.asset, s.amount);
+            _debitCollateral(s.user, w.srcEid, w.asset, w.amount);
         }
 
-        emit WithdrawPendingFinalized(withdrawId, success);
-        return s;
+        // Clear pending state so user can withdraw again
+        delete pendingWithdraw[withdrawId];
+
+        emit WithdrawPendingFinalized(s.user, success);
     }
 
     // ---------------------------------------------------------------------
@@ -454,6 +461,31 @@ contract PositionBook is AccessManaged, ReentrancyGuard {
             balances[i] = b;
             reserved[i] = r;
             available[i] = b > r ? b - r : 0;
+        }
+    }
+
+    /// @notice Check if a ChainAsset exists in the array
+    function _containsChainAsset(ChainAsset[] storage assets, uint32 eid, address asset) internal view returns (bool) {
+        for (uint256 i = 0; i < assets.length; i++) {
+            if (assets[i].eid == eid && assets[i].asset == asset) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// @notice Remove a ChainAsset from the array (swap and pop for gas efficiency)
+    function _removeCollateralAsset(address user, uint32 eid, address asset) internal {
+        ChainAsset[] storage assets = _collateralAssets[user];
+        for (uint256 i = 0; i < assets.length; i++) {
+            if (assets[i].eid == eid && assets[i].asset == asset) {
+                // Swap with last element and pop
+                if (i != assets.length - 1) {
+                    assets[i] = assets[assets.length - 1];
+                }
+                assets.pop();
+                return;
+            }
         }
     }
 }

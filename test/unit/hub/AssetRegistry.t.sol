@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.23;
+pragma solidity ^0.8.24;
 
 import {BaseTest} from "../../BaseTest.t.sol";
 import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import {AssetRegistry} from "../../../src/hub/AssetRegistry.sol";
-
-import {console} from "forge-std/console.sol";
 
 contract AssetRegistryTest is BaseTest {
     function test_SetCollateralConfig() public {

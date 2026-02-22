@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.23;
+pragma solidity ^0.8.24;
 
 import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {IOracle} from "../interfaces/IOracle.sol";
 
 /**
  * RiskEngine (Hub-side)
@@ -43,20 +44,14 @@ interface IPositionBook {
     function createPendingBorrow(
         bytes32 borrowId,
         address user,
-        uint32 dstEid,
+        uint32 srcEid,
         address debtAsset,
         uint256 amount,
         address receiver
     ) external;
 
-    function createPendingWithdraw(
-        bytes32 withdrawId,
-        address user,
-        uint32 srcEid,
-        address asset,
-        uint256 amount,
-        address receiver
-    ) external;
+    function createPendingWithdraw(bytes32 withdrawId, address user, uint32 srcEid, address asset, uint256 amount)
+        external;
 }
 
 interface IDebtManager {
@@ -82,16 +77,6 @@ interface IAssetRegistry {
 
     function collateralConfig(uint32 eid, address asset) external view returns (CollateralConfig memory);
     function debtConfig(uint32 eid, address asset) external view returns (DebtConfig memory);
-}
-
-interface IOracle {
-    /**
-     * @notice Return price for asset in 1e18 units (e.g. USD price scaled by 1e18),
-     * along with last update timestamp (unix seconds).
-     *
-     * Your Pyth adapter should provide this.
-     */
-    function getPriceE18(address asset) external view returns (uint256 priceE18, uint256 lastUpdatedAt);
 }
 
 /// -----------------------------------------------------------------------
@@ -290,7 +275,7 @@ contract RiskEngine is AccessManaged, ReentrancyGuard {
     function validateAndCreateBorrow(
         bytes32 borrowId,
         address user,
-        uint32 dstEid,
+        uint32 srcEid,
         address debtAsset,
         uint256 amount,
         address receiver,
@@ -300,25 +285,27 @@ contract RiskEngine is AccessManaged, ReentrancyGuard {
         if (borrowId == bytes32(0)) revert InvalidAmount();
         if (user == address(0) || receiver == address(0) || debtAsset == address(0)) revert InvalidAddress();
         if (amount == 0) revert InvalidAmount();
-        if (dstEid == 0) revert InvalidAmount();
+        if (srcEid == 0) revert InvalidAmount();
 
-        // Supported debt asset on destination chain
-        IAssetRegistry.DebtConfig memory dc = assetRegistry.debtConfig(dstEid, debtAsset);
-        if (!dc.isSupported) revert UnsupportedDebtAsset(debtAsset);
+        {
+            // Supported debt asset on destination chain
+            IAssetRegistry.DebtConfig memory dc = assetRegistry.debtConfig(srcEid, debtAsset);
+            if (!dc.isSupported) revert UnsupportedDebtAsset(debtAsset);
 
-        // Compute borrow power using LTV (not liquidation threshold)
-        (, uint256 borrowPowerE18,) = _collateralSums(user, collateralSlots);
+            // Compute borrow power using LTV (not liquidation threshold)
+            (, uint256 borrowPowerE18,) = _collateralSums(user, collateralSlots);
 
-        uint256 currentDebtValueE18 = _debtSum(user, debtSlots);
-        uint256 newBorrowValueE18 = _valueE18Token(debtAsset, amount, dc.decimals);
-        uint256 nextDebtValueE18 = currentDebtValueE18 + newBorrowValueE18;
+            uint256 currentDebtValueE18 = _debtSum(user, debtSlots);
+            uint256 newBorrowValueE18 = _valueE18Token(debtAsset, amount, dc.decimals);
+            uint256 nextDebtValueE18 = currentDebtValueE18 + newBorrowValueE18;
 
-        if (nextDebtValueE18 > borrowPowerE18) {
-            revert InsufficientBorrowPower(borrowPowerE18, nextDebtValueE18);
+            if (nextDebtValueE18 > borrowPowerE18) {
+                revert InsufficientBorrowPower(borrowPowerE18, nextDebtValueE18);
+            }
         }
 
         // Create pending + reserve debt in PositionBook (RiskEngine-only).
-        positionBook.createPendingBorrow(borrowId, user, dstEid, debtAsset, amount, receiver);
+        positionBook.createPendingBorrow(borrowId, user, srcEid, debtAsset, amount, receiver);
     }
 
     /**
@@ -356,9 +343,8 @@ contract RiskEngine is AccessManaged, ReentrancyGuard {
             revert WouldBeUndercollateralized(0, 0);
         }
 
-        // Reserve collateral and create pending
+        // Reserve collateral (prevents double-withdrawal while cross-chain message is in-flight)
         positionBook.reserveCollateral(user, srcEid, collateralAsset, amount);
-        positionBook.createPendingWithdraw(withdrawId, user, srcEid, collateralAsset, amount, receiver);
     }
 
     // -----------------------------
@@ -381,30 +367,44 @@ contract RiskEngine is AccessManaged, ReentrancyGuard {
         uint256 seenCount = 0;
 
         for (uint256 i = 0; i < n; i++) {
-            uint32 eid = collateralSlots[i].eid;
-            address asset = collateralSlots[i].asset;
+            CollateralSlot calldata slot = collateralSlots[i];
 
-            // Compute unique key for this (eid, asset) pair
-            bytes32 key = keccak256(abi.encodePacked(eid, asset));
+            // Check for duplicates and add to seen list
+            seenKeys[seenCount] = _validateUniqueCollateralSlot(seenKeys, seenCount, slot.eid, slot.asset);
+            seenCount++;
 
-            // Check for duplicates - revert if already seen
-            for (uint256 j = 0; j < seenCount; j++) {
-                if (seenKeys[j] == key) revert DuplicateCollateralSlot(eid, asset);
-            }
-            seenKeys[seenCount++] = key;
-
-            IAssetRegistry.CollateralConfig memory cc = assetRegistry.collateralConfig(eid, asset);
-            if (!cc.isSupported) revert UnsupportedCollateral(eid, asset);
+            IAssetRegistry.CollateralConfig memory cc = assetRegistry.collateralConfig(slot.eid, slot.asset);
+            if (!cc.isSupported) revert UnsupportedCollateral(slot.eid, slot.asset);
 
             // Use available collateral (excludes reserved withdrawals/seizures in-flight)
-            uint256 amount = positionBook.availableCollateralOf(user, eid, asset);
+            uint256 amount = positionBook.availableCollateralOf(user, slot.eid, slot.asset);
             if (amount == 0) continue;
 
-            uint256 valueE18 = _valueE18Token(asset, amount, cc.decimals);
+            // Calculate value and accumulate results
+            uint256 valueE18 = _valueE18Token(slot.asset, amount, cc.decimals);
 
             collateralValueE18 += valueE18;
             borrowPowerE18 += (valueE18 * cc.ltvBps) / 10_000;
             liquidationValueE18 += (valueE18 * cc.liqThresholdBps) / 10_000;
+        }
+    }
+
+    /// @notice Validates that a collateral slot hasn't been seen before and returns its unique key
+    /// @dev Reverts with DuplicateCollateralSlot if the (eid, asset) pair already exists in seenKeys
+    /// @param seenKeys Array of previously seen slot keys
+    /// @param seenCount Number of entries currently in seenKeys
+    /// @param eid Chain EID for the collateral
+    /// @param asset Asset address for the collateral
+    /// @return key The unique key for this (eid, asset) pair
+    function _validateUniqueCollateralSlot(bytes32[] memory seenKeys, uint256 seenCount, uint32 eid, address asset)
+        internal
+        pure
+        returns (bytes32 key)
+    {
+        key = keccak256(abi.encodePacked(eid, asset));
+
+        for (uint256 j = 0; j < seenCount; j++) {
+            if (seenKeys[j] == key) revert DuplicateCollateralSlot(eid, asset);
         }
     }
 
@@ -430,7 +430,6 @@ contract RiskEngine is AccessManaged, ReentrancyGuard {
         }
     }
 
-    // TODO: implement against actual oracle
     function _valueE18Token(address asset, uint256 amount, uint8 decimals) internal view returns (uint256) {
         uint256 ts;
         uint256 priceE18;

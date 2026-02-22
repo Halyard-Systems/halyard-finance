@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.23;
+pragma solidity ^0.8.24;
 
 import {BaseTest} from "../../BaseTest.t.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-
-import {console} from "forge-std/console.sol";
 
 contract HubControllerTest is BaseTest {
     function test_SetPaused() public {

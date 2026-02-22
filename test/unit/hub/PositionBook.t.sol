@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.23;
+pragma solidity ^0.8.24;
 
 import {BaseTest} from "../../BaseTest.t.sol";
 
@@ -8,6 +8,7 @@ contract PositionBookTest is BaseTest {
         vm.prank(address(hubController));
         positionBook.creditCollateral(alice, 1, address(0x123), 100);
         assertEq(positionBook.collateralOf(alice, 1, address(0x123)), 100);
+        assertEq(positionBook.collateralAssetsOf(alice).length, 1);
     }
 
     // function test_ReservedCollateralOf() public {

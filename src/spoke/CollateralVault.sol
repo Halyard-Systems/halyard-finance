@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.23;
+pragma solidity ^0.8.24;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -62,13 +62,21 @@ contract CollateralVault is Ownable {
     mapping(address => bool) public isAssetAllowed;
 
     modifier onlyController() {
-        if (msg.sender != controller) revert OnlyController();
+        _onlyController();
         _;
     }
 
     modifier notPaused() {
-        if (paused) revert Paused();
+        _notPaused();
         _;
+    }
+
+    function _onlyController() internal view {
+        if (msg.sender != controller) revert OnlyController();
+    }
+
+    function _notPaused() internal view {
+        if (paused) revert Paused();
     }
 
     constructor(address _owner, address _controller) Ownable(_owner) {

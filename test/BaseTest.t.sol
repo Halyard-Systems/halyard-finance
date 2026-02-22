@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.23;
+pragma solidity ^0.8.24;
 
-import {Test, console} from "lib/forge-std/src/Test.sol";
-import {MessagingFee, Origin} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
-import {MessagingFee} from "lib/devtools/packages/oapp-evm/contracts/oapp/OApp.sol";
+import {Test} from "lib/forge-std/src/Test.sol";
 
 import {HubAccessManager} from "../src/hub/HubAccessManager.sol";
 import {HubController} from "../src/hub/HubController.sol";
@@ -69,7 +67,7 @@ contract BaseTest is Test {
         // Deploy Hub contracts
         hubAccessManager = new HubAccessManager(admin);
         hubController = new HubController(admin, address(mockLzEndpoint), address(hubAccessManager));
-        hubRouter = new HubRouter(admin);
+        hubRouter = new HubRouter(admin, address(hubAccessManager));
 
         assetRegistry = new AssetRegistry(address(hubAccessManager));
         _setupDefaultAssets(assetRegistry);
@@ -84,6 +82,7 @@ contract BaseTest is Test {
 
         riskEngine = new RiskEngine(address(hubAccessManager));
         riskEngine.setDependencies(address(positionBook), address(debtManager), address(assetRegistry), mockOracle);
+        hubRouter.setRiskEngine(address(riskEngine));
 
         liquidationEngine = new LiquidationEngine(address(hubAccessManager));
         _setupLiquidationEngine(liquidationEngine);
@@ -99,6 +98,7 @@ contract BaseTest is Test {
         // Configure spokeController
         spokeController.setCollateralVault(address(collateralVault));
         spokeController.setLiquidityVault(address(liquidityVault));
+        // forge-lint: disable-next-line(unsafe-typecast)
         spokeController.configureHub(hubEid, bytes32("test_hub"));
         spokeController.configureSpokeEid(spokeEid);
         // Map canonical token to actual mock token
@@ -189,6 +189,15 @@ contract BaseTest is Test {
             })
         );
 
+        // Register canonical token on spoke chain (used in integration tests)
+        registry.setCollateralConfig(
+            spokeEid,
+            canonicalToken,
+            AssetRegistry.CollateralConfig({
+                isSupported: true, ltvBps: 8000, liqThresholdBps: 8500, liqBonusBps: 500, decimals: 18, supplyCap: 0
+            })
+        );
+
         registry.setDebtConfig(
             1, address(0x123), AssetRegistry.DebtConfig({isSupported: true, decimals: 18, borrowCap: 0})
         );
@@ -204,7 +213,7 @@ contract BaseTest is Test {
     function _setupPermissions(HubAccessManager accessManager) internal {
         accessManager.setTargetFunctionRole(
             address(hubController),
-            buildFunctionSelector(hubController.sendWithdrawCommand.selector),
+            buildFunctionSelector(hubController.processWithdraw.selector),
             accessManager.ROLE_ROUTER()
         );
 
@@ -212,6 +221,17 @@ contract BaseTest is Test {
             address(hubController),
             buildFunctionSelector(hubController.sendBorrowCommand.selector),
             accessManager.ROLE_ROUTER()
+        );
+
+        accessManager.setTargetFunctionRole(
+            address(hubRouter),
+            buildFunctionSelector(hubRouter.finalizeWithdraw.selector),
+            accessManager.ROLE_HUB_CONTROLLER()
+        );
+        accessManager.setTargetFunctionRole(
+            address(hubRouter),
+            buildFunctionSelector(hubRouter.finalizeBorrow.selector),
+            accessManager.ROLE_HUB_CONTROLLER()
         );
 
         accessManager.setTargetFunctionRole(
@@ -237,7 +257,7 @@ contract BaseTest is Test {
         accessManager.setTargetFunctionRole(
             address(positionBook),
             buildFunctionSelector(positionBook.createPendingWithdraw.selector),
-            accessManager.ROLE_RISK_ENGINE()
+            accessManager.ROLE_HUB_CONTROLLER()
         );
         accessManager.setTargetFunctionRole(
             address(positionBook),
@@ -278,5 +298,6 @@ contract BaseTest is Test {
         accessManager.grantRole(accessManager.ROLE_HUB_CONTROLLER(), address(hubController), 0);
         accessManager.grantRole(accessManager.ROLE_ASSET_REGISTRY(), address(assetRegistry), 0);
         accessManager.grantRole(accessManager.ROLE_RISK_ENGINE(), address(riskEngine), 0);
+        accessManager.grantRole(accessManager.ROLE_POSITION_BOOK(), address(positionBook), 0);
     }
 }

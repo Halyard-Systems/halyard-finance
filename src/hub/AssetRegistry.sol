@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.23;
+pragma solidity ^0.8.24;
 
 import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
-import {HubAccessManager} from "./HubAccessManager.sol";
 
 /**
  * AssetRegistry (Hub-side)
@@ -42,13 +41,21 @@ contract AssetRegistry is AccessManaged {
     // Modifiers
     // ---------------------------------------------------------------------
     modifier validEid(uint32 eid) {
-        if (eid == 0) revert InvalidEid();
+        _validEid(eid);
         _;
     }
 
     modifier validAsset(address asset) {
-        if (asset == address(0)) revert InvalidAddress();
+        _validAsset(asset);
         _;
+    }
+
+    function _validEid(uint32 eid) internal pure {
+        if (eid == 0) revert InvalidEid();
+    }
+
+    function _validAsset(address asset) internal pure {
+        if (asset == address(0)) revert InvalidAddress();
     }
 
     // ---------------------------------------------------------------------
