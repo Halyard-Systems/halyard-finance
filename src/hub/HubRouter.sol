@@ -47,6 +47,7 @@ contract HubRouter is Ownable, Pausable, AccessManaged {
     event DebtManagerSet(address indexed debtManager);
 
     event WithdrawRequested(address indexed user, uint32 indexed dstEid, address asset, uint256 amount);
+    event WithdrawFinalized(bytes32 indexed withdrawId, address indexed user, bool success);
 
     event BorrowRequested(
         bytes32 indexed borrowId, address indexed user, uint32 indexed dstEid, address asset, uint256 amount
@@ -111,24 +112,9 @@ contract HubRouter is Ownable, Pausable, AccessManaged {
     /**
      * @notice Request withdrawal of collateral from a spoke chain
      * @dev Flow:
-     *   1. Validate user has sufficient collateral
-     *   2. Check risk (health factor after withdrawal)
-     *   3. Mark withdrawal as pending
-     *   4. Send CMD_RELEASE_WITHDRAW to spoke
-     *   5. Wait for WITHDRAW_RELEASED receipt from spoke (handled by HubController)
-     *
-     * @param dstEid Destination spoke chain EID where collateral is held
-     * @param asset Canonical asset address
-     * @param amount Amount to withdraw
-     * @param options LayerZero options
-     * @param fee LayerZero messaging fee
-     */
-    /**
-     * @notice Request withdrawal of collateral from a spoke chain
-     * @dev Flow:
      *   1. RiskEngine validates health factor using oracle prices for every asset
-     *   2. RiskEngine reserves collateral in PositionBook (prevents double-withdrawal)
-     *   3. HubController creates pending withdraw and sends CMD_RELEASE_WITHDRAW to spoke
+     *   2. RiskEngine reserves collateral and creates pending withdraw in PositionBook
+     *   3. HubController sends CMD_RELEASE_WITHDRAW to spoke
      *   4. Wait for WITHDRAW_RELEASED receipt from spoke (handled by HubController)
      *
      * If the user has outstanding loans, the withdrawal must not push their
@@ -159,25 +145,20 @@ contract HubRouter is Ownable, Pausable, AccessManaged {
         if (asset == address(0)) revert InvalidAddress();
         if (amount == 0) revert InvalidAmount();
 
-        // Validate health factor via oracle prices and reserve collateral.
-        // This calls Pyth (via the oracle adapter) for every collateral and debt asset
-        // to compute total account value. If the user has loans, reverts if the
-        // withdrawal would push the health factor below 1.0.
+        address user = msg.sender;
+        bytes32 withdrawId = keccak256(abi.encodePacked(user, dstEid, asset, amount, block.number));
+
+        // Validate health factor via oracle prices, reserve collateral, and create pending withdraw.
         riskEngine.validateAndCreateWithdraw(
-            keccak256(abi.encodePacked(msg.sender, dstEid, asset, amount, block.number)),
-            msg.sender,
-            dstEid,
-            asset,
-            amount,
-            msg.sender,
-            collateralSlots,
-            debtSlots
+            withdrawId, user, dstEid, asset, amount, user, collateralSlots, debtSlots
         );
 
-        // Send CMD_RELEASE_WITHDRAW command to spoke (also creates pending withdraw in PositionBook)
-        hubController.processWithdraw{value: msg.value}(dstEid, msg.sender, asset, amount, options, fee);
+        // Send CMD_RELEASE_WITHDRAW command to spoke
+        hubController.sendWithdrawCommand{value: msg.value}(
+            dstEid, withdrawId, user, user, asset, amount, options, fee, user
+        );
 
-        emit WithdrawRequested(msg.sender, dstEid, asset, amount);
+        emit WithdrawRequested(user, dstEid, asset, amount);
     }
 
     // ──────────────────────────────────────────────────────────────────────────────
@@ -243,23 +224,14 @@ contract HubRouter is Ownable, Pausable, AccessManaged {
 
     /**
      * @notice Finalize a withdrawal after spoke confirmation
-     * @dev Called by HubController after receiving WITHDRAW_RELEASED receipt
+     * @dev Called by HubController after receiving WITHDRAW_RELEASED receipt.
+     *   On success: PositionBook debits collateral and clears reservation.
+     *   On failure: PositionBook just clears the reservation.
      */
-    function finalizeWithdraw(
-        bytes32,
-        /* withdrawId */
-        address user,
-        uint32,
-        /* srcEid */
-        address,
-        /* asset */
-        uint256 /* amount */
-    )
-        external
-        restricted
-    {
-        // Finalize in PositionBook (debit collateral, unreserve)
-        // TODO: positionBook.finalizeWithdraw(user, srcEid, asset, amount);
+    function finalizeWithdraw(bytes32 withdrawId, bool success) external restricted {
+        (address user,,,,) = positionBook.finalizePendingWithdraw(withdrawId, success);
+
+        emit WithdrawFinalized(withdrawId, user, success);
     }
 
     /**

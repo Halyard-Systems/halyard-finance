@@ -10,13 +10,16 @@ import {MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
  */
 interface IHubController {
     /// @notice Send CMD_RELEASE_WITHDRAW command to spoke
-    function processWithdraw(
+    function sendWithdrawCommand(
         uint32 dstEid,
+        bytes32 withdrawId,
         address user,
+        address receiver,
         address asset,
         uint256 amount,
         bytes calldata options,
-        MessagingFee calldata fee
+        MessagingFee calldata fee,
+        address refundAddress
     ) external payable;
 
     /// @notice Send CMD_RELEASE_BORROW command to spoke
