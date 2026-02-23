@@ -14,7 +14,9 @@ interface IPositionBook {
         external;
 
     /// @notice Finalize a pending withdraw after spoke receipt.
-    function finalizePendingWithdraw(bytes32 withdrawId, bool success) external;
+    function finalizePendingWithdraw(bytes32 withdrawId, bool success)
+        external
+        returns (address user, uint32 srcEid, address asset, uint256 amount, bool exists);
 
     /// @notice Finalize a pending borrow after spoke receipt.
     function finalizePendingBorrow(bytes32 borrowId, bool success)
