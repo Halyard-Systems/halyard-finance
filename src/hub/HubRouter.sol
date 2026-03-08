@@ -57,6 +57,8 @@ contract HubRouter is Ownable, Pausable, AccessManaged {
 
     event RepayFinalized(bytes32 indexed repayId, address indexed user, uint32 srcEid, address asset, uint256 amount);
 
+    event LiquidationFinalized(bytes32 indexed liqId, bool success);
+
     // ──────────────────────────────────────────────────────────────────────────────
     // State
     // ──────────────────────────────────────────────────────────────────────────────
@@ -262,5 +264,17 @@ contract HubRouter is Ownable, Pausable, AccessManaged {
         debtManager.burnDebt(user, srcEid, asset, amount);
 
         emit RepayFinalized(repayId, user, srcEid, asset, amount);
+    }
+
+    /**
+     * @notice Finalize a liquidation after spoke sends COLLATERAL_SEIZED receipt
+     * @dev Called by HubController after receiving COLLATERAL_SEIZED receipt.
+     *   On success: PositionBook debits collateral and clears reservation.
+     *   On failure: PositionBook just clears the reservation (debt was already burned).
+     */
+    function finalizeLiquidation(bytes32 liqId, bool success) external restricted {
+        positionBook.finalizePendingLiquidation(liqId, success);
+
+        emit LiquidationFinalized(liqId, success);
     }
 }

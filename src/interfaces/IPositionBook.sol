@@ -33,4 +33,33 @@ interface IPositionBook {
 
     /// @notice Clear debt reservation after DebtManager mints debt.
     function clearBorrowReservation(bytes32 borrowId) external;
+
+    /// @notice Create a pending liquidation (reserves collateral for seizure).
+    function createPendingLiquidation(
+        bytes32 liqId,
+        address user,
+        uint32 seizeEid,
+        address seizeAsset,
+        uint256 seizeAmount,
+        address liquidator
+    ) external;
+
+    /// @notice Finalize a pending liquidation after spoke receipt.
+    function finalizePendingLiquidation(bytes32 liqId, bool success)
+        external
+        returns (
+            address user,
+            uint32 seizeEid,
+            address seizeAsset,
+            uint256 seizeAmount,
+            address liquidator,
+            bool exists,
+            bool finalized
+        );
+
+    /// @notice Get available collateral (total minus reserved).
+    function availableCollateralOf(address user, uint32 eid, address asset) external view returns (uint256);
+
+    /// @notice Get reserved debt for in-flight borrows.
+    function reservedDebtOf(address user, uint32 eid, address asset) external view returns (uint256);
 }

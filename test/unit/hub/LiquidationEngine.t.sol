@@ -2,89 +2,52 @@
 pragma solidity ^0.8.24;
 
 import {BaseTest} from "../../BaseTest.t.sol";
+import {MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import {LiquidationEngine} from "../../../src/hub/LiquidationEngine.sol";
 
 contract LiquidationEngineTest is BaseTest {
-    function test_setCollateralConfig() public {
-        vm.prank(admin);
-        liquidationEngine.setCollateralConfig(
-            1,
-            address(0x123),
-            LiquidationEngine.CollateralConfig({
-                isSupported: true, ltvBps: 8000, liqThresholdBps: 8500, liqBonusBps: 500, decimals: 18, supplyCap: 0
-            })
+    function test_setDependencies() public {
+        assertEq(address(liquidationEngine.positionBook()), address(positionBook));
+        assertEq(address(liquidationEngine.debtManager()), address(debtManager));
+        assertEq(address(liquidationEngine.oracle()), mockOracle);
+        assertEq(address(liquidationEngine.hubController()), address(hubController));
+    }
+
+    function test_setDependencies_OnlyRestricted() public {
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, alice));
+        liquidationEngine.setDependencies(
+            address(positionBook), address(debtManager), address(assetRegistry), mockOracle, address(hubController)
         );
     }
 
-    function test_setCollateralConfig_OnlyRestricted() public {
-        vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, alice));
-        liquidationEngine.setCollateralConfig(
-            1,
-            address(0x123),
-            LiquidationEngine.CollateralConfig({
-                isSupported: true, ltvBps: 8000, liqThresholdBps: 8500, liqBonusBps: 500, decimals: 18, supplyCap: 0
-            })
+    function test_setDependencies_RejectsZeroAddress() public {
+        LiquidationEngine engine = new LiquidationEngine(address(hubAccessManager));
+        vm.prank(admin);
+        vm.expectRevert(LiquidationEngine.InvalidAddress.selector);
+        engine.setDependencies(
+            address(0), address(debtManager), address(assetRegistry), mockOracle, address(hubController)
         );
     }
 
-    function test_disableCollateral() public {
-        vm.prank(admin);
-        liquidationEngine.disableCollateral(1, address(0x123));
+    function test_liquidate_RevertsOnZeroAddress() public {
+        LiquidationEngine.CollateralSlot[] memory cs = new LiquidationEngine.CollateralSlot[](0);
+        LiquidationEngine.DebtSlot[] memory ds = new LiquidationEngine.DebtSlot[](0);
+        MessagingFee memory fee = MessagingFee({nativeFee: 0, lzTokenFee: 0});
+
+        vm.prank(bob);
+        vm.expectRevert(LiquidationEngine.InvalidAddress.selector);
+        liquidationEngine.liquidate(address(0), spokeEid, canonicalToken, 50e18, spokeEid, canonicalToken, cs, ds, bytes(""), fee);
     }
 
-    function test_disableCollateral_OnlyRestricted() public {
-        vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, alice));
-        liquidationEngine.disableCollateral(1, address(0x123));
-    }
+    function test_liquidate_RevertsOnZeroAmount() public {
+        LiquidationEngine.CollateralSlot[] memory cs = new LiquidationEngine.CollateralSlot[](0);
+        LiquidationEngine.DebtSlot[] memory ds = new LiquidationEngine.DebtSlot[](0);
+        MessagingFee memory fee = MessagingFee({nativeFee: 0, lzTokenFee: 0});
 
-    function test_setDebtConfig() public {
-        vm.prank(admin);
-        liquidationEngine.setDebtConfig(
-            address(0x123), LiquidationEngine.DebtConfig({isSupported: true, decimals: 18, borrowCap: 0})
-        );
-    }
-
-    function test_setDebtConfig_OnlyRestricted() public {
-        vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, alice));
-        liquidationEngine.setDebtConfig(
-            address(0x123), LiquidationEngine.DebtConfig({isSupported: true, decimals: 18, borrowCap: 0})
-        );
-    }
-
-    function test_disableDebt() public {
-        vm.prank(admin);
-        liquidationEngine.disableDebt(address(0x123));
-    }
-
-    function test_disableDebt_OnlyRestricted() public {
-        vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, alice));
-        liquidationEngine.disableDebt(address(0x123));
-    }
-
-    function test_setSpokeTokenAddress() public {
-        vm.prank(admin);
-        liquidationEngine.setSpokeTokenAddress(1, address(0x123), address(0x124));
-    }
-
-    function test_setSpokeTokenAddress_OnlyRestricted() public {
-        vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, alice));
-        liquidationEngine.setSpokeTokenAddress(1, address(0x123), address(0x124));
-    }
-
-    function test_setBorrowRatePerSecondRay() public {
-        vm.prank(admin);
-        liquidationEngine.setBorrowRatePerSecondRay(address(0x123), 1000);
-    }
-
-    function test_setBorrowRatePerSecondRay_OnlyRestricted() public {
-        vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, alice));
-        liquidationEngine.setBorrowRatePerSecondRay(address(0x123), 1000);
+        vm.prank(bob);
+        vm.expectRevert(LiquidationEngine.InvalidAmount.selector);
+        liquidationEngine.liquidate(alice, spokeEid, canonicalToken, 0, spokeEid, canonicalToken, cs, ds, bytes(""), fee);
     }
 }

@@ -86,9 +86,13 @@ contract BaseTest is Test {
         hubRouter.setDebtManager(address(debtManager));
 
         liquidationEngine = new LiquidationEngine(address(hubAccessManager));
-        _setupLiquidationEngine(liquidationEngine);
 
         _setupPermissions(hubAccessManager);
+
+        // Set LiquidationEngine dependencies (after permissions so setDependencies works)
+        liquidationEngine.setDependencies(
+            address(positionBook), address(debtManager), address(assetRegistry), mockOracle, address(hubController)
+        );
 
         // Deploy Spoke contracts
         spokeController = new SpokeController(admin, address(mockLzEndpoint));
@@ -152,26 +156,8 @@ contract BaseTest is Test {
     }
 
     function _setupLiquidationEngine(LiquidationEngine engine) internal {
-        engine.setCollateralConfig(
-            1,
-            address(0x123),
-            LiquidationEngine.CollateralConfig({
-                isSupported: true, ltvBps: 8000, liqThresholdBps: 8500, liqBonusBps: 500, decimals: 18, supplyCap: 0
-            })
-        );
-        engine.setCollateralConfig(
-            2,
-            address(0x124),
-            LiquidationEngine.CollateralConfig({
-                isSupported: true, ltvBps: 8000, liqThresholdBps: 8500, liqBonusBps: 500, decimals: 18, supplyCap: 0
-            })
-        );
-        engine.setDebtConfig(
-            address(0x123), LiquidationEngine.DebtConfig({isSupported: true, decimals: 18, borrowCap: 0})
-        );
-        engine.setDebtConfig(
-            address(0x124), LiquidationEngine.DebtConfig({isSupported: true, decimals: 18, borrowCap: 0})
-        );
+        // LiquidationEngine dependencies are set after permissions are configured
+        // (setDependencies is restricted, requires ADMIN role which admin has by default)
     }
 
     function _setupDefaultAssets(AssetRegistry registry) internal {
@@ -298,7 +284,19 @@ contract BaseTest is Test {
         accessManager.setTargetFunctionRole(
             address(positionBook),
             buildFunctionSelector(positionBook.finalizePendingLiquidation.selector),
+            accessManager.ROLE_ROUTER()
+        );
+
+        accessManager.setTargetFunctionRole(
+            address(hubRouter),
+            buildFunctionSelector(hubRouter.finalizeLiquidation.selector),
             accessManager.ROLE_HUB_CONTROLLER()
+        );
+
+        accessManager.setTargetFunctionRole(
+            address(hubController),
+            buildFunctionSelector(hubController.sendSeizeCommand.selector),
+            accessManager.ROLE_LIQUIDATION_ENGINE()
         );
 
         accessManager.setTargetFunctionRole(
@@ -325,5 +323,8 @@ contract BaseTest is Test {
         accessManager.grantRole(accessManager.ROLE_ASSET_REGISTRY(), address(assetRegistry), 0);
         accessManager.grantRole(accessManager.ROLE_RISK_ENGINE(), address(riskEngine), 0);
         accessManager.grantRole(accessManager.ROLE_POSITION_BOOK(), address(positionBook), 0);
+        accessManager.grantRole(accessManager.ROLE_LIQUIDATION_ENGINE(), address(liquidationEngine), 0);
+        // LiquidationEngine needs ROLE_ROUTER to call DebtManager.burnDebt
+        accessManager.grantRole(accessManager.ROLE_ROUTER(), address(liquidationEngine), 0);
     }
 }

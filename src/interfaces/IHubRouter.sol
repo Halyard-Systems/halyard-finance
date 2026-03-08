@@ -15,4 +15,7 @@ interface IHubRouter {
 
     /// @notice Finalize a repay after spoke sends REPAY_RECEIVED receipt
     function finalizeRepay(bytes32 repayId, address user, uint32 srcEid, address asset, uint256 amount) external;
+
+    /// @notice Finalize a liquidation after spoke sends COLLATERAL_SEIZED receipt
+    function finalizeLiquidation(bytes32 liqId, bool success) external;
 }
