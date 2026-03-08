@@ -149,9 +149,7 @@ contract HubRouter is Ownable, Pausable, AccessManaged {
         bytes32 withdrawId = keccak256(abi.encodePacked(user, dstEid, asset, amount, block.number));
 
         // Validate health factor via oracle prices, reserve collateral, and create pending withdraw.
-        riskEngine.validateAndCreateWithdraw(
-            withdrawId, user, dstEid, asset, amount, user, collateralSlots, debtSlots
-        );
+        riskEngine.validateAndCreateWithdraw(withdrawId, user, dstEid, asset, amount, user, collateralSlots, debtSlots);
 
         // Send CMD_RELEASE_WITHDRAW command to spoke
         hubController.sendWithdrawCommand{value: msg.value}(
@@ -206,9 +204,7 @@ contract HubRouter is Ownable, Pausable, AccessManaged {
         // RiskEngine calls Pyth for every collateral and debt asset to compute
         // borrow power. Reverts if the new debt would exceed borrow power.
         // Also creates the pending borrow in PositionBook.
-        riskEngine.validateAndCreateBorrow(
-            borrowId, user, dstEid, asset, amount, user, collateralSlots, debtSlots
-        );
+        riskEngine.validateAndCreateBorrow(borrowId, user, dstEid, asset, amount, user, collateralSlots, debtSlots);
 
         // Send CMD_RELEASE_BORROW command to spoke
         hubController.sendBorrowCommand{value: msg.value}(

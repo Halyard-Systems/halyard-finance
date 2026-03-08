@@ -309,9 +309,7 @@ contract BaseTest is Test {
         );
 
         accessManager.setTargetFunctionRole(
-            address(debtManager),
-            buildFunctionSelector(debtManager.mintDebt.selector),
-            accessManager.ROLE_ROUTER()
+            address(debtManager), buildFunctionSelector(debtManager.mintDebt.selector), accessManager.ROLE_ROUTER()
         );
 
         accessManager.grantRole(accessManager.ROLE_ROUTER(), address(hubRouter), 0);

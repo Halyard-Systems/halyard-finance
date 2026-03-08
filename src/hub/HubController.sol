@@ -181,8 +181,7 @@ contract HubController is AccessManaged, OApp, OAppOptionsType3 {
     }
 
     function _handleBorrowReleased(bytes memory payload) internal {
-        (bytes32 borrowId, bool success,,,,) =
-            abi.decode(payload, (bytes32, bool, address, uint32, address, uint256));
+        (bytes32 borrowId, bool success,,,,) = abi.decode(payload, (bytes32, bool, address, uint32, address, uint256));
 
         hubRouter.finalizeBorrow(borrowId, success);
         emit BorrowReleased(borrowId, success);
