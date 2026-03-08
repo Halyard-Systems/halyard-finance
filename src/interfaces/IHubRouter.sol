@@ -12,4 +12,7 @@ interface IHubRouter {
 
     /// @notice Finalize a borrow after spoke sends BORROW_RELEASED receipt
     function finalizeBorrow(bytes32 borrowId, bool success) external;
+
+    /// @notice Finalize a repay after spoke sends REPAY_RECEIVED receipt
+    function finalizeRepay(bytes32 repayId, address user, uint32 srcEid, address asset, uint256 amount) external;
 }

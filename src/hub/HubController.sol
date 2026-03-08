@@ -34,6 +34,7 @@ contract HubController is AccessManaged, OApp, OAppOptionsType3 {
     event PositionBookSet(address indexed positionBook);
     event HubRouterSet(address indexed hubRouter);
     event BorrowReleased(bytes32 indexed borrowId, bool success);
+    event RepayReceived(bytes32 indexed repayId, address indexed user, uint32 srcEid, address asset, uint256 amount);
 
     IPositionBook public positionBook;
     IHubRouter public hubRouter;
@@ -160,6 +161,8 @@ contract HubController is AccessManaged, OApp, OAppOptionsType3 {
             _handleWithdrawReleased(payload);
         } else if (msgType == uint8(IMessageTypes.MsgType.BORROW_RELEASED)) {
             _handleBorrowReleased(payload);
+        } else if (msgType == uint8(IMessageTypes.MsgType.REPAY_RECEIVED)) {
+            _handleRepayReceived(payload);
         } else {
             revert InvalidMessageType(msgType, origin);
         }
@@ -185,6 +188,14 @@ contract HubController is AccessManaged, OApp, OAppOptionsType3 {
 
         hubRouter.finalizeBorrow(borrowId, success);
         emit BorrowReleased(borrowId, success);
+    }
+
+    function _handleRepayReceived(bytes memory payload) internal {
+        (bytes32 repayId, address user, uint32 srcEid, address canonicalAsset, uint256 amount) =
+            abi.decode(payload, (bytes32, address, uint32, address, uint256));
+
+        hubRouter.finalizeRepay(repayId, user, srcEid, canonicalAsset, amount);
+        emit RepayReceived(repayId, user, srcEid, canonicalAsset, amount);
     }
 
     // ──────────────────────────────────────────────────────────────────────────────

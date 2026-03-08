@@ -74,6 +74,26 @@ contract BaseIntegrationTest is BaseTest {
         );
     }
 
+    /// @notice Simulate the hub receiving a REPAY_RECEIVED receipt from spoke
+    function _simulateRepayReceipt(bytes32 repayId, address user, address asset, uint256 amount) internal {
+        uint32 srcEid = spokeController.spokeEid();
+        bytes32 spokeSender = bytes32(uint256(uint160(address(spokeController))));
+
+        // Build REPAY_RECEIVED message (msgType = 3)
+        bytes memory payload = abi.encode(repayId, user, srcEid, asset, amount);
+        bytes memory message = abi.encode(uint8(3), payload);
+
+        // Simulate LayerZero delivering the receipt to hub
+        vm.prank(address(mockLzEndpoint));
+        hubController.lzReceive(
+            Origin({srcEid: srcEid, sender: spokeSender, nonce: 4}),
+            bytes32(uint256(4)), // guid
+            message,
+            address(0),
+            bytes("")
+        );
+    }
+
     /// @notice Complete deposit flow: spoke deposit + hub receipt
     /// @param user The user depositing
     /// @param depositId Unique deposit identifier

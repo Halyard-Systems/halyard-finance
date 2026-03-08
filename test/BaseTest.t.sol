@@ -242,6 +242,11 @@ contract BaseTest is Test {
             buildFunctionSelector(hubRouter.finalizeBorrow.selector),
             accessManager.ROLE_HUB_CONTROLLER()
         );
+        accessManager.setTargetFunctionRole(
+            address(hubRouter),
+            buildFunctionSelector(hubRouter.finalizeRepay.selector),
+            accessManager.ROLE_HUB_CONTROLLER()
+        );
 
         accessManager.setTargetFunctionRole(
             address(positionBook),
@@ -310,6 +315,9 @@ contract BaseTest is Test {
 
         accessManager.setTargetFunctionRole(
             address(debtManager), buildFunctionSelector(debtManager.mintDebt.selector), accessManager.ROLE_ROUTER()
+        );
+        accessManager.setTargetFunctionRole(
+            address(debtManager), buildFunctionSelector(debtManager.burnDebt.selector), accessManager.ROLE_ROUTER()
         );
 
         accessManager.grantRole(accessManager.ROLE_ROUTER(), address(hubRouter), 0);

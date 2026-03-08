@@ -55,6 +55,8 @@ contract HubRouter is Ownable, Pausable, AccessManaged {
 
     event BorrowFinalized(bytes32 indexed borrowId, address indexed user, bool success);
 
+    event RepayFinalized(bytes32 indexed repayId, address indexed user, uint32 srcEid, address asset, uint256 amount);
+
     // ──────────────────────────────────────────────────────────────────────────────
     // State
     // ──────────────────────────────────────────────────────────────────────────────
@@ -246,5 +248,19 @@ contract HubRouter is Ownable, Pausable, AccessManaged {
         }
 
         emit BorrowFinalized(borrowId, user, success);
+    }
+
+    /**
+     * @notice Finalize a repay after spoke sends REPAY_RECEIVED receipt
+     * @dev Called by HubController after receiving REPAY_RECEIVED receipt.
+     *   Burns debt via DebtManager. No pending/reservation needed since repay is push-driven.
+     */
+    function finalizeRepay(bytes32 repayId, address user, uint32 srcEid, address asset, uint256 amount)
+        external
+        restricted
+    {
+        debtManager.burnDebt(user, srcEid, asset, amount);
+
+        emit RepayFinalized(repayId, user, srcEid, asset, amount);
     }
 }

@@ -7,4 +7,7 @@ pragma solidity ^0.8.24;
  */
 interface IDebtManager {
     function mintDebt(address user, uint32 eid, address asset, uint256 amount) external returns (uint256 scaledAdded);
+    function burnDebt(address user, uint32 eid, address asset, uint256 amount)
+        external
+        returns (uint256 scaledRemoved, uint256 nominalBurned);
 }
