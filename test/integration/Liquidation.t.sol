@@ -228,7 +228,10 @@ contract LiquidationTest is BaseIntegrationTest {
         );
 
         // Debt should be reduced
-        assertLt(debtManager.debtOf(alice, spokeEid, canonicalToken), debtManager.debtOf(alice, spokeEid, canonicalToken) + 10e18);
+        assertLt(
+            debtManager.debtOf(alice, spokeEid, canonicalToken),
+            debtManager.debtOf(alice, spokeEid, canonicalToken) + 10e18
+        );
     }
 
     function test_LiquidationConfigurableBonus() public {

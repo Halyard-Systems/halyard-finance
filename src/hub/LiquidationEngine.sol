@@ -208,7 +208,9 @@ contract LiquidationEngine is AccessManaged, ReentrancyGuard {
         bytes calldata options,
         MessagingFee calldata fee
     ) external payable nonReentrant {
-        if (user == address(0) || debtAsset == address(0) || seizeAsset == address(0)) revert InvalidAddress();
+        if (user == address(0) || debtAsset == address(0) || seizeAsset == address(0)) {
+            revert InvalidAddress();
+        }
         if (debtRepayAmount == 0) revert InvalidAmount();
 
         // 1. Validate account is undercollateralized (health factor < 1.0)

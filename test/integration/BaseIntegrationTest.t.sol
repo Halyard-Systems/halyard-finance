@@ -95,7 +95,14 @@ contract BaseIntegrationTest is BaseTest {
     }
 
     /// @notice Simulate the hub receiving a COLLATERAL_SEIZED receipt from spoke
-    function _simulateSeizeReceipt(bytes32 liqId, address user, address seizeAsset, uint256 seizeAmount, address liquidator, bool success) internal {
+    function _simulateSeizeReceipt(
+        bytes32 liqId,
+        address user,
+        address seizeAsset,
+        uint256 seizeAmount,
+        address liquidator,
+        bool success
+    ) internal {
         uint32 srcEid = spokeController.spokeEid();
         bytes32 spokeSender = bytes32(uint256(uint160(address(spokeController))));
 

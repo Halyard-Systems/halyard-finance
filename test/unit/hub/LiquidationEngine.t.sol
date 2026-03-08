@@ -38,7 +38,9 @@ contract LiquidationEngineTest is BaseTest {
 
         vm.prank(bob);
         vm.expectRevert(LiquidationEngine.InvalidAddress.selector);
-        liquidationEngine.liquidate(address(0), spokeEid, canonicalToken, 50e18, spokeEid, canonicalToken, cs, ds, bytes(""), fee);
+        liquidationEngine.liquidate(
+            address(0), spokeEid, canonicalToken, 50e18, spokeEid, canonicalToken, cs, ds, bytes(""), fee
+        );
     }
 
     function test_liquidate_RevertsOnZeroAmount() public {
@@ -48,6 +50,8 @@ contract LiquidationEngineTest is BaseTest {
 
         vm.prank(bob);
         vm.expectRevert(LiquidationEngine.InvalidAmount.selector);
-        liquidationEngine.liquidate(alice, spokeEid, canonicalToken, 0, spokeEid, canonicalToken, cs, ds, bytes(""), fee);
+        liquidationEngine.liquidate(
+            alice, spokeEid, canonicalToken, 0, spokeEid, canonicalToken, cs, ds, bytes(""), fee
+        );
     }
 }
