@@ -64,9 +64,7 @@ contract BorrowTest is BaseIntegrationTest {
         _mockLzSend();
 
         vm.prank(alice);
-        vm.expectRevert(
-            abi.encodeWithSelector(RiskEngine.InsufficientBorrowPower.selector, 80e18, 90e18)
-        );
+        vm.expectRevert(abi.encodeWithSelector(RiskEngine.InsufficientBorrowPower.selector, 80e18, 90e18));
         hubRouter.borrowAndNotify{value: 0.1 ether}(
             spokeEid, canonicalToken, borrowAmount, collateralSlots, debtSlots, bytes(""), fee
         );
@@ -116,8 +114,7 @@ contract BorrowTest is BaseIntegrationTest {
 
         // First borrow
         _mockLzSend();
-        bytes32 borrowId1 =
-            keccak256(abi.encodePacked(alice, spokeEid, canonicalToken, firstBorrow, block.number));
+        bytes32 borrowId1 = keccak256(abi.encodePacked(alice, spokeEid, canonicalToken, firstBorrow, block.number));
 
         vm.prank(alice);
         hubRouter.borrowAndNotify{value: 0.1 ether}(
@@ -131,8 +128,7 @@ contract BorrowTest is BaseIntegrationTest {
 
         // Second borrow (cumulative debt = 60e18 < 80e18 borrow power)
         _mockLzSend();
-        bytes32 borrowId2 =
-            keccak256(abi.encodePacked(alice, spokeEid, canonicalToken, secondBorrow, block.number));
+        bytes32 borrowId2 = keccak256(abi.encodePacked(alice, spokeEid, canonicalToken, secondBorrow, block.number));
 
         vm.prank(alice);
         hubRouter.borrowAndNotify{value: 0.1 ether}(

@@ -17,3 +17,6 @@ docs/
 node_modules/
 lib/
 !frontend/src/lib/
+
+# Mac OS
+.DS_Store

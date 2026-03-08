@@ -8,7 +8,7 @@ pragma solidity ^0.8.24;
  */
 interface IHubRouter {
     /// @notice Finalize a withdrawal after spoke sends WITHDRAW_RELEASED receipt
-    function finalizeWithdraw(bytes32 withdrawId, address user, uint32 srcEid, address asset, uint256 amount) external;
+    function finalizeWithdraw(bytes32 withdrawId, bool success) external;
 
     /// @notice Finalize a borrow after spoke sends BORROW_RELEASED receipt
     function finalizeBorrow(bytes32 borrowId, bool success) external;

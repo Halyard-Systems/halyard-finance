@@ -335,27 +335,31 @@ contract PositionBook is AccessManaged {
     function finalizePendingWithdraw(bytes32 withdrawId, bool success)
         external
         restricted
-        returns (PendingWithdraw memory w)
+        returns (address user, uint32 srcEid, address asset, uint256 amount, bool exists)
     {
         PendingWithdraw storage s = pendingWithdraw[withdrawId];
         if (!s.exists) revert UnknownPending(withdrawId);
 
         // Copy to memory before clearing storage
-        w = s;
+        user = s.user;
+        srcEid = s.srcEid;
+        asset = s.asset;
+        amount = s.amount;
+        exists = s.exists;
 
         // Always remove the reservation for this withdraw
-        uint256 res = _reservedCollateral[s.user][w.srcEid][w.asset];
-        if (res < w.amount) revert ReservationUnderflow();
-        _reservedCollateral[s.user][w.srcEid][w.asset] = res - w.amount;
+        uint256 res = _reservedCollateral[user][srcEid][asset];
+        if (res < amount) revert ReservationUnderflow();
+        _reservedCollateral[user][srcEid][asset] = res - amount;
 
         if (success) {
-            _debitCollateral(s.user, w.srcEid, w.asset, w.amount);
+            _debitCollateral(user, srcEid, asset, amount);
         }
 
         // Clear pending state so user can withdraw again
         delete pendingWithdraw[withdrawId];
 
-        emit WithdrawPendingFinalized(s.user, success);
+        emit WithdrawPendingFinalized(user, success);
     }
 
     // ---------------------------------------------------------------------
