@@ -115,6 +115,8 @@ contract LiquidationEngine is AccessManaged, ReentrancyGuard {
     error PriceUnavailable(address asset);
     error UnsupportedCollateral(uint32 eid, address asset);
     error UnsupportedDebtAsset(uint32 eid, address asset);
+    error DuplicateCollateralSlot(uint32 eid, address asset);
+    error DuplicateDebtSlot(uint32 eid, address asset);
     error IncompleteCollateralSlots(uint32 missingEid, address missingAsset);
     error IncompleteDebtSlots(uint32 missingEid, address missingAsset);
 
@@ -303,8 +305,19 @@ contract LiquidationEngine is AccessManaged, ReentrancyGuard {
         // Validate that all on-chain collateral positions are included in supplied slots
         _validateCollateralCompleteness(user, collateralSlots);
 
-        for (uint256 i = 0; i < collateralSlots.length; i++) {
+        uint256 n = collateralSlots.length;
+
+        // Track seen (eid, asset) pairs to prevent duplicate counting
+        bytes32[] memory seenKeys = new bytes32[](n);
+        uint256 seenCount = 0;
+
+        for (uint256 i = 0; i < n; i++) {
             CollateralSlot calldata slot = collateralSlots[i];
+
+            // Check for duplicates and add to seen list
+            seenKeys[seenCount] = _validateUniqueCollateralSlot(seenKeys, seenCount, slot.eid, slot.asset);
+            seenCount++;
+
             IAssetRegistryLiq.CollateralConfig memory cc = assetRegistry.collateralConfig(slot.eid, slot.asset);
             if (!cc.isSupported) revert UnsupportedCollateral(slot.eid, slot.asset);
 
@@ -320,8 +333,19 @@ contract LiquidationEngine is AccessManaged, ReentrancyGuard {
         // Validate that all on-chain debt positions are included in supplied slots
         _validateDebtCompleteness(user, debtSlots);
 
-        for (uint256 i = 0; i < debtSlots.length; i++) {
+        uint256 n = debtSlots.length;
+
+        // Track seen (eid, asset) pairs to prevent duplicate counting
+        bytes32[] memory seenKeys = new bytes32[](n);
+        uint256 seenCount = 0;
+
+        for (uint256 i = 0; i < n; i++) {
             DebtSlot calldata slot = debtSlots[i];
+
+            // Check for duplicates and add to seen list
+            seenKeys[seenCount] = _validateUniqueDebtSlot(seenKeys, seenCount, slot.eid, slot.asset);
+            seenCount++;
+
             IAssetRegistryLiq.DebtConfig memory dc = assetRegistry.debtConfig(slot.eid, slot.asset);
             if (!dc.isSupported) revert UnsupportedDebtAsset(slot.eid, slot.asset);
 
@@ -365,6 +389,32 @@ contract LiquidationEngine is AccessManaged, ReentrancyGuard {
                 }
             }
             if (!found) revert IncompleteDebtSlots(onChain[i].eid, onChain[i].asset);
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // Internal: duplicate slot validation
+    // ---------------------------------------------------------------------
+
+    function _validateUniqueCollateralSlot(bytes32[] memory seenKeys, uint256 seenCount, uint32 eid, address asset)
+        internal
+        pure
+        returns (bytes32 key)
+    {
+        key = keccak256(abi.encodePacked(eid, asset));
+        for (uint256 j = 0; j < seenCount; j++) {
+            if (seenKeys[j] == key) revert DuplicateCollateralSlot(eid, asset);
+        }
+    }
+
+    function _validateUniqueDebtSlot(bytes32[] memory seenKeys, uint256 seenCount, uint32 eid, address asset)
+        internal
+        pure
+        returns (bytes32 key)
+    {
+        key = keccak256(abi.encodePacked(eid, asset));
+        for (uint256 j = 0; j < seenCount; j++) {
+            if (seenKeys[j] == key) revert DuplicateDebtSlot(eid, asset);
         }
     }
 

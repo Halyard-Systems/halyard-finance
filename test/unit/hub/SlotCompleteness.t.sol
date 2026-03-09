@@ -413,6 +413,107 @@ contract SlotCompletenessTest is BaseTest {
     }
 
     // ---------------------------------------------------------------
+    // RiskEngine: Duplicate debt slots
+    // ---------------------------------------------------------------
+
+    function test_RiskEngine_RevertsDuplicateDebtSlots() public {
+        _mockOracle();
+
+        _creditCollateral(alice, 1, address(0x123), 1000e18);
+        _mintDebt(alice, 1, address(0x123), 50e18);
+
+        RiskEngine.CollateralSlot[] memory collateralSlots = new RiskEngine.CollateralSlot[](1);
+        collateralSlots[0] = RiskEngine.CollateralSlot({eid: 1, asset: address(0x123)});
+
+        // Same debt slot repeated 3x — would triple-count debt value
+        RiskEngine.DebtSlot[] memory duplicateDebtSlots = new RiskEngine.DebtSlot[](3);
+        duplicateDebtSlots[0] = RiskEngine.DebtSlot({eid: 1, asset: address(0x123)});
+        duplicateDebtSlots[1] = RiskEngine.DebtSlot({eid: 1, asset: address(0x123)});
+        duplicateDebtSlots[2] = RiskEngine.DebtSlot({eid: 1, asset: address(0x123)});
+
+        vm.expectRevert(
+            abi.encodeWithSelector(RiskEngine.DuplicateDebtSlot.selector, uint32(1), address(0x123))
+        );
+        riskEngine.accountData(alice, collateralSlots, duplicateDebtSlots);
+    }
+
+    function test_RiskEngine_RevertsDuplicateDebtSlots_canBorrow() public {
+        _mockOracle();
+
+        _creditCollateral(alice, 1, address(0x123), 1000e18);
+        _mintDebt(alice, 1, address(0x123), 50e18);
+
+        RiskEngine.CollateralSlot[] memory collateralSlots = new RiskEngine.CollateralSlot[](1);
+        collateralSlots[0] = RiskEngine.CollateralSlot({eid: 1, asset: address(0x123)});
+
+        RiskEngine.DebtSlot[] memory duplicateDebtSlots = new RiskEngine.DebtSlot[](2);
+        duplicateDebtSlots[0] = RiskEngine.DebtSlot({eid: 1, asset: address(0x123)});
+        duplicateDebtSlots[1] = RiskEngine.DebtSlot({eid: 1, asset: address(0x123)});
+
+        vm.expectRevert(
+            abi.encodeWithSelector(RiskEngine.DuplicateDebtSlot.selector, uint32(1), address(0x123))
+        );
+        riskEngine.canBorrow(alice, 1, address(0x123), 10e18, collateralSlots, duplicateDebtSlots);
+    }
+
+    // ---------------------------------------------------------------
+    // LiquidationEngine: Duplicate debt slots
+    // ---------------------------------------------------------------
+
+    function test_LiquidationEngine_RevertsDuplicateDebtSlots() public {
+        _mockOracle();
+
+        _creditCollateral(alice, 1, address(0x123), 100e18);
+        _mintDebt(alice, 1, address(0x123), 90e18);
+
+        LiquidationEngine.CollateralSlot[] memory collateralSlots = new LiquidationEngine.CollateralSlot[](1);
+        collateralSlots[0] = LiquidationEngine.CollateralSlot({eid: 1, asset: address(0x123)});
+
+        // Same debt slot 3x — would inflate debt value and make healthy positions appear liquidatable
+        LiquidationEngine.DebtSlot[] memory duplicateDebtSlots = new LiquidationEngine.DebtSlot[](3);
+        duplicateDebtSlots[0] = LiquidationEngine.DebtSlot({eid: 1, asset: address(0x123)});
+        duplicateDebtSlots[1] = LiquidationEngine.DebtSlot({eid: 1, asset: address(0x123)});
+        duplicateDebtSlots[2] = LiquidationEngine.DebtSlot({eid: 1, asset: address(0x123)});
+
+        MessagingFee memory fee = MessagingFee({nativeFee: 0, lzTokenFee: 0});
+
+        vm.prank(bob);
+        vm.expectRevert(
+            abi.encodeWithSelector(LiquidationEngine.DuplicateDebtSlot.selector, uint32(1), address(0x123))
+        );
+        liquidationEngine.liquidate(
+            alice, 1, address(0x123), 50e18, 1, address(0x123),
+            collateralSlots, duplicateDebtSlots, bytes(""), fee
+        );
+    }
+
+    function test_LiquidationEngine_RevertsDuplicateCollateralSlots() public {
+        _mockOracle();
+
+        _creditCollateral(alice, 1, address(0x123), 100e18);
+        _mintDebt(alice, 1, address(0x123), 90e18);
+
+        // Same collateral slot 2x — would inflate collateral value
+        LiquidationEngine.CollateralSlot[] memory duplicateCollateral = new LiquidationEngine.CollateralSlot[](2);
+        duplicateCollateral[0] = LiquidationEngine.CollateralSlot({eid: 1, asset: address(0x123)});
+        duplicateCollateral[1] = LiquidationEngine.CollateralSlot({eid: 1, asset: address(0x123)});
+
+        LiquidationEngine.DebtSlot[] memory debtSlots = new LiquidationEngine.DebtSlot[](1);
+        debtSlots[0] = LiquidationEngine.DebtSlot({eid: 1, asset: address(0x123)});
+
+        MessagingFee memory fee = MessagingFee({nativeFee: 0, lzTokenFee: 0});
+
+        vm.prank(bob);
+        vm.expectRevert(
+            abi.encodeWithSelector(LiquidationEngine.DuplicateCollateralSlot.selector, uint32(1), address(0x123))
+        );
+        liquidationEngine.liquidate(
+            alice, 1, address(0x123), 50e18, 1, address(0x123),
+            duplicateCollateral, debtSlots, bytes(""), fee
+        );
+    }
+
+    // ---------------------------------------------------------------
     // RiskEngine: successful flow with complete slots
     // ---------------------------------------------------------------
 

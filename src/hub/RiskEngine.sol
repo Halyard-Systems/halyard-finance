@@ -111,6 +111,7 @@ contract RiskEngine is AccessManaged, ReentrancyGuard {
     error WouldBeUndercollateralized(uint256 liqValueE18, uint256 nextDebtValueE18);
     error InsufficientAvailableCollateral(uint256 available, uint256 requested);
     error DuplicateCollateralSlot(uint32 eid, address asset);
+    error DuplicateDebtSlot(uint32 eid, address asset);
     error IncompleteCollateralSlots(uint32 missingEid, address missingAsset);
     error IncompleteDebtSlots(uint32 missingEid, address missingAsset);
 
@@ -441,9 +442,17 @@ contract RiskEngine is AccessManaged, ReentrancyGuard {
 
         uint256 n = debtSlots.length;
 
+        // Track seen (eid, asset) pairs to prevent duplicate counting
+        bytes32[] memory seenKeys = new bytes32[](n);
+        uint256 seenCount = 0;
+
         for (uint256 i = 0; i < n; i++) {
             DebtSlot calldata slot = debtSlots[i];
             if (slot.asset == address(0)) continue;
+
+            // Check for duplicates and add to seen list
+            seenKeys[seenCount] = _validateUniqueDebtSlot(seenKeys, seenCount, slot.eid, slot.asset);
+            seenCount++;
 
             IAssetRegistry.DebtConfig memory dc = assetRegistry.debtConfig(slot.eid, slot.asset);
             if (!dc.isSupported) revert UnsupportedDebtAsset(slot.asset);
@@ -454,6 +463,20 @@ contract RiskEngine is AccessManaged, ReentrancyGuard {
             if (totalNominal == 0) continue;
 
             debtValueE18 += _valueE18Token(slot.asset, totalNominal, dc.decimals);
+        }
+    }
+
+    /// @notice Validates that a debt slot hasn't been seen before and returns its unique key
+    /// @dev Reverts with DuplicateDebtSlot if the (eid, asset) pair already exists in seenKeys
+    function _validateUniqueDebtSlot(bytes32[] memory seenKeys, uint256 seenCount, uint32 eid, address asset)
+        internal
+        pure
+        returns (bytes32 key)
+    {
+        key = keccak256(abi.encodePacked(eid, asset));
+
+        for (uint256 j = 0; j < seenCount; j++) {
+            if (seenKeys[j] == key) revert DuplicateDebtSlot(eid, asset);
         }
     }
 
