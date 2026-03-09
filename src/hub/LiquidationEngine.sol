@@ -263,7 +263,17 @@ contract LiquidationEngine is AccessManaged, ReentrancyGuard {
         //    debt erasure if the spoke seizure fails (C-2 fix).
         address liquidator = msg.sender;
         bytes32 liqId = keccak256(
-            abi.encodePacked(liquidator, user, debtEid, debtAsset, debtRepayAmount, seizeEid, seizeAsset, block.number, nonces[liquidator]++)
+            abi.encodePacked(
+                liquidator,
+                user,
+                debtEid,
+                debtAsset,
+                debtRepayAmount,
+                seizeEid,
+                seizeAsset,
+                block.number,
+                nonces[liquidator]++
+            )
         );
 
         positionBook.createPendingLiquidation(

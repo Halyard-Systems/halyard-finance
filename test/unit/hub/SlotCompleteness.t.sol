@@ -14,11 +14,7 @@ contract SlotCompletenessTest is BaseTest {
     // ---------------------------------------------------------------
 
     function _mockOracle() internal {
-        vm.mockCall(
-            mockOracle,
-            abi.encodeWithSignature("getPriceE18(address)"),
-            abi.encode(1000e18, block.timestamp)
-        );
+        vm.mockCall(mockOracle, abi.encodeWithSignature("getPriceE18(address)"), abi.encode(1000e18, block.timestamp));
     }
 
     function _creditCollateral(address user, uint32 eid, address asset, uint256 amount) internal {
@@ -51,13 +47,16 @@ contract SlotCompletenessTest is BaseTest {
         RiskEngine.DebtSlot[] memory emptyDebtSlots = new RiskEngine.DebtSlot[](0);
 
         vm.prank(address(hubRouter));
-        vm.expectRevert(
-            abi.encodeWithSelector(RiskEngine.IncompleteDebtSlots.selector, uint32(1), address(0x123))
-        );
+        vm.expectRevert(abi.encodeWithSelector(RiskEngine.IncompleteDebtSlots.selector, uint32(1), address(0x123)));
         riskEngine.validateAndCreateBorrow(
             bytes32(keccak256("exploit_borrow")),
-            alice, 1, address(0x123), 10e18, alice,
-            collateralSlots, emptyDebtSlots
+            alice,
+            1,
+            address(0x123),
+            10e18,
+            alice,
+            collateralSlots,
+            emptyDebtSlots
         );
     }
 
@@ -86,13 +85,16 @@ contract SlotCompletenessTest is BaseTest {
         // Missing: (2, 0x124)
 
         vm.prank(address(hubRouter));
-        vm.expectRevert(
-            abi.encodeWithSelector(RiskEngine.IncompleteDebtSlots.selector, uint32(2), address(0x124))
-        );
+        vm.expectRevert(abi.encodeWithSelector(RiskEngine.IncompleteDebtSlots.selector, uint32(2), address(0x124)));
         riskEngine.validateAndCreateBorrow(
             bytes32(keccak256("exploit_borrow_partial")),
-            alice, 1, address(0x123), 10e18, alice,
-            collateralSlots, partialDebtSlots
+            alice,
+            1,
+            address(0x123),
+            10e18,
+            alice,
+            collateralSlots,
+            partialDebtSlots
         );
     }
 
@@ -110,9 +112,7 @@ contract SlotCompletenessTest is BaseTest {
         vm.prank(address(hubRouter));
         // Should succeed — no debt to omit
         riskEngine.validateAndCreateBorrow(
-            bytes32(keccak256("valid_borrow")),
-            alice, 1, address(0x123), 10e18, alice,
-            collateralSlots, emptyDebtSlots
+            bytes32(keccak256("valid_borrow")), alice, 1, address(0x123), 10e18, alice, collateralSlots, emptyDebtSlots
         );
     }
 
@@ -134,8 +134,13 @@ contract SlotCompletenessTest is BaseTest {
         vm.prank(address(hubRouter));
         riskEngine.validateAndCreateBorrow(
             bytes32(keccak256("valid_superset_borrow")),
-            alice, 1, address(0x123), 5e18, alice,
-            collateralSlots, supersetDebtSlots
+            alice,
+            1,
+            address(0x123),
+            5e18,
+            alice,
+            collateralSlots,
+            supersetDebtSlots
         );
     }
 
@@ -158,8 +163,13 @@ contract SlotCompletenessTest is BaseTest {
         );
         riskEngine.validateAndCreateWithdraw(
             bytes32(keccak256("exploit_withdraw")),
-            alice, 1, address(0x123), 10e18, alice,
-            emptyCollateralSlots, debtSlots
+            alice,
+            1,
+            address(0x123),
+            10e18,
+            alice,
+            emptyCollateralSlots,
+            debtSlots
         );
     }
 
@@ -187,8 +197,13 @@ contract SlotCompletenessTest is BaseTest {
         );
         riskEngine.validateAndCreateWithdraw(
             bytes32(keccak256("exploit_partial_collateral")),
-            alice, 1, address(0x123), 10e18, alice,
-            partialSlots, debtSlots
+            alice,
+            1,
+            address(0x123),
+            10e18,
+            alice,
+            partialSlots,
+            debtSlots
         );
     }
 
@@ -224,9 +239,7 @@ contract SlotCompletenessTest is BaseTest {
 
         RiskEngine.DebtSlot[] memory emptyDebtSlots = new RiskEngine.DebtSlot[](0);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(RiskEngine.IncompleteDebtSlots.selector, uint32(1), address(0x123))
-        );
+        vm.expectRevert(abi.encodeWithSelector(RiskEngine.IncompleteDebtSlots.selector, uint32(1), address(0x123)));
         riskEngine.canBorrow(alice, 1, address(0x123), 10e18, collateralSlots, emptyDebtSlots);
     }
 
@@ -272,9 +285,7 @@ contract SlotCompletenessTest is BaseTest {
         collateralSlots[0] = RiskEngine.CollateralSlot({eid: 1, asset: address(0x123)});
         RiskEngine.DebtSlot[] memory emptyDebt = new RiskEngine.DebtSlot[](0);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(RiskEngine.IncompleteDebtSlots.selector, uint32(1), address(0x123))
-        );
+        vm.expectRevert(abi.encodeWithSelector(RiskEngine.IncompleteDebtSlots.selector, uint32(1), address(0x123)));
         riskEngine.accountData(alice, collateralSlots, emptyDebt);
     }
 
@@ -301,8 +312,7 @@ contract SlotCompletenessTest is BaseTest {
             abi.encodeWithSelector(LiquidationEngine.IncompleteCollateralSlots.selector, uint32(1), address(0x123))
         );
         liquidationEngine.liquidate(
-            alice, 1, address(0x123), 50e18, 1, address(0x123),
-            emptyCollateral, debtSlots, bytes(""), fee
+            alice, 1, address(0x123), 50e18, 1, address(0x123), emptyCollateral, debtSlots, bytes(""), fee
         );
     }
 
@@ -326,8 +336,7 @@ contract SlotCompletenessTest is BaseTest {
             abi.encodeWithSelector(LiquidationEngine.IncompleteDebtSlots.selector, uint32(1), address(0x123))
         );
         liquidationEngine.liquidate(
-            alice, 1, address(0x123), 50e18, 1, address(0x123),
-            collateralSlots, emptyDebt, bytes(""), fee
+            alice, 1, address(0x123), 50e18, 1, address(0x123), collateralSlots, emptyDebt, bytes(""), fee
         );
     }
 
@@ -358,8 +367,7 @@ contract SlotCompletenessTest is BaseTest {
             abi.encodeWithSelector(LiquidationEngine.IncompleteCollateralSlots.selector, uint32(2), address(0x124))
         );
         liquidationEngine.liquidate(
-            alice, 1, address(0x123), 50e18, 1, address(0x123),
-            partialCollateral, debtSlots, bytes(""), fee
+            alice, 1, address(0x123), 50e18, 1, address(0x123), partialCollateral, debtSlots, bytes(""), fee
         );
     }
 
@@ -431,9 +439,7 @@ contract SlotCompletenessTest is BaseTest {
         duplicateDebtSlots[1] = RiskEngine.DebtSlot({eid: 1, asset: address(0x123)});
         duplicateDebtSlots[2] = RiskEngine.DebtSlot({eid: 1, asset: address(0x123)});
 
-        vm.expectRevert(
-            abi.encodeWithSelector(RiskEngine.DuplicateDebtSlot.selector, uint32(1), address(0x123))
-        );
+        vm.expectRevert(abi.encodeWithSelector(RiskEngine.DuplicateDebtSlot.selector, uint32(1), address(0x123)));
         riskEngine.accountData(alice, collateralSlots, duplicateDebtSlots);
     }
 
@@ -450,9 +456,7 @@ contract SlotCompletenessTest is BaseTest {
         duplicateDebtSlots[0] = RiskEngine.DebtSlot({eid: 1, asset: address(0x123)});
         duplicateDebtSlots[1] = RiskEngine.DebtSlot({eid: 1, asset: address(0x123)});
 
-        vm.expectRevert(
-            abi.encodeWithSelector(RiskEngine.DuplicateDebtSlot.selector, uint32(1), address(0x123))
-        );
+        vm.expectRevert(abi.encodeWithSelector(RiskEngine.DuplicateDebtSlot.selector, uint32(1), address(0x123)));
         riskEngine.canBorrow(alice, 1, address(0x123), 10e18, collateralSlots, duplicateDebtSlots);
     }
 
@@ -478,12 +482,9 @@ contract SlotCompletenessTest is BaseTest {
         MessagingFee memory fee = MessagingFee({nativeFee: 0, lzTokenFee: 0});
 
         vm.prank(bob);
-        vm.expectRevert(
-            abi.encodeWithSelector(LiquidationEngine.DuplicateDebtSlot.selector, uint32(1), address(0x123))
-        );
+        vm.expectRevert(abi.encodeWithSelector(LiquidationEngine.DuplicateDebtSlot.selector, uint32(1), address(0x123)));
         liquidationEngine.liquidate(
-            alice, 1, address(0x123), 50e18, 1, address(0x123),
-            collateralSlots, duplicateDebtSlots, bytes(""), fee
+            alice, 1, address(0x123), 50e18, 1, address(0x123), collateralSlots, duplicateDebtSlots, bytes(""), fee
         );
     }
 
@@ -508,8 +509,7 @@ contract SlotCompletenessTest is BaseTest {
             abi.encodeWithSelector(LiquidationEngine.DuplicateCollateralSlot.selector, uint32(1), address(0x123))
         );
         liquidationEngine.liquidate(
-            alice, 1, address(0x123), 50e18, 1, address(0x123),
-            duplicateCollateral, debtSlots, bytes(""), fee
+            alice, 1, address(0x123), 50e18, 1, address(0x123), duplicateCollateral, debtSlots, bytes(""), fee
         );
     }
 
@@ -533,8 +533,13 @@ contract SlotCompletenessTest is BaseTest {
         // Should succeed — all positions included
         riskEngine.validateAndCreateBorrow(
             bytes32(keccak256("valid_complete_borrow")),
-            alice, 1, address(0x123), 5e18, alice,
-            collateralSlots, debtSlots
+            alice,
+            1,
+            address(0x123),
+            5e18,
+            alice,
+            collateralSlots,
+            debtSlots
         );
     }
 }

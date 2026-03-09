@@ -182,4 +182,43 @@ contract BorrowTest is BaseIntegrationTest {
             spokeEid, canonicalToken, 41e18, collateralSlots, debtSlots, bytes(""), fee
         );
     }
+
+    /// @notice stale borrow index should not allow marginal borrows
+    ///   that would be blocked if interest were properly accrued.
+    function test_StaleInterestDoesNotInflateHealthFactor() public {
+        uint256 depositAmount = 100e18;
+        // Borrow at exactly 80% LTV (the maximum allowed)
+        uint256 borrowAmount = 80e18;
+
+        _mockOraclePrice(canonicalToken, 1e18);
+        _depositAndCredit(alice, bytes32("deposit_stale"), canonicalToken, depositAmount);
+
+        (IRiskEngine.CollateralSlot[] memory collateralSlots, IRiskEngine.DebtSlot[] memory debtSlots) = _buildSlots();
+        MessagingFee memory fee = MessagingFee({nativeFee: 0.1 ether, lzTokenFee: 0});
+
+        // First borrow: 80e18 (exactly at borrow power limit)
+        _mockLzSend();
+        bytes32 borrowId =
+            keccak256(abi.encodePacked(alice, spokeEid, canonicalToken, borrowAmount, block.number, uint256(0)));
+
+        vm.prank(alice);
+        hubRouter.borrowAndNotify{value: 0.1 ether}(
+            spokeEid, canonicalToken, borrowAmount, collateralSlots, debtSlots, bytes(""), fee
+        );
+        _simulateBorrowReceipt(borrowId, alice, canonicalToken, borrowAmount, true);
+
+        // Advance time so interest accrues (5% APR for 1 year → debt ~84e18)
+        // Without accrue, debtOf still reports 80e18 (stale index).
+        vm.warp(block.timestamp + 365 days);
+
+        // Attempt a tiny additional borrow (1 wei).
+        // With stale index: debt appears as 80e18, borrow power is 80e18 → 1 wei fits.
+        // With fresh accrual: debt ≈ 84e18 > 80e18 borrow power → reverts.
+        _mockLzSend();
+        vm.prank(alice);
+        vm.expectRevert(); // InsufficientBorrowPower (debt + accrued interest exceeds borrow power)
+        hubRouter.borrowAndNotify{value: 0.1 ether}(
+            spokeEid, canonicalToken, 1, collateralSlots, debtSlots, bytes(""), fee
+        );
+    }
 }

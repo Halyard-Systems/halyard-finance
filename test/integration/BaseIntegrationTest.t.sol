@@ -30,9 +30,9 @@ contract BaseIntegrationTest is BaseTest {
     }
 
     /// @notice Simulate the hub receiving a WITHDRAW_RELEASED receipt from spoke
-    function _simulateWithdrawReceipt(
-        address user, address asset, uint256 amount, bool success, uint256 nonce
-    ) internal {
+    function _simulateWithdrawReceipt(address user, address asset, uint256 amount, bool success, uint256 nonce)
+        internal
+    {
         uint32 srcEid = spokeController.spokeEid();
         bytes32 spokeSender = bytes32(uint256(uint160(address(spokeController))));
 

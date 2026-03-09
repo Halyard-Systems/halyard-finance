@@ -276,17 +276,8 @@ contract HubRouter is Ownable, Pausable, AccessManaged {
      *   On failure: Just clears the reservation. Debt is NOT burned (seizure didn't happen).
      */
     function finalizeLiquidation(bytes32 liqId, bool success) external restricted {
-        (
-            address user,
-            ,
-            ,
-            ,
-            ,
-            uint32 debtEid,
-            address debtAsset,
-            uint256 debtRepayAmount,
-            ,
-        ) = positionBook.finalizePendingLiquidation(liqId, success);
+        (address user,,,,, uint32 debtEid, address debtAsset, uint256 debtRepayAmount,,) =
+            positionBook.finalizePendingLiquidation(liqId, success);
 
         // Only burn debt if spoke seizure succeeded — prevents permanent debt erasure on failure
         if (success) {

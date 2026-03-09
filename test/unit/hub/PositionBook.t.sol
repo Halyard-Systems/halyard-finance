@@ -25,12 +25,7 @@ contract PositionBookTest is BaseTest {
             EID,
             ASSET,
             AssetRegistry.CollateralConfig({
-                isSupported: true,
-                ltvBps: 8000,
-                liqThresholdBps: 8500,
-                liqBonusBps: 500,
-                decimals: 18,
-                supplyCap: cap
+                isSupported: true, ltvBps: 8000, liqThresholdBps: 8500, liqBonusBps: 500, decimals: 18, supplyCap: cap
             })
         );
     }
@@ -59,9 +54,7 @@ contract PositionBookTest is BaseTest {
         _setSupplyCap(CAP);
 
         vm.prank(address(hubController));
-        vm.expectRevert(
-            abi.encodeWithSelector(PositionBook.SupplyCapExceeded.selector, EID, ASSET, CAP, CAP + 1)
-        );
+        vm.expectRevert(abi.encodeWithSelector(PositionBook.SupplyCapExceeded.selector, EID, ASSET, CAP, CAP + 1));
         positionBook.creditCollateral(alice, EID, ASSET, CAP + 1);
     }
 
@@ -72,9 +65,7 @@ contract PositionBookTest is BaseTest {
         positionBook.creditCollateral(alice, EID, ASSET, 600e18);
 
         vm.prank(address(hubController));
-        vm.expectRevert(
-            abi.encodeWithSelector(PositionBook.SupplyCapExceeded.selector, EID, ASSET, CAP, 1100e18)
-        );
+        vm.expectRevert(abi.encodeWithSelector(PositionBook.SupplyCapExceeded.selector, EID, ASSET, CAP, 1100e18));
         positionBook.creditCollateral(bob, EID, ASSET, 500e18);
     }
 

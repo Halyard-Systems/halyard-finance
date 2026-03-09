@@ -73,6 +73,9 @@ interface IDebtManager {
 
     /// @notice Returns all (eid, asset) pairs the user has debt in.
     function debtAssetsOf(address user) external view returns (ChainAsset[] memory);
+
+    /// @notice Accrue interest for an (eid, asset) pair, updating the stored borrow index.
+    function accrue(uint32 eid, address asset) external;
 }
 
 interface IAssetRegistry {
@@ -306,6 +309,9 @@ contract RiskEngine is AccessManaged, ReentrancyGuard {
         if (amount == 0) revert InvalidAmount();
         if (srcEid == 0) revert InvalidAmount();
 
+        // Accrue interest so debtOf() reflects up-to-date borrow indices
+        _accrueDebtSlots(debtSlots);
+
         {
             // Supported debt asset on destination chain
             IAssetRegistry.DebtConfig memory dc = assetRegistry.debtConfig(srcEid, debtAsset);
@@ -348,6 +354,9 @@ contract RiskEngine is AccessManaged, ReentrancyGuard {
         if (user == address(0) || receiver == address(0) || collateralAsset == address(0)) revert InvalidAddress();
         if (amount == 0) revert InvalidAmount();
         if (srcEid == 0) revert InvalidAmount();
+
+        // Accrue interest so debtOf() reflects up-to-date borrow indices
+        _accrueDebtSlots(debtSlots);
 
         // Check supported collateral and available balance
         IAssetRegistry.CollateralConfig memory cc = assetRegistry.collateralConfig(srcEid, collateralAsset);
@@ -430,6 +439,14 @@ contract RiskEngine is AccessManaged, ReentrancyGuard {
 
         for (uint256 j = 0; j < seenCount; j++) {
             if (seenKeys[j] == key) revert DuplicateCollateralSlot(eid, asset);
+        }
+    }
+
+    /// @notice Accrue interest for all debt slots so that debtOf() reads fresh indices.
+    function _accrueDebtSlots(DebtSlot[] calldata debtSlots) internal {
+        for (uint256 i = 0; i < debtSlots.length; i++) {
+            if (debtSlots[i].asset == address(0)) continue;
+            debtManager.accrue(debtSlots[i].eid, debtSlots[i].asset);
         }
     }
 

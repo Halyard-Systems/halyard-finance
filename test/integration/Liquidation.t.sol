@@ -103,7 +103,14 @@ contract LiquidationTest is BaseIntegrationTest {
         // Compute expected liqId
         bytes32 expectedLiqId = keccak256(
             abi.encodePacked(
-                bob, alice, spokeEid, canonicalToken, debtToRepay, spokeEid, canonicalToken, block.number,
+                bob,
+                alice,
+                spokeEid,
+                canonicalToken,
+                debtToRepay,
+                spokeEid,
+                canonicalToken,
+                block.number,
                 liquidationEngine.nonces(bob) - 1
             )
         );
@@ -172,7 +179,14 @@ contract LiquidationTest is BaseIntegrationTest {
         // seizeAmount = debtToRepay * (10000 + 500) / 10000 = 20 * 1.05 = 21e18
         bytes32 liqId = keccak256(
             abi.encodePacked(
-                bob, alice, spokeEid, canonicalToken, debtToRepay, spokeEid, canonicalToken, block.number,
+                bob,
+                alice,
+                spokeEid,
+                canonicalToken,
+                debtToRepay,
+                spokeEid,
+                canonicalToken,
+                block.number,
                 liquidationEngine.nonces(bob) - 1
             )
         );
@@ -209,11 +223,22 @@ contract LiquidationTest is BaseIntegrationTest {
         );
 
         // Debt should NOT be burned yet (deferred)
-        assertEq(debtManager.debtOf(alice, spokeEid, canonicalToken), debtBefore, "Debt must not be burned before confirmation");
+        assertEq(
+            debtManager.debtOf(alice, spokeEid, canonicalToken),
+            debtBefore,
+            "Debt must not be burned before confirmation"
+        );
 
         bytes32 liqId = keccak256(
             abi.encodePacked(
-                bob, alice, spokeEid, canonicalToken, debtToRepay, spokeEid, canonicalToken, block.number,
+                bob,
+                alice,
+                spokeEid,
+                canonicalToken,
+                debtToRepay,
+                spokeEid,
+                canonicalToken,
+                block.number,
                 liquidationEngine.nonces(bob) - 1
             )
         );
@@ -225,9 +250,7 @@ contract LiquidationTest is BaseIntegrationTest {
 
         // Debt should be PRESERVED — not burned since seizure failed
         assertEq(
-            debtManager.debtOf(alice, spokeEid, canonicalToken),
-            debtBefore,
-            "Debt must be preserved when seizure fails"
+            debtManager.debtOf(alice, spokeEid, canonicalToken), debtBefore, "Debt must be preserved when seizure fails"
         );
 
         // Collateral should also be preserved
@@ -258,7 +281,14 @@ contract LiquidationTest is BaseIntegrationTest {
 
         bytes32 liqId = keccak256(
             abi.encodePacked(
-                bob, alice, spokeEid, canonicalToken, debtToRepay, spokeEid, canonicalToken, block.number,
+                bob,
+                alice,
+                spokeEid,
+                canonicalToken,
+                debtToRepay,
+                spokeEid,
+                canonicalToken,
+                block.number,
                 liquidationEngine.nonces(bob) - 1
             )
         );
@@ -338,7 +368,14 @@ contract LiquidationTest is BaseIntegrationTest {
 
         bytes32 liqId = keccak256(
             abi.encodePacked(
-                bob, alice, spokeEid, canonicalToken, inflatedRepayAmount, spokeEid, canonicalToken, block.number,
+                bob,
+                alice,
+                spokeEid,
+                canonicalToken,
+                inflatedRepayAmount,
+                spokeEid,
+                canonicalToken,
+                block.number,
                 liquidationEngine.nonces(bob) - 1
             )
         );
@@ -397,7 +434,14 @@ contract LiquidationTest is BaseIntegrationTest {
 
         bytes32 liqId = keccak256(
             abi.encodePacked(
-                bob, alice, spokeEid, canonicalToken, debtToRepay, spokeEid, canonicalToken, block.number,
+                bob,
+                alice,
+                spokeEid,
+                canonicalToken,
+                debtToRepay,
+                spokeEid,
+                canonicalToken,
+                block.number,
                 liquidationEngine.nonces(bob) - 1
             )
         );
