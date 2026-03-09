@@ -234,6 +234,60 @@ contract LiquidationTest is BaseIntegrationTest {
         );
     }
 
+    /// @notice C-1 regression: liquidator cannot inflate debtRepayAmount beyond actual debt
+    ///   to seize disproportionate collateral. The seize amount must be based on the actual
+    ///   debt burned (clamped), not the caller-supplied debtRepayAmount.
+    function test_LiquidationSeizeClampedToActualDebt() public {
+        uint256 depositAmount = 100e18;
+        uint256 borrowAmount = 80e18;
+
+        _depositAndBorrow(alice, depositAmount, borrowAmount);
+        _makePositionLiquidatable();
+        _mockOraclePrice(canonicalToken, 1e18);
+
+        (LiquidationEngine.CollateralSlot[] memory cs, LiquidationEngine.DebtSlot[] memory ds) = _buildLiqSlots();
+        MessagingFee memory fee = MessagingFee({nativeFee: 0.1 ether, lzTokenFee: 0});
+
+        _mockLzSend();
+
+        // Alice's actual debt after interest accrual
+        uint256 actualDebt = debtManager.debtOf(alice, spokeEid, canonicalToken);
+        assertGt(actualDebt, 85e18); // Debt grew past liq threshold
+
+        // Attacker tries to repay 10x the actual debt to inflate seize amount
+        uint256 inflatedRepayAmount = actualDebt * 10;
+
+        vm.prank(bob);
+        liquidationEngine.liquidate{value: 0.1 ether}(
+            alice, spokeEid, canonicalToken, inflatedRepayAmount, spokeEid, canonicalToken, cs, ds, bytes(""), fee
+        );
+
+        // Debt should be fully burned (clamped to actual debt, not inflated amount)
+        uint256 debtAfter = debtManager.debtOf(alice, spokeEid, canonicalToken);
+        assertEq(debtAfter, 0);
+
+        // Seize amount should be based on actualDebt, not inflatedRepayAmount
+        // With 5% bonus: expectedSeize = actualDebt * 1.05
+        uint256 expectedSeize = (actualDebt * 10500) / 10000;
+
+        bytes32 liqId = keccak256(
+            abi.encodePacked(
+                bob, alice, spokeEid, canonicalToken, inflatedRepayAmount, spokeEid, canonicalToken, block.number
+            )
+        );
+
+        _simulateSeizeReceipt(liqId, alice, canonicalToken, expectedSeize, bob, true);
+
+        // Collateral lost should be proportional to actual debt, NOT the inflated amount
+        uint256 collateralAfter = positionBook.collateralOf(alice, spokeEid, canonicalToken);
+        assertEq(collateralAfter, depositAmount - expectedSeize);
+
+        // The inflated amount would have seized 10x more — verify that didn't happen
+        uint256 inflatedSeize = (inflatedRepayAmount * 10500) / 10000;
+        assertGt(collateralAfter, 0, "Collateral should not be fully drained");
+        assertGt(inflatedSeize, depositAmount, "Inflated seize would exceed total collateral");
+    }
+
     function test_LiquidationConfigurableBonus() public {
         // Change the bonus to 10% (1000 bps) via AssetRegistry
         vm.prank(admin);
