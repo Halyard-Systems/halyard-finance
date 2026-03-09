@@ -54,6 +54,10 @@ contract LiquidityVault is Ownable {
     error TransferFailed();
     error NotifyFailed();
     error Paused();
+    error ActiveLiquidityToken(address token);
+    error RescueNotScheduled();
+    error RescueNotReady(uint256 readyAt);
+    error RescueParamsMismatch();
 
     // -----------------------------
     // Events
@@ -74,6 +78,10 @@ contract LiquidityVault is Ownable {
     event AssetAllowed(address indexed asset, bool allowed);
     event UseAllowlistSet(bool enabled);
 
+    event RescueScheduled(address indexed token, address indexed to, uint256 amount, uint256 readyAt);
+    event RescueCancelled(address indexed token);
+    event RescueExecuted(address indexed token, address indexed to, uint256 amount);
+
     // -----------------------------
     // Admin / config
     // -----------------------------
@@ -83,6 +91,20 @@ contract LiquidityVault is Ownable {
     // Optional asset allowlist
     bool public useAllowlist;
     mapping(address => bool) public isAssetAllowed;
+
+    // Tracks tokens that have been used as liquidity (for blocking rescue)
+    mapping(address => bool) public isActiveAsset;
+
+    // Rescue timelock
+    uint256 public constant RESCUE_DELAY = 2 days;
+
+    struct RescueRequest {
+        address to;
+        uint256 amount;
+        uint256 readyAt;
+    }
+
+    mapping(address => RescueRequest) public pendingRescues;
 
     modifier onlyController() {
         _onlyController();
@@ -140,6 +162,7 @@ contract LiquidityVault is Ownable {
         if (useAllowlist && !isAssetAllowed[asset]) revert InvalidAddress();
 
         if (!IERC20(asset).transferFrom(msg.sender, address(this), amount)) revert TransferFailed();
+        isActiveAsset[asset] = true;
         emit LiquidityAdded(msg.sender, asset, amount);
     }
 
@@ -208,11 +231,38 @@ contract LiquidityVault is Ownable {
     }
 
     // -----------------------------
-    // Admin: rescue tokens (dust / wrong transfers)
+    // Admin: rescue (non-liquidity tokens only, with timelock)
     // -----------------------------
-    function rescueERC20(address token, address to, uint256 amount) external onlyOwner {
+
+    /// @notice Schedule a rescue. Reverts if the token is an active liquidity asset.
+    function scheduleRescue(address token, address to, uint256 amount) external onlyOwner {
         if (token == address(0) || to == address(0)) revert InvalidAddress();
         if (amount == 0) revert InvalidAmount();
-        if (!IERC20(token).transfer(to, amount)) revert TransferFailed();
+        if (isActiveAsset[token]) revert ActiveLiquidityToken(token);
+
+        uint256 readyAt = block.timestamp + RESCUE_DELAY;
+        pendingRescues[token] = RescueRequest({to: to, amount: amount, readyAt: readyAt});
+
+        emit RescueScheduled(token, to, amount, readyAt);
+    }
+
+    /// @notice Cancel a pending rescue.
+    function cancelRescue(address token) external onlyOwner {
+        if (pendingRescues[token].readyAt == 0) revert RescueNotScheduled();
+        delete pendingRescues[token];
+        emit RescueCancelled(token);
+    }
+
+    /// @notice Execute a rescue after the timelock has elapsed.
+    function executeRescue(address token) external onlyOwner {
+        RescueRequest memory req = pendingRescues[token];
+        if (req.readyAt == 0) revert RescueNotScheduled();
+        if (block.timestamp < req.readyAt) revert RescueNotReady(req.readyAt);
+        if (isActiveAsset[token]) revert ActiveLiquidityToken(token);
+
+        delete pendingRescues[token];
+        if (!IERC20(token).transfer(req.to, req.amount)) revert TransferFailed();
+
+        emit RescueExecuted(token, req.to, req.amount);
     }
 }

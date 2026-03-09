@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {BaseTest} from "../../BaseTest.t.sol";
 import {LiquidityVault} from "../../../src/spoke/LiquidityVault.sol";
+import {MockERC20} from "../../../src/mocks/MockERC20.sol";
 
 contract LiquidityVaultTest is BaseTest {
     function test_SetController() public {
@@ -272,43 +273,67 @@ contract LiquidityVaultTest is BaseTest {
         assertEq(mockToken.balanceOf(address(liquidityVault)), 0);
     }
 
-    function test_RescueERC20Success() public {
+    function test_RescueActiveToken_Reverts() public {
         vm.startPrank(alice);
         mockToken.approve(address(liquidityVault), 100);
         liquidityVault.addLiquidity(address(mockToken), 100);
         vm.stopPrank();
 
-        uint256 aliceBalanceBefore = mockToken.balanceOf(alice);
-        uint256 liquidityVaultBalanceBefore = mockToken.balanceOf(address(liquidityVault));
-
         vm.prank(admin);
-        liquidityVault.rescueERC20(address(mockToken), alice, 70);
-
-        assertEq(mockToken.balanceOf(address(alice)), aliceBalanceBefore + 70);
-        assertEq(mockToken.balanceOf(address(liquidityVault)), liquidityVaultBalanceBefore - 70);
+        vm.expectRevert(abi.encodeWithSelector(LiquidityVault.ActiveLiquidityToken.selector, address(mockToken)));
+        liquidityVault.scheduleRescue(address(mockToken), alice, 70);
     }
 
-    function test_RescueERC20_InvalidAddress() public {
-        uint256 aliceBalanceBefore = mockToken.balanceOf(alice);
-        uint256 liquidityVaultBalanceBefore = mockToken.balanceOf(address(liquidityVault));
+    function test_RescueNonActiveToken_Success() public {
+        // Deploy a stray token and send some to the vault (simulating accidental transfer)
+        MockERC20 strayToken = new MockERC20("Stray", "STRAY", 18);
+        strayToken.mint(address(liquidityVault), 100);
 
+        // Schedule rescue
+        vm.prank(admin);
+        liquidityVault.scheduleRescue(address(strayToken), alice, 70);
+
+        // Cannot execute before timelock
+        vm.prank(admin);
+        vm.expectRevert();
+        liquidityVault.executeRescue(address(strayToken));
+
+        // Warp past timelock
+        vm.warp(block.timestamp + liquidityVault.RESCUE_DELAY() + 1);
+
+        uint256 aliceBefore = strayToken.balanceOf(alice);
+        vm.prank(admin);
+        liquidityVault.executeRescue(address(strayToken));
+
+        assertEq(strayToken.balanceOf(alice), aliceBefore + 70);
+    }
+
+    function test_RescueSchedule_InvalidAddress() public {
         vm.prank(admin);
         vm.expectRevert(abi.encodeWithSelector(LiquidityVault.InvalidAddress.selector));
-        liquidityVault.rescueERC20(address(0), alice, 70);
-
-        assertEq(mockToken.balanceOf(alice), aliceBalanceBefore);
-        assertEq(mockToken.balanceOf(address(liquidityVault)), liquidityVaultBalanceBefore);
+        liquidityVault.scheduleRescue(address(0), alice, 70);
     }
 
-    function test_RescueERC20_InvalidAmount() public {
-        uint256 aliceBalanceBefore = mockToken.balanceOf(alice);
-        uint256 liquidityVaultBalanceBefore = mockToken.balanceOf(address(liquidityVault));
-
+    function test_RescueSchedule_InvalidAmount() public {
         vm.prank(admin);
         vm.expectRevert(abi.encodeWithSelector(LiquidityVault.InvalidAmount.selector));
-        liquidityVault.rescueERC20(address(mockToken), alice, 0);
+        liquidityVault.scheduleRescue(address(mockToken), alice, 0);
+    }
 
-        assertEq(mockToken.balanceOf(alice), aliceBalanceBefore);
-        assertEq(mockToken.balanceOf(address(liquidityVault)), liquidityVaultBalanceBefore);
+    function test_CancelRescue() public {
+        MockERC20 strayToken = new MockERC20("Stray", "STRAY", 18);
+        strayToken.mint(address(liquidityVault), 100);
+
+        vm.prank(admin);
+        liquidityVault.scheduleRescue(address(strayToken), alice, 50);
+
+        vm.prank(admin);
+        liquidityVault.cancelRescue(address(strayToken));
+
+        // Execute should now fail
+        vm.warp(block.timestamp + liquidityVault.RESCUE_DELAY() + 1);
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(LiquidityVault.RescueNotScheduled.selector));
+        liquidityVault.executeRescue(address(strayToken));
     }
 }

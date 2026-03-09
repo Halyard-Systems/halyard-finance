@@ -37,6 +37,10 @@ contract CollateralVault is Ownable {
     error InsufficientBalance(uint256 have, uint256 need);
     error TransferFailed();
     error Paused();
+    error ActiveCollateralToken(address token);
+    error RescueNotScheduled();
+    error RescueNotReady(uint256 readyAt);
+    error RescueParamsMismatch();
 
     // -----------------------------
     // Events
@@ -50,6 +54,10 @@ contract CollateralVault is Ownable {
 
     // Optional allowlist events
     event AssetAllowed(address indexed asset, bool allowed);
+
+    event RescueScheduled(address indexed token, address indexed to, uint256 amount, uint256 readyAt);
+    event RescueCancelled(address indexed token);
+    event RescueExecuted(address indexed token, address indexed to, uint256 amount);
 
     // -----------------------------
     // Admin / config
@@ -110,13 +118,33 @@ contract CollateralVault is Ownable {
     }
 
     // -----------------------------
+    // Rescue timelock
+    // -----------------------------
+    uint256 public constant RESCUE_DELAY = 2 days;
+
+    struct RescueRequest {
+        address to;
+        uint256 amount;
+        uint256 readyAt;
+    }
+
+    mapping(address => RescueRequest) public pendingRescues;
+
+    // -----------------------------
     // Storage: per-user locked balances
     // -----------------------------
     // locked[user][asset] => amount locked in this vault
     mapping(address => mapping(address => uint256)) private locked;
 
+    // Total locked per asset (for blocking rescue of active collateral)
+    mapping(address => uint256) private _totalLocked;
+
     function lockedBalanceOf(address user, address asset) external view returns (uint256) {
         return locked[user][asset];
+    }
+
+    function totalLockedOf(address asset) external view returns (uint256) {
+        return _totalLocked[asset];
     }
 
     // -----------------------------
@@ -142,6 +170,7 @@ contract CollateralVault is Ownable {
 
         // Credit locked balance
         locked[onBehalfOf][asset] += amount;
+        _totalLocked[asset] += amount;
 
         emit Deposited(onBehalfOf, onBehalfOf, asset, amount);
     }
@@ -183,21 +212,44 @@ contract CollateralVault is Ownable {
         uint256 bal = locked[user][asset];
         if (bal < amount) revert InsufficientBalance(bal, amount);
         locked[user][asset] = bal - amount;
+        _totalLocked[asset] -= amount;
 
         if (!IERC20(asset).transfer(to, amount)) revert TransferFailed();
     }
 
     // -----------------------------
-    // Admin: rescue (non-collateral tokens / dust)
+    // Admin: rescue (non-collateral tokens only, with timelock)
     // -----------------------------
-    /**
-     * @notice Rescue tokens from the vault.
-     * WARNING: this can steal user collateral if misused; guard with timelock/multisig in production.
-     * In production, many teams only allow rescuing tokens that are not enabled collateral assets.
-     */
-    function rescueERC20(address token, address to, uint256 amount) external onlyOwner {
+
+    /// @notice Schedule a rescue. Reverts if the token has any active locked collateral.
+    function scheduleRescue(address token, address to, uint256 amount) external onlyOwner {
         if (token == address(0) || to == address(0)) revert InvalidAddress();
         if (amount == 0) revert InvalidAmount();
-        if (!IERC20(token).transfer(to, amount)) revert TransferFailed();
+        if (_totalLocked[token] > 0) revert ActiveCollateralToken(token);
+
+        uint256 readyAt = block.timestamp + RESCUE_DELAY;
+        pendingRescues[token] = RescueRequest({to: to, amount: amount, readyAt: readyAt});
+
+        emit RescueScheduled(token, to, amount, readyAt);
+    }
+
+    /// @notice Cancel a pending rescue.
+    function cancelRescue(address token) external onlyOwner {
+        if (pendingRescues[token].readyAt == 0) revert RescueNotScheduled();
+        delete pendingRescues[token];
+        emit RescueCancelled(token);
+    }
+
+    /// @notice Execute a rescue after the timelock has elapsed.
+    function executeRescue(address token) external onlyOwner {
+        RescueRequest memory req = pendingRescues[token];
+        if (req.readyAt == 0) revert RescueNotScheduled();
+        if (block.timestamp < req.readyAt) revert RescueNotReady(req.readyAt);
+        if (_totalLocked[token] > 0) revert ActiveCollateralToken(token);
+
+        delete pendingRescues[token];
+        if (!IERC20(token).transfer(req.to, req.amount)) revert TransferFailed();
+
+        emit RescueExecuted(token, req.to, req.amount);
     }
 }

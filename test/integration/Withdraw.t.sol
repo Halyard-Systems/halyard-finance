@@ -40,7 +40,7 @@ contract WithdrawTest is BaseIntegrationTest {
         assertEq(positionBook.availableCollateralOf(alice, spokeEid, canonicalToken), depositAmount - withdrawAmount);
 
         // Simulate spoke confirming the withdrawal (WITHDRAW_RELEASED receipt)
-        _simulateWithdrawReceipt(alice, canonicalToken, withdrawAmount, true);
+        _simulateWithdrawReceipt(alice, canonicalToken, withdrawAmount, true, 0);
 
         // Verify final state: collateral debited, reservation cleared, no pending
         assertEq(positionBook.collateralOf(alice, spokeEid, canonicalToken), depositAmount - withdrawAmount);

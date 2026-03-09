@@ -31,9 +31,9 @@ contract BorrowTest is BaseIntegrationTest {
 
         _mockLzSend();
 
-        // Compute expected borrowId (same formula as HubRouter)
+        // Compute expected borrowId (same formula as HubRouter, includes nonce)
         bytes32 expectedBorrowId =
-            keccak256(abi.encodePacked(alice, spokeEid, canonicalToken, borrowAmount, block.number));
+            keccak256(abi.encodePacked(alice, spokeEid, canonicalToken, borrowAmount, block.number, uint256(0)));
 
         vm.prank(alice);
         hubRouter.borrowAndNotify{value: 0.1 ether}(
@@ -83,7 +83,7 @@ contract BorrowTest is BaseIntegrationTest {
         _mockLzSend();
 
         bytes32 expectedBorrowId =
-            keccak256(abi.encodePacked(alice, spokeEid, canonicalToken, borrowAmount, block.number));
+            keccak256(abi.encodePacked(alice, spokeEid, canonicalToken, borrowAmount, block.number, uint256(0)));
 
         vm.prank(alice);
         hubRouter.borrowAndNotify{value: 0.1 ether}(
@@ -112,9 +112,10 @@ contract BorrowTest is BaseIntegrationTest {
         (IRiskEngine.CollateralSlot[] memory collateralSlots, IRiskEngine.DebtSlot[] memory debtSlots) = _buildSlots();
         MessagingFee memory fee = MessagingFee({nativeFee: 0.1 ether, lzTokenFee: 0});
 
-        // First borrow
+        // First borrow (nonce 0)
         _mockLzSend();
-        bytes32 borrowId1 = keccak256(abi.encodePacked(alice, spokeEid, canonicalToken, firstBorrow, block.number));
+        bytes32 borrowId1 =
+            keccak256(abi.encodePacked(alice, spokeEid, canonicalToken, firstBorrow, block.number, uint256(0)));
 
         vm.prank(alice);
         hubRouter.borrowAndNotify{value: 0.1 ether}(
@@ -122,13 +123,10 @@ contract BorrowTest is BaseIntegrationTest {
         );
         _simulateBorrowReceipt(borrowId1, alice, canonicalToken, firstBorrow, true);
 
-        // Advance block so the second borrow produces a distinct borrowId
-        // (borrowId includes block.number, so same-block same-amount borrows collide)
-        vm.roll(block.number + 1);
-
-        // Second borrow (cumulative debt = 60e18 < 80e18 borrow power)
+        // Second borrow (nonce 1, cumulative debt = 60e18 < 80e18 borrow power)
         _mockLzSend();
-        bytes32 borrowId2 = keccak256(abi.encodePacked(alice, spokeEid, canonicalToken, secondBorrow, block.number));
+        bytes32 borrowId2 =
+            keccak256(abi.encodePacked(alice, spokeEid, canonicalToken, secondBorrow, block.number, uint256(1)));
 
         vm.prank(alice);
         hubRouter.borrowAndNotify{value: 0.1 ether}(

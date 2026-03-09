@@ -28,7 +28,9 @@ contract RepayTest is BaseIntegrationTest {
 
         _mockLzSend();
 
-        bytes32 borrowId = keccak256(abi.encodePacked(user, spokeEid, canonicalToken, borrowAmount, block.number));
+        uint256 nonce = hubRouter.nonces(user);
+        bytes32 borrowId =
+            keccak256(abi.encodePacked(user, spokeEid, canonicalToken, borrowAmount, block.number, nonce));
 
         vm.prank(user);
         hubRouter.borrowAndNotify{value: 0.1 ether}(
@@ -108,20 +110,20 @@ contract RepayTest is BaseIntegrationTest {
         (IRiskEngine.CollateralSlot[] memory collateralSlots, IRiskEngine.DebtSlot[] memory debtSlots) = _buildSlots();
         MessagingFee memory fee = MessagingFee({nativeFee: 0.1 ether, lzTokenFee: 0});
 
-        // First borrow
+        // First borrow (nonce 0)
         _mockLzSend();
-        bytes32 borrowId1 = keccak256(abi.encodePacked(alice, spokeEid, canonicalToken, firstBorrow, block.number));
+        bytes32 borrowId1 =
+            keccak256(abi.encodePacked(alice, spokeEid, canonicalToken, firstBorrow, block.number, uint256(0)));
         vm.prank(alice);
         hubRouter.borrowAndNotify{value: 0.1 ether}(
             spokeEid, canonicalToken, firstBorrow, collateralSlots, debtSlots, bytes(""), fee
         );
         _simulateBorrowReceipt(borrowId1, alice, canonicalToken, firstBorrow, true);
 
-        vm.roll(block.number + 1);
-
-        // Second borrow
+        // Second borrow (nonce 1)
         _mockLzSend();
-        bytes32 borrowId2 = keccak256(abi.encodePacked(alice, spokeEid, canonicalToken, secondBorrow, block.number));
+        bytes32 borrowId2 =
+            keccak256(abi.encodePacked(alice, spokeEid, canonicalToken, secondBorrow, block.number, uint256(1)));
         vm.prank(alice);
         hubRouter.borrowAndNotify{value: 0.1 ether}(
             spokeEid, canonicalToken, secondBorrow, collateralSlots, debtSlots, bytes(""), fee

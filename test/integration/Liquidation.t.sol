@@ -46,7 +46,9 @@ contract LiquidationTest is BaseIntegrationTest {
 
         _mockLzSend();
 
-        bytes32 borrowId = keccak256(abi.encodePacked(user, spokeEid, canonicalToken, borrowAmount, block.number));
+        uint256 nonce = hubRouter.nonces(user);
+        bytes32 borrowId =
+            keccak256(abi.encodePacked(user, spokeEid, canonicalToken, borrowAmount, block.number, nonce));
 
         vm.prank(user);
         hubRouter.borrowAndNotify{value: 0.1 ether}(
@@ -100,7 +102,10 @@ contract LiquidationTest is BaseIntegrationTest {
 
         // Compute expected liqId
         bytes32 expectedLiqId = keccak256(
-            abi.encodePacked(bob, alice, spokeEid, canonicalToken, debtToRepay, spokeEid, canonicalToken, block.number)
+            abi.encodePacked(
+                bob, alice, spokeEid, canonicalToken, debtToRepay, spokeEid, canonicalToken, block.number,
+                liquidationEngine.nonces(bob) - 1
+            )
         );
 
         // Verify pending liquidation was created (collateral reserved)
@@ -166,7 +171,10 @@ contract LiquidationTest is BaseIntegrationTest {
         // The liquidation bonus is 500 bps (5%) from AssetRegistry config
         // seizeAmount = debtToRepay * (10000 + 500) / 10000 = 20 * 1.05 = 21e18
         bytes32 liqId = keccak256(
-            abi.encodePacked(bob, alice, spokeEid, canonicalToken, debtToRepay, spokeEid, canonicalToken, block.number)
+            abi.encodePacked(
+                bob, alice, spokeEid, canonicalToken, debtToRepay, spokeEid, canonicalToken, block.number,
+                liquidationEngine.nonces(bob) - 1
+            )
         );
 
         uint256 expectedSeize = (debtToRepay * 10500) / 10000;
@@ -204,7 +212,10 @@ contract LiquidationTest is BaseIntegrationTest {
         assertEq(debtManager.debtOf(alice, spokeEid, canonicalToken), debtBefore, "Debt must not be burned before confirmation");
 
         bytes32 liqId = keccak256(
-            abi.encodePacked(bob, alice, spokeEid, canonicalToken, debtToRepay, spokeEid, canonicalToken, block.number)
+            abi.encodePacked(
+                bob, alice, spokeEid, canonicalToken, debtToRepay, spokeEid, canonicalToken, block.number,
+                liquidationEngine.nonces(bob) - 1
+            )
         );
 
         uint256 expectedSeize = (debtToRepay * 10500) / 10000;
@@ -246,7 +257,10 @@ contract LiquidationTest is BaseIntegrationTest {
         );
 
         bytes32 liqId = keccak256(
-            abi.encodePacked(bob, alice, spokeEid, canonicalToken, debtToRepay, spokeEid, canonicalToken, block.number)
+            abi.encodePacked(
+                bob, alice, spokeEid, canonicalToken, debtToRepay, spokeEid, canonicalToken, block.number,
+                liquidationEngine.nonces(bob) - 1
+            )
         );
 
         uint256 expectedSeize = (debtToRepay * 10500) / 10000;
@@ -324,7 +338,8 @@ contract LiquidationTest is BaseIntegrationTest {
 
         bytes32 liqId = keccak256(
             abi.encodePacked(
-                bob, alice, spokeEid, canonicalToken, inflatedRepayAmount, spokeEid, canonicalToken, block.number
+                bob, alice, spokeEid, canonicalToken, inflatedRepayAmount, spokeEid, canonicalToken, block.number,
+                liquidationEngine.nonces(bob) - 1
             )
         );
 
@@ -381,7 +396,10 @@ contract LiquidationTest is BaseIntegrationTest {
         );
 
         bytes32 liqId = keccak256(
-            abi.encodePacked(bob, alice, spokeEid, canonicalToken, debtToRepay, spokeEid, canonicalToken, block.number)
+            abi.encodePacked(
+                bob, alice, spokeEid, canonicalToken, debtToRepay, spokeEid, canonicalToken, block.number,
+                liquidationEngine.nonces(bob) - 1
+            )
         );
 
         // With 10% bonus: seizeAmount = 20 * 1.10 = 22e18
