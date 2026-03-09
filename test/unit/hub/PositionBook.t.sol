@@ -104,6 +104,35 @@ contract PositionBookTest is BaseTest {
         assertEq(positionBook.globalCollateralOf(EID, ASSET), CAP);
     }
 
+    function test_TooManyCollateralAssets_Reverts() public {
+        // Fill up to MAX_COLLATERAL_ASSETS with distinct (eid, asset) pairs
+        uint256 max = positionBook.MAX_COLLATERAL_ASSETS();
+        for (uint256 i = 0; i < max; i++) {
+            vm.prank(address(hubController));
+            positionBook.creditCollateral(alice, uint32(i + 1), address(uint160(0x1000 + i)), 1);
+        }
+
+        assertEq(positionBook.collateralAssetsOf(alice).length, max);
+
+        // The next distinct asset should revert
+        vm.prank(address(hubController));
+        vm.expectRevert(abi.encodeWithSelector(PositionBook.TooManyCollateralAssets.selector, max));
+        positionBook.creditCollateral(alice, uint32(max + 1), address(uint160(0x1000 + max)), 1);
+    }
+
+    function test_ExistingAssetDoesNotCountTowardCap() public {
+        uint256 max = positionBook.MAX_COLLATERAL_ASSETS();
+        for (uint256 i = 0; i < max; i++) {
+            vm.prank(address(hubController));
+            positionBook.creditCollateral(alice, uint32(i + 1), address(uint160(0x1000 + i)), 1);
+        }
+
+        // Adding more to an existing (eid, asset) pair should still work
+        vm.prank(address(hubController));
+        positionBook.creditCollateral(alice, 1, address(uint160(0x1000)), 100);
+        assertEq(positionBook.collateralOf(alice, 1, address(uint160(0x1000))), 101);
+    }
+
     // function test_ReservedCollateralOf() public {
     //     vm.prank(riskEngine);
     //     positionBook.reserveCollateral(alice, 1, address(0x123), 100);

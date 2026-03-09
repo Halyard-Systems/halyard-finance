@@ -59,6 +59,7 @@ contract DebtManager is AccessManaged, ReentrancyGuard {
     error AccrualOverflow();
     error DebtUnderflow();
     error CapExceeded(uint256 cap, uint256 nextTotalDebt);
+    error TooManyDebtAssets(uint256 max);
 
     // -----------------------------
     // Events
@@ -73,11 +74,6 @@ contract DebtManager is AccessManaged, ReentrancyGuard {
         address indexed user, uint256 indexed eid, address indexed asset, uint256 amount, uint256 scaledRemoved
     );
 
-    /// @notice authorized caller for mint/burn (usually HubController, or a Router/Facade)
-    address public minter;
-
-    address public owner;
-
     IAssetRegistryDebtRates public assetRegistry;
 
     constructor(address _owner, address _assetRegistry) AccessManaged(_owner) {
@@ -91,6 +87,9 @@ contract DebtManager is AccessManaged, ReentrancyGuard {
         assetRegistry = IAssetRegistryDebtRates(_assetRegistry);
         emit AssetRegistrySet(_assetRegistry);
     }
+
+    /// @notice Maximum distinct (eid, asset) debt pairs per user
+    uint256 public constant MAX_DEBT_ASSETS = 20;
 
     // -----------------------------
     // Storage (chain-aware: eid => asset => ...)
@@ -250,6 +249,9 @@ contract DebtManager is AccessManaged, ReentrancyGuard {
 
         // Track this debt asset if not already tracked
         if (!_hasDebtAsset[user][eid][asset]) {
+            if (_debtAssets[user].length >= MAX_DEBT_ASSETS) {
+                revert TooManyDebtAssets(MAX_DEBT_ASSETS);
+            }
             _debtAssets[user].push(ChainAsset({eid: eid, asset: asset}));
             _hasDebtAsset[user][eid][asset] = true;
         }

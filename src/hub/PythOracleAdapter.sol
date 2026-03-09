@@ -74,7 +74,7 @@ contract PythOracleAdapter is IOracle, AccessManaged {
             }
         }
 
-        if (p.expo > 59 || p.expo < -18) revert ExponentTooLarge(p.expo);
+        if (p.expo > 39 || p.expo < -18) revert ExponentTooLarge(p.expo);
 
         // Normalize to 1e18
         uint256 rawPrice = uint256(uint64(p.price));

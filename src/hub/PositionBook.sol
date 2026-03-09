@@ -60,6 +60,7 @@ contract PositionBook is AccessManaged {
     error DebtAssetNotConfigured(); // if you choose to store allowed debt assets here (optional)
     error WithdrawAlreadyPending();
     error SupplyCapExceeded(uint32 eid, address asset, uint256 cap, uint256 totalAfter);
+    error TooManyCollateralAssets(uint256 max);
 
     // ---------------------------------------------------------------------
     // Events
@@ -131,6 +132,9 @@ contract PositionBook is AccessManaged {
         address asset;
     }
 
+    /// @notice Maximum distinct (eid, asset) collateral pairs per user
+    uint256 public constant MAX_COLLATERAL_ASSETS = 20;
+
     // ---------------------------------------------------------------------
     // Canonical collateral balances (hub-side book)
     // ---------------------------------------------------------------------
@@ -195,6 +199,9 @@ contract PositionBook is AccessManaged {
 
         // Track this asset if not already tracked
         if (!_hasCollateralAsset[user][eid][asset]) {
+            if (_collateralAssets[user].length >= MAX_COLLATERAL_ASSETS) {
+                revert TooManyCollateralAssets(MAX_COLLATERAL_ASSETS);
+            }
             _collateralAssets[user].push(ChainAsset({eid: eid, asset: asset}));
             _hasCollateralAsset[user][eid][asset] = true;
         }
