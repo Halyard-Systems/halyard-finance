@@ -38,7 +38,9 @@ interface ISpokeRepayController {
      * asset:   debt token on this spoke (or canonical asset depending on your mapping approach)
      * amount:  token amount received
      */
-    function onRepayNotified(bytes32 repayId, address payer, address onBehalfOf, address asset, uint256 amount) external;
+    function onRepayNotified(bytes32 repayId, address payer, address onBehalfOf, address asset, uint256 amount)
+        external
+        payable;
 }
 
 contract LiquidityVault is Ownable {
@@ -182,7 +184,7 @@ contract LiquidityVault is Ownable {
      * repayId should be unique. A common pattern is:
      *   repayId = keccak256(abi.encodePacked(block.chainid, msg.sender, onBehalfOf, asset, amount, userNonce))
      */
-    function repay(bytes32 repayId, address asset, uint256 amount, address onBehalfOf) external notPaused {
+    function repay(bytes32 repayId, address asset, uint256 amount, address onBehalfOf) external payable notPaused {
         if (repayId == bytes32(0)) revert InvalidAmount();
         if (asset == address(0) || onBehalfOf == address(0)) revert InvalidAddress();
         if (amount == 0) revert InvalidAmount();
@@ -193,7 +195,9 @@ contract LiquidityVault is Ownable {
 
         // Notify controller (push)
         // If this reverts, the transferFrom is reverted too.
-        try ISpokeRepayController(controller).onRepayNotified(repayId, msg.sender, onBehalfOf, asset, amount) {
+        try ISpokeRepayController(controller).onRepayNotified{value: msg.value}(
+            repayId, msg.sender, onBehalfOf, asset, amount
+        ) {
         // ok
         }
         catch {

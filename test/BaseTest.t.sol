@@ -103,8 +103,7 @@ contract BaseTest is Test {
         // Configure spokeController
         spokeController.setCollateralVault(address(collateralVault));
         spokeController.setLiquidityVault(address(liquidityVault));
-        // forge-lint: disable-next-line(unsafe-typecast)
-        spokeController.configureHub(hubEid, bytes32("test_hub"));
+        spokeController.configureHub(hubEid, bytes32(uint256(uint160(address(hubController)))));
         spokeController.configureSpokeEid(spokeEid);
         // Map canonical token to actual mock token
         spokeController.setTokenMapping(canonicalToken, address(mockToken));

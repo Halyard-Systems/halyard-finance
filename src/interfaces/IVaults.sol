@@ -18,5 +18,7 @@ interface ILiquidityVault {
 
 /// Push-driven hook from LiquidityVault to SpokeController
 interface ISpokeRepayController {
-    function onRepayNotified(bytes32 repayId, address payer, address onBehalfOf, address asset, uint256 amount) external;
+    function onRepayNotified(bytes32 repayId, address payer, address onBehalfOf, address asset, uint256 amount)
+        external
+        payable;
 }
