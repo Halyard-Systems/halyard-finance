@@ -73,6 +73,7 @@ contract BaseTest is Test {
         _setupDefaultAssets(assetRegistry);
 
         positionBook = new PositionBook(address(hubAccessManager));
+        positionBook.setAssetRegistry(address(assetRegistry));
         hubController.setPositionBook(address(positionBook));
         hubRouter.setPositionBook(address(positionBook));
         hubRouter.setHubController(address(hubController));

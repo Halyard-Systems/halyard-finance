@@ -2,6 +2,20 @@
 pragma solidity ^0.8.24;
 
 import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
+
+/// @dev Minimal interface for AssetRegistry supply cap checks
+interface IAssetRegistryPB {
+    struct CollateralConfig {
+        bool isSupported;
+        uint16 ltvBps;
+        uint16 liqThresholdBps;
+        uint16 liqBonusBps;
+        uint8 decimals;
+        uint256 supplyCap;
+    }
+
+    function collateralConfig(uint32 eid, address asset) external view returns (CollateralConfig memory);
+}
 /**
  * PositionBook (Hub-side) - storage for user positions.
  *
@@ -45,6 +59,7 @@ contract PositionBook is AccessManaged {
     error CollateralOverflow(); // (rare) included for completeness
     error DebtAssetNotConfigured(); // if you choose to store allowed debt assets here (optional)
     error WithdrawAlreadyPending();
+    error SupplyCapExceeded(uint32 eid, address asset, uint256 cap, uint256 totalAfter);
 
     // ---------------------------------------------------------------------
     // Events
@@ -62,6 +77,8 @@ contract PositionBook is AccessManaged {
 
     event WithdrawPendingCreated(address indexed user, uint32 indexed srcEid, address asset, uint256 amount);
     event WithdrawPendingFinalized(address user, bool success);
+
+    event AssetRegistrySet(address indexed assetRegistry);
 
     event LiquidationPendingCreated(
         bytes32 indexed liqId,
@@ -103,6 +120,12 @@ contract PositionBook is AccessManaged {
         if (_authority == address(0)) revert InvalidAddress();
     }
 
+    function setAssetRegistry(address _assetRegistry) external restricted {
+        if (_assetRegistry == address(0)) revert InvalidAddress();
+        assetRegistry = IAssetRegistryPB(_assetRegistry);
+        emit AssetRegistrySet(_assetRegistry);
+    }
+
     struct ChainAsset {
         uint32 eid;
         address asset;
@@ -121,8 +144,18 @@ contract PositionBook is AccessManaged {
     // reservedCollateral[user][eid][asset] => amount reserved for pending withdraw or pending seizure
     mapping(address => mapping(uint32 => mapping(address => uint256))) private _reservedCollateral;
 
+    // Global collateral totals for supply cap enforcement
+    // _globalCollateral[eid][asset] => total collateral across all users
+    mapping(uint32 => mapping(address => uint256)) private _globalCollateral;
+
+    IAssetRegistryPB public assetRegistry;
+
     function collateralOf(address user, uint32 eid, address asset) external view returns (uint256) {
         return _collateral[user][eid][asset];
+    }
+
+    function globalCollateralOf(uint32 eid, address asset) external view returns (uint256) {
+        return _globalCollateral[eid][asset];
     }
 
     function collateralAssetsOf(address user) external view returns (ChainAsset[] memory) {
@@ -148,6 +181,16 @@ contract PositionBook is AccessManaged {
         if (eid == 0) revert InvalidEid();
         if (amount == 0) revert InvalidAmount();
 
+        // Enforce supply cap if AssetRegistry is configured
+        if (address(assetRegistry) != address(0)) {
+            uint256 cap = assetRegistry.collateralConfig(eid, asset).supplyCap;
+            if (cap > 0) {
+                uint256 totalAfter = _globalCollateral[eid][asset] + amount;
+                if (totalAfter > cap) revert SupplyCapExceeded(eid, asset, cap, totalAfter);
+            }
+        }
+
+        _globalCollateral[eid][asset] += amount;
         _collateral[user][eid][asset] += amount;
 
         // Track this asset if not already tracked
@@ -164,6 +207,7 @@ contract PositionBook is AccessManaged {
         uint256 bal = _collateral[user][eid][asset];
         if (bal < amount) revert CollateralUnderflow();
         _collateral[user][eid][asset] = bal - amount;
+        _globalCollateral[eid][asset] -= amount;
 
         // If balance is now zero, remove from tracking
         if (_collateral[user][eid][asset] == 0 && _hasCollateralAsset[user][eid][asset]) {
