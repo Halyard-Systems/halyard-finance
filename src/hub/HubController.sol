@@ -35,6 +35,7 @@ contract HubController is AccessManaged, OApp, OAppOptionsType3 {
     event HubRouterSet(address indexed hubRouter);
     event BorrowReleased(bytes32 indexed borrowId, bool success);
     event RepayReceived(bytes32 indexed repayId, address indexed user, uint32 srcEid, address asset, uint256 amount);
+    event CollateralSeized(bytes32 indexed liqId, bool success);
 
     IPositionBook public positionBook;
     IHubRouter public hubRouter;
@@ -163,6 +164,8 @@ contract HubController is AccessManaged, OApp, OAppOptionsType3 {
             _handleBorrowReleased(payload);
         } else if (msgType == uint8(IMessageTypes.MsgType.REPAY_RECEIVED)) {
             _handleRepayReceived(payload);
+        } else if (msgType == uint8(IMessageTypes.MsgType.COLLATERAL_SEIZED)) {
+            _handleCollateralSeized(payload);
         } else {
             revert InvalidMessageType(msgType, origin);
         }
@@ -198,8 +201,16 @@ contract HubController is AccessManaged, OApp, OAppOptionsType3 {
         emit RepayReceived(repayId, user, srcEid, canonicalAsset, amount);
     }
 
+    function _handleCollateralSeized(bytes memory payload) internal {
+        (bytes32 liqId, bool success,,,,,) =
+            abi.decode(payload, (bytes32, bool, address, uint32, address, uint256, address));
+
+        hubRouter.finalizeLiquidation(liqId, success);
+        emit CollateralSeized(liqId, success);
+    }
+
     // ──────────────────────────────────────────────────────────────────────────────
-    // Command Functions (called by HubRouter to send commands to spokes)
+    // Command Functions (called by HubRouter/LiquidationEngine to send commands to spokes)
     // ──────────────────────────────────────────────────────────────────────────────
 
     /**
@@ -240,6 +251,27 @@ contract HubController is AccessManaged, OApp, OAppOptionsType3 {
     ) external payable restricted {
         bytes memory payload = abi.encode(borrowId, user, receiver, asset, amount);
         bytes memory message = abi.encode(uint8(IMessageTypes.MsgType.CMD_RELEASE_BORROW), payload);
+
+        _lzSend(dstEid, message, options, fee, refundAddress);
+    }
+
+    /**
+     * @notice Send CMD_SEIZE_COLLATERAL command to spoke
+     * @dev Called by LiquidationEngine after validating liquidation eligibility
+     */
+    function sendSeizeCommand(
+        uint32 dstEid,
+        bytes32 liqId,
+        address user,
+        address liquidator,
+        address asset,
+        uint256 amount,
+        bytes calldata options,
+        MessagingFee calldata fee,
+        address refundAddress
+    ) external payable restricted {
+        bytes memory payload = abi.encode(liqId, user, liquidator, asset, amount);
+        bytes memory message = abi.encode(uint8(IMessageTypes.MsgType.CMD_SEIZE_COLLATERAL), payload);
 
         _lzSend(dstEid, message, options, fee, refundAddress);
     }

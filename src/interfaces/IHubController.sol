@@ -34,4 +34,17 @@ interface IHubController {
         MessagingFee calldata fee,
         address refundAddress
     ) external payable;
+
+    /// @notice Send CMD_SEIZE_COLLATERAL command to spoke
+    function sendSeizeCommand(
+        uint32 dstEid,
+        bytes32 liqId,
+        address user,
+        address liquidator,
+        address asset,
+        uint256 amount,
+        bytes calldata options,
+        MessagingFee calldata fee,
+        address refundAddress
+    ) external payable;
 }

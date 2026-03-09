@@ -94,6 +94,33 @@ contract BaseIntegrationTest is BaseTest {
         );
     }
 
+    /// @notice Simulate the hub receiving a COLLATERAL_SEIZED receipt from spoke
+    function _simulateSeizeReceipt(
+        bytes32 liqId,
+        address user,
+        address seizeAsset,
+        uint256 seizeAmount,
+        address liquidator,
+        bool success
+    ) internal {
+        uint32 srcEid = spokeController.spokeEid();
+        bytes32 spokeSender = bytes32(uint256(uint160(address(spokeController))));
+
+        // Build COLLATERAL_SEIZED message (msgType = 4)
+        bytes memory payload = abi.encode(liqId, success, user, srcEid, seizeAsset, seizeAmount, liquidator);
+        bytes memory message = abi.encode(uint8(4), payload);
+
+        // Simulate LayerZero delivering the receipt to hub
+        vm.prank(address(mockLzEndpoint));
+        hubController.lzReceive(
+            Origin({srcEid: srcEid, sender: spokeSender, nonce: 5}),
+            bytes32(uint256(5)), // guid
+            message,
+            address(0),
+            bytes("")
+        );
+    }
+
     /// @notice Complete deposit flow: spoke deposit + hub receipt
     /// @param user The user depositing
     /// @param depositId Unique deposit identifier
