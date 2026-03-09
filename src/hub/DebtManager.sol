@@ -59,6 +59,7 @@ contract DebtManager is AccessManaged, ReentrancyGuard {
     error AccrualOverflow();
     error DebtUnderflow();
     error CapExceeded(uint256 cap, uint256 nextTotalDebt);
+    error TooManyDebtAssets(uint256 max);
 
     // -----------------------------
     // Events
@@ -73,11 +74,6 @@ contract DebtManager is AccessManaged, ReentrancyGuard {
         address indexed user, uint256 indexed eid, address indexed asset, uint256 amount, uint256 scaledRemoved
     );
 
-    /// @notice authorized caller for mint/burn (usually HubController, or a Router/Facade)
-    address public minter;
-
-    address public owner;
-
     IAssetRegistryDebtRates public assetRegistry;
 
     constructor(address _owner, address _assetRegistry) AccessManaged(_owner) {
@@ -91,6 +87,9 @@ contract DebtManager is AccessManaged, ReentrancyGuard {
         assetRegistry = IAssetRegistryDebtRates(_assetRegistry);
         emit AssetRegistrySet(_assetRegistry);
     }
+
+    /// @notice Maximum distinct (eid, asset) debt pairs per user
+    uint256 public constant MAX_DEBT_ASSETS = 20;
 
     // -----------------------------
     // Storage (chain-aware: eid => asset => ...)
@@ -107,6 +106,19 @@ contract DebtManager is AccessManaged, ReentrancyGuard {
 
     // userScaledDebt[user][eid][asset] in scaled token units
     mapping(address => mapping(uint32 => mapping(address => uint256))) public userScaledDebt;
+
+    // Track which (eid, asset) pairs each user has debt in (for completeness validation)
+    struct ChainAsset {
+        uint32 eid;
+        address asset;
+    }
+
+    mapping(address => ChainAsset[]) private _debtAssets;
+    mapping(address => mapping(uint32 => mapping(address => bool))) private _hasDebtAsset;
+
+    function debtAssetsOf(address user) external view returns (ChainAsset[] memory) {
+        return _debtAssets[user];
+    }
 
     // -----------------------------
     // Views
@@ -235,6 +247,15 @@ contract DebtManager is AccessManaged, ReentrancyGuard {
         userScaledDebt[user][eid][asset] += scaledAdded;
         totalScaledDebt[eid][asset] += scaledAdded;
 
+        // Track this debt asset if not already tracked
+        if (!_hasDebtAsset[user][eid][asset]) {
+            if (_debtAssets[user].length >= MAX_DEBT_ASSETS) {
+                revert TooManyDebtAssets(MAX_DEBT_ASSETS);
+            }
+            _debtAssets[user].push(ChainAsset({eid: eid, asset: asset}));
+            _hasDebtAsset[user][eid][asset] = true;
+        }
+
         emit DebtMinted(user, uint256(eid), asset, amount, scaledAdded);
     }
 
@@ -273,6 +294,12 @@ contract DebtManager is AccessManaged, ReentrancyGuard {
 
             userScaledDebt[user][eid][asset] = 0;
 
+            // Remove from debt asset tracking since balance is now zero
+            if (_hasDebtAsset[user][eid][asset]) {
+                _removeDebtAsset(user, eid, asset);
+                _hasDebtAsset[user][eid][asset] = false;
+            }
+
             uint256 tot = totalScaledDebt[eid][asset];
             if (tot < scaledRemoved) revert DebtUnderflow();
             totalScaledDebt[eid][asset] = tot - scaledRemoved;
@@ -297,5 +324,19 @@ contract DebtManager is AccessManaged, ReentrancyGuard {
     function _indexOrInit(uint32 eid, address asset) internal view returns (uint256) {
         uint256 idx = borrowIndexRay[eid][asset];
         return idx == 0 ? RAY : idx;
+    }
+
+    /// @notice Remove a ChainAsset from the debt tracking array (swap and pop)
+    function _removeDebtAsset(address user, uint32 eid, address asset) internal {
+        ChainAsset[] storage assets = _debtAssets[user];
+        for (uint256 i = 0; i < assets.length; i++) {
+            if (assets[i].eid == eid && assets[i].asset == asset) {
+                if (i != assets.length - 1) {
+                    assets[i] = assets[assets.length - 1];
+                }
+                assets.pop();
+                return;
+            }
+        }
     }
 }

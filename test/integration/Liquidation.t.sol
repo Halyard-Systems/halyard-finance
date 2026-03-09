@@ -46,7 +46,9 @@ contract LiquidationTest is BaseIntegrationTest {
 
         _mockLzSend();
 
-        bytes32 borrowId = keccak256(abi.encodePacked(user, spokeEid, canonicalToken, borrowAmount, block.number));
+        uint256 nonce = hubRouter.nonces(user);
+        bytes32 borrowId =
+            keccak256(abi.encodePacked(user, spokeEid, canonicalToken, borrowAmount, block.number, nonce));
 
         vm.prank(user);
         hubRouter.borrowAndNotify{value: 0.1 ether}(
@@ -94,13 +96,23 @@ contract LiquidationTest is BaseIntegrationTest {
             alice, spokeEid, canonicalToken, debtToRepay, spokeEid, canonicalToken, cs, ds, bytes(""), fee
         );
 
-        // Verify debt was reduced
-        uint256 debtAfter = debtManager.debtOf(alice, spokeEid, canonicalToken);
-        assertLt(debtAfter, debtBefore);
+        // Debt is deferred — NOT burned yet (C-2 fix)
+        uint256 debtAfterLiquidate = debtManager.debtOf(alice, spokeEid, canonicalToken);
+        assertEq(debtAfterLiquidate, debtBefore, "Debt should not be burned until seizure is confirmed");
 
         // Compute expected liqId
         bytes32 expectedLiqId = keccak256(
-            abi.encodePacked(bob, alice, spokeEid, canonicalToken, debtToRepay, spokeEid, canonicalToken, block.number)
+            abi.encodePacked(
+                bob,
+                alice,
+                spokeEid,
+                canonicalToken,
+                debtToRepay,
+                spokeEid,
+                canonicalToken,
+                block.number,
+                liquidationEngine.nonces(bob) - 1
+            )
         );
 
         // Verify pending liquidation was created (collateral reserved)
@@ -111,6 +123,10 @@ contract LiquidationTest is BaseIntegrationTest {
 
         // Simulate spoke confirming seizure
         _simulateSeizeReceipt(expectedLiqId, alice, canonicalToken, expectedSeize, bob, true);
+
+        // NOW debt should be burned (after successful seizure confirmation)
+        uint256 debtAfter = debtManager.debtOf(alice, spokeEid, canonicalToken);
+        assertLt(debtAfter, debtBefore, "Debt should be burned after successful seizure");
 
         // Verify collateral was debited
         uint256 collateralAfter = positionBook.collateralOf(alice, spokeEid, canonicalToken);
@@ -162,7 +178,17 @@ contract LiquidationTest is BaseIntegrationTest {
         // The liquidation bonus is 500 bps (5%) from AssetRegistry config
         // seizeAmount = debtToRepay * (10000 + 500) / 10000 = 20 * 1.05 = 21e18
         bytes32 liqId = keccak256(
-            abi.encodePacked(bob, alice, spokeEid, canonicalToken, debtToRepay, spokeEid, canonicalToken, block.number)
+            abi.encodePacked(
+                bob,
+                alice,
+                spokeEid,
+                canonicalToken,
+                debtToRepay,
+                spokeEid,
+                canonicalToken,
+                block.number,
+                liquidationEngine.nonces(bob) - 1
+            )
         );
 
         uint256 expectedSeize = (debtToRepay * 10500) / 10000;
@@ -170,6 +196,66 @@ contract LiquidationTest is BaseIntegrationTest {
 
         // Alice lost exactly 21e18 collateral (20e18 debt value + 5% bonus)
         assertEq(positionBook.collateralOf(alice, spokeEid, canonicalToken), depositAmount - expectedSeize);
+    }
+
+    /// @notice C-2 regression: failed spoke seizure must NOT erase borrower's debt.
+    ///   Debt burn is deferred to finalization. On failure, debt stays intact.
+    function test_FailedSeizurePreservesDebt() public {
+        uint256 depositAmount = 100e18;
+        uint256 borrowAmount = 80e18;
+
+        _depositAndBorrow(alice, depositAmount, borrowAmount);
+        _makePositionLiquidatable();
+        _mockOraclePrice(canonicalToken, 1e18);
+
+        (LiquidationEngine.CollateralSlot[] memory cs, LiquidationEngine.DebtSlot[] memory ds) = _buildLiqSlots();
+        MessagingFee memory fee = MessagingFee({nativeFee: 0.1 ether, lzTokenFee: 0});
+
+        _mockLzSend();
+
+        uint256 debtBefore = debtManager.debtOf(alice, spokeEid, canonicalToken);
+        uint256 collateralBefore = positionBook.collateralOf(alice, spokeEid, canonicalToken);
+        uint256 debtToRepay = 40e18;
+
+        vm.prank(bob);
+        liquidationEngine.liquidate{value: 0.1 ether}(
+            alice, spokeEid, canonicalToken, debtToRepay, spokeEid, canonicalToken, cs, ds, bytes(""), fee
+        );
+
+        // Debt should NOT be burned yet (deferred)
+        assertEq(
+            debtManager.debtOf(alice, spokeEid, canonicalToken),
+            debtBefore,
+            "Debt must not be burned before confirmation"
+        );
+
+        bytes32 liqId = keccak256(
+            abi.encodePacked(
+                bob,
+                alice,
+                spokeEid,
+                canonicalToken,
+                debtToRepay,
+                spokeEid,
+                canonicalToken,
+                block.number,
+                liquidationEngine.nonces(bob) - 1
+            )
+        );
+
+        uint256 expectedSeize = (debtToRepay * 10500) / 10000;
+
+        // Spoke FAILS to seize (vault paused, insufficient balance, etc.)
+        _simulateSeizeReceipt(liqId, alice, canonicalToken, expectedSeize, bob, false);
+
+        // Debt should be PRESERVED — not burned since seizure failed
+        assertEq(
+            debtManager.debtOf(alice, spokeEid, canonicalToken), debtBefore, "Debt must be preserved when seizure fails"
+        );
+
+        // Collateral should also be preserved
+        assertEq(positionBook.collateralOf(alice, spokeEid, canonicalToken), collateralBefore);
+        assertEq(positionBook.reservedCollateralOf(alice, spokeEid, canonicalToken), 0);
     }
 
     function test_LiquidationSeizeFailsOnSpoke() public {
@@ -194,7 +280,17 @@ contract LiquidationTest is BaseIntegrationTest {
         );
 
         bytes32 liqId = keccak256(
-            abi.encodePacked(bob, alice, spokeEid, canonicalToken, debtToRepay, spokeEid, canonicalToken, block.number)
+            abi.encodePacked(
+                bob,
+                alice,
+                spokeEid,
+                canonicalToken,
+                debtToRepay,
+                spokeEid,
+                canonicalToken,
+                block.number,
+                liquidationEngine.nonces(bob) - 1
+            )
         );
 
         uint256 expectedSeize = (debtToRepay * 10500) / 10000;
@@ -234,6 +330,73 @@ contract LiquidationTest is BaseIntegrationTest {
         );
     }
 
+    /// @notice C-1 regression: liquidator cannot inflate debtRepayAmount beyond actual debt
+    ///   to seize disproportionate collateral. The seize amount must be based on the actual
+    ///   debt burned (clamped), not the caller-supplied debtRepayAmount.
+    function test_LiquidationSeizeClampedToActualDebt() public {
+        uint256 depositAmount = 100e18;
+        uint256 borrowAmount = 80e18;
+
+        _depositAndBorrow(alice, depositAmount, borrowAmount);
+        _makePositionLiquidatable();
+        _mockOraclePrice(canonicalToken, 1e18);
+
+        (LiquidationEngine.CollateralSlot[] memory cs, LiquidationEngine.DebtSlot[] memory ds) = _buildLiqSlots();
+        MessagingFee memory fee = MessagingFee({nativeFee: 0.1 ether, lzTokenFee: 0});
+
+        _mockLzSend();
+
+        // Alice's actual debt after interest accrual
+        uint256 actualDebt = debtManager.debtOf(alice, spokeEid, canonicalToken);
+        assertGt(actualDebt, 85e18); // Debt grew past liq threshold
+
+        // Attacker tries to repay 10x the actual debt to inflate seize amount
+        uint256 inflatedRepayAmount = actualDebt * 10;
+
+        vm.prank(bob);
+        liquidationEngine.liquidate{value: 0.1 ether}(
+            alice, spokeEid, canonicalToken, inflatedRepayAmount, spokeEid, canonicalToken, cs, ds, bytes(""), fee
+        );
+
+        // Debt is deferred — NOT burned yet
+        uint256 debtAfterLiquidate = debtManager.debtOf(alice, spokeEid, canonicalToken);
+        assertEq(debtAfterLiquidate, actualDebt, "Debt should not be burned until seizure is confirmed");
+
+        // Seize amount should be based on actualDebt, not inflatedRepayAmount
+        // With 5% bonus: expectedSeize = actualDebt * 1.05
+        uint256 expectedSeize = (actualDebt * 10500) / 10000;
+
+        bytes32 liqId = keccak256(
+            abi.encodePacked(
+                bob,
+                alice,
+                spokeEid,
+                canonicalToken,
+                inflatedRepayAmount,
+                spokeEid,
+                canonicalToken,
+                block.number,
+                liquidationEngine.nonces(bob) - 1
+            )
+        );
+
+        _simulateSeizeReceipt(liqId, alice, canonicalToken, expectedSeize, bob, true);
+
+        // NOW debt should be fully burned (clamped to actual debt, not inflated amount)
+        // Allow 1 wei dust from RAY math rounding
+        uint256 debtAfter = debtManager.debtOf(alice, spokeEid, canonicalToken);
+        assertLe(debtAfter, 1, "Debt should be fully burned (within rounding dust)");
+
+        // Collateral lost should be proportional to actual debt, NOT the inflated amount
+        uint256 collateralAfter = positionBook.collateralOf(alice, spokeEid, canonicalToken);
+        assertEq(collateralAfter, depositAmount - expectedSeize);
+
+        // The inflated amount would have seized 10x more — verify that didn't happen
+        uint256 inflatedSeize = (inflatedRepayAmount * 10500) / 10000;
+        assertGt(collateralAfter, 0, "Collateral should not be fully drained");
+        assertGt(inflatedSeize, depositAmount, "Inflated seize would exceed total collateral");
+    }
+
     function test_LiquidationConfigurableBonus() public {
         // Change the bonus to 10% (1000 bps) via AssetRegistry
         vm.prank(admin);
@@ -270,7 +433,17 @@ contract LiquidationTest is BaseIntegrationTest {
         );
 
         bytes32 liqId = keccak256(
-            abi.encodePacked(bob, alice, spokeEid, canonicalToken, debtToRepay, spokeEid, canonicalToken, block.number)
+            abi.encodePacked(
+                bob,
+                alice,
+                spokeEid,
+                canonicalToken,
+                debtToRepay,
+                spokeEid,
+                canonicalToken,
+                block.number,
+                liquidationEngine.nonces(bob) - 1
+            )
         );
 
         // With 10% bonus: seizeAmount = 20 * 1.10 = 22e18

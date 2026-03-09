@@ -67,6 +67,9 @@ contract HubRouter is Ownable, Pausable, AccessManaged {
     IRiskEngine public riskEngine;
     IDebtManager public debtManager;
 
+    /// @notice Per-user nonce to prevent deterministic ID collisions within the same block
+    mapping(address => uint256) public nonces;
+
     // ──────────────────────────────────────────────────────────────────────────────
     // Constructor
     // ──────────────────────────────────────────────────────────────────────────────
@@ -150,7 +153,7 @@ contract HubRouter is Ownable, Pausable, AccessManaged {
         if (amount == 0) revert InvalidAmount();
 
         address user = msg.sender;
-        bytes32 withdrawId = keccak256(abi.encodePacked(user, dstEid, asset, amount, block.number));
+        bytes32 withdrawId = keccak256(abi.encodePacked(user, dstEid, asset, amount, block.number, nonces[user]++));
 
         // Validate health factor via oracle prices, reserve collateral, and create pending withdraw.
         riskEngine.validateAndCreateWithdraw(withdrawId, user, dstEid, asset, amount, user, collateralSlots, debtSlots);
@@ -202,7 +205,7 @@ contract HubRouter is Ownable, Pausable, AccessManaged {
         if (amount == 0) revert InvalidAmount();
 
         address user = msg.sender;
-        bytes32 borrowId = keccak256(abi.encodePacked(user, dstEid, asset, amount, block.number));
+        bytes32 borrowId = keccak256(abi.encodePacked(user, dstEid, asset, amount, block.number, nonces[user]++));
 
         // Validate health factor via oracle prices and reserve debt headroom.
         // RiskEngine calls Pyth for every collateral and debt asset to compute
@@ -269,11 +272,17 @@ contract HubRouter is Ownable, Pausable, AccessManaged {
     /**
      * @notice Finalize a liquidation after spoke sends COLLATERAL_SEIZED receipt
      * @dev Called by HubController after receiving COLLATERAL_SEIZED receipt.
-     *   On success: PositionBook debits collateral and clears reservation.
-     *   On failure: PositionBook just clears the reservation (debt was already burned).
+     *   On success: Burns deferred debt via DebtManager, debits collateral, clears reservation.
+     *   On failure: Just clears the reservation. Debt is NOT burned (seizure didn't happen).
      */
     function finalizeLiquidation(bytes32 liqId, bool success) external restricted {
-        positionBook.finalizePendingLiquidation(liqId, success);
+        (address user,,,,, uint32 debtEid, address debtAsset, uint256 debtRepayAmount,,) =
+            positionBook.finalizePendingLiquidation(liqId, success);
+
+        // Only burn debt if spoke seizure succeeded — prevents permanent debt erasure on failure
+        if (success) {
+            debtManager.burnDebt(user, debtEid, debtAsset, debtRepayAmount);
+        }
 
         emit LiquidationFinalized(liqId, success);
     }

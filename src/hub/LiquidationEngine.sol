@@ -24,24 +24,39 @@ import {IOracle} from "../interfaces/IOracle.sol";
 
 /// @dev Minimal interface for PositionBook functions needed by LiquidationEngine
 interface IPositionBookLiq {
+    struct ChainAsset {
+        uint32 eid;
+        address asset;
+    }
+
     function availableCollateralOf(address user, uint32 eid, address asset) external view returns (uint256);
     function reservedDebtOf(address user, uint32 eid, address asset) external view returns (uint256);
+    function collateralAssetsOf(address user) external view returns (ChainAsset[] memory);
     function createPendingLiquidation(
         bytes32 liqId,
         address user,
         uint32 seizeEid,
         address seizeAsset,
         uint256 seizeAmount,
-        address liquidator
+        address liquidator,
+        uint32 debtEid,
+        address debtAsset,
+        uint256 debtRepayAmount
     ) external;
 }
 
 /// @dev Minimal interface for DebtManager functions needed by LiquidationEngine
 interface IDebtManagerLiq {
+    struct ChainAsset {
+        uint32 eid;
+        address asset;
+    }
+
     function debtOf(address user, uint32 eid, address asset) external view returns (uint256);
     function burnDebt(address user, uint32 eid, address asset, uint256 amount)
         external
         returns (uint256 scaledRemoved, uint256 nominalBurned);
+    function debtAssetsOf(address user) external view returns (ChainAsset[] memory);
 }
 
 /// @dev Minimal interface for AssetRegistry
@@ -100,6 +115,10 @@ contract LiquidationEngine is AccessManaged, ReentrancyGuard {
     error PriceUnavailable(address asset);
     error UnsupportedCollateral(uint32 eid, address asset);
     error UnsupportedDebtAsset(uint32 eid, address asset);
+    error DuplicateCollateralSlot(uint32 eid, address asset);
+    error DuplicateDebtSlot(uint32 eid, address asset);
+    error IncompleteCollateralSlots(uint32 missingEid, address missingAsset);
+    error IncompleteDebtSlots(uint32 missingEid, address missingAsset);
 
     // ---------------------------------------------------------------------
     // Events
@@ -145,6 +164,9 @@ contract LiquidationEngine is AccessManaged, ReentrancyGuard {
     IAssetRegistryLiq public assetRegistry;
     IOracle public oracle;
     IHubControllerLiq public hubController;
+
+    /// @notice Per-liquidator nonce to prevent deterministic ID collisions within the same block
+    mapping(address => uint256) public nonces;
 
     constructor(address _authority) AccessManaged(_authority) {}
 
@@ -224,30 +246,47 @@ contract LiquidationEngine is AccessManaged, ReentrancyGuard {
         IAssetRegistryLiq.DebtConfig memory dc = assetRegistry.debtConfig(debtEid, debtAsset);
         if (!dc.isSupported) revert UnsupportedDebtAsset(debtEid, debtAsset);
 
-        uint256 seizeAmount = _computeSeizeAmount(debtAsset, debtRepayAmount, dc.decimals, seizeAsset, cc);
+        // 3. Clamp repay amount to actual debt (prevents inflated seize — C-1 fix)
+        uint256 actualDebt = debtManager.debtOf(user, debtEid, debtAsset);
+        uint256 clampedRepay = debtRepayAmount > actualDebt ? actualDebt : debtRepayAmount;
+        if (clampedRepay == 0) revert InvalidAmount();
 
-        // 3. Verify enough collateral is available
+        // 4. Compute seize amount based on clamped repay, not caller-supplied amount
+        uint256 seizeAmount = _computeSeizeAmount(debtAsset, clampedRepay, dc.decimals, seizeAsset, cc);
+
+        // 5. Verify enough collateral is available
         uint256 available = positionBook.availableCollateralOf(user, seizeEid, seizeAsset);
         if (available < seizeAmount) revert InsufficientSeizableCollateral(available, seizeAmount);
 
-        // 4. Burn borrower's debt
-        debtManager.burnDebt(user, debtEid, debtAsset, debtRepayAmount);
-
-        // 5. Create pending liquidation (reserves collateral)
+        // 6. Create pending liquidation (reserves collateral + stores debt info for deferred burn)
+        //    Debt is NOT burned here — deferred to finalizeLiquidation to prevent permanent
+        //    debt erasure if the spoke seizure fails (C-2 fix).
         address liquidator = msg.sender;
         bytes32 liqId = keccak256(
-            abi.encodePacked(liquidator, user, debtEid, debtAsset, debtRepayAmount, seizeEid, seizeAsset, block.number)
+            abi.encodePacked(
+                liquidator,
+                user,
+                debtEid,
+                debtAsset,
+                debtRepayAmount,
+                seizeEid,
+                seizeAsset,
+                block.number,
+                nonces[liquidator]++
+            )
         );
 
-        positionBook.createPendingLiquidation(liqId, user, seizeEid, seizeAsset, seizeAmount, liquidator);
+        positionBook.createPendingLiquidation(
+            liqId, user, seizeEid, seizeAsset, seizeAmount, liquidator, debtEid, debtAsset, clampedRepay
+        );
 
-        // 6. Send CMD_SEIZE_COLLATERAL to spoke
+        // 7. Send CMD_SEIZE_COLLATERAL to spoke
         hubController.sendSeizeCommand{value: msg.value}(
             seizeEid, liqId, user, liquidator, seizeAsset, seizeAmount, options, fee, liquidator
         );
 
         emit LiquidationInitiated(
-            liqId, liquidator, user, debtEid, debtAsset, debtRepayAmount, seizeEid, seizeAsset, seizeAmount
+            liqId, liquidator, user, debtEid, debtAsset, clampedRepay, seizeEid, seizeAsset, seizeAmount
         );
     }
 
@@ -276,8 +315,22 @@ contract LiquidationEngine is AccessManaged, ReentrancyGuard {
         view
         returns (uint256 liquidationValueE18)
     {
-        for (uint256 i = 0; i < collateralSlots.length; i++) {
+        // Validate that all on-chain collateral positions are included in supplied slots
+        _validateCollateralCompleteness(user, collateralSlots);
+
+        uint256 n = collateralSlots.length;
+
+        // Track seen (eid, asset) pairs to prevent duplicate counting
+        bytes32[] memory seenKeys = new bytes32[](n);
+        uint256 seenCount = 0;
+
+        for (uint256 i = 0; i < n; i++) {
             CollateralSlot calldata slot = collateralSlots[i];
+
+            // Check for duplicates and add to seen list
+            seenKeys[seenCount] = _validateUniqueCollateralSlot(seenKeys, seenCount, slot.eid, slot.asset);
+            seenCount++;
+
             IAssetRegistryLiq.CollateralConfig memory cc = assetRegistry.collateralConfig(slot.eid, slot.asset);
             if (!cc.isSupported) revert UnsupportedCollateral(slot.eid, slot.asset);
 
@@ -290,8 +343,22 @@ contract LiquidationEngine is AccessManaged, ReentrancyGuard {
     }
 
     function _debtValue(address user, DebtSlot[] calldata debtSlots) internal view returns (uint256 debtValueE18) {
-        for (uint256 i = 0; i < debtSlots.length; i++) {
+        // Validate that all on-chain debt positions are included in supplied slots
+        _validateDebtCompleteness(user, debtSlots);
+
+        uint256 n = debtSlots.length;
+
+        // Track seen (eid, asset) pairs to prevent duplicate counting
+        bytes32[] memory seenKeys = new bytes32[](n);
+        uint256 seenCount = 0;
+
+        for (uint256 i = 0; i < n; i++) {
             DebtSlot calldata slot = debtSlots[i];
+
+            // Check for duplicates and add to seen list
+            seenKeys[seenCount] = _validateUniqueDebtSlot(seenKeys, seenCount, slot.eid, slot.asset);
+            seenCount++;
+
             IAssetRegistryLiq.DebtConfig memory dc = assetRegistry.debtConfig(slot.eid, slot.asset);
             if (!dc.isSupported) revert UnsupportedDebtAsset(slot.eid, slot.asset);
 
@@ -301,6 +368,66 @@ contract LiquidationEngine is AccessManaged, ReentrancyGuard {
             if (totalNominal == 0) continue;
 
             debtValueE18 += _valueE18(slot.asset, totalNominal, dc.decimals);
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // Internal: slot completeness validation
+    // ---------------------------------------------------------------------
+
+    /// @notice Validates that every on-chain collateral position is present in the supplied slots.
+    function _validateCollateralCompleteness(address user, CollateralSlot[] calldata collateralSlots) internal view {
+        IPositionBookLiq.ChainAsset[] memory onChain = positionBook.collateralAssetsOf(user);
+        for (uint256 i = 0; i < onChain.length; i++) {
+            bool found = false;
+            for (uint256 j = 0; j < collateralSlots.length; j++) {
+                if (collateralSlots[j].eid == onChain[i].eid && collateralSlots[j].asset == onChain[i].asset) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) revert IncompleteCollateralSlots(onChain[i].eid, onChain[i].asset);
+        }
+    }
+
+    /// @notice Validates that every on-chain debt position is present in the supplied slots.
+    function _validateDebtCompleteness(address user, DebtSlot[] calldata debtSlots) internal view {
+        IDebtManagerLiq.ChainAsset[] memory onChain = debtManager.debtAssetsOf(user);
+        for (uint256 i = 0; i < onChain.length; i++) {
+            bool found = false;
+            for (uint256 j = 0; j < debtSlots.length; j++) {
+                if (debtSlots[j].eid == onChain[i].eid && debtSlots[j].asset == onChain[i].asset) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) revert IncompleteDebtSlots(onChain[i].eid, onChain[i].asset);
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // Internal: duplicate slot validation
+    // ---------------------------------------------------------------------
+
+    function _validateUniqueCollateralSlot(bytes32[] memory seenKeys, uint256 seenCount, uint32 eid, address asset)
+        internal
+        pure
+        returns (bytes32 key)
+    {
+        key = keccak256(abi.encodePacked(eid, asset));
+        for (uint256 j = 0; j < seenCount; j++) {
+            if (seenKeys[j] == key) revert DuplicateCollateralSlot(eid, asset);
+        }
+    }
+
+    function _validateUniqueDebtSlot(bytes32[] memory seenKeys, uint256 seenCount, uint32 eid, address asset)
+        internal
+        pure
+        returns (bytes32 key)
+    {
+        key = keccak256(abi.encodePacked(eid, asset));
+        for (uint256 j = 0; j < seenCount; j++) {
+            if (seenKeys[j] == key) revert DuplicateDebtSlot(eid, asset);
         }
     }
 

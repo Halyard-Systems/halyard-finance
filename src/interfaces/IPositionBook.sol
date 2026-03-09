@@ -34,14 +34,17 @@ interface IPositionBook {
     /// @notice Clear debt reservation after DebtManager mints debt.
     function clearBorrowReservation(bytes32 borrowId) external;
 
-    /// @notice Create a pending liquidation (reserves collateral for seizure).
+    /// @notice Create a pending liquidation (reserves collateral for seizure, stores debt for deferred burn).
     function createPendingLiquidation(
         bytes32 liqId,
         address user,
         uint32 seizeEid,
         address seizeAsset,
         uint256 seizeAmount,
-        address liquidator
+        address liquidator,
+        uint32 debtEid,
+        address debtAsset,
+        uint256 debtRepayAmount
     ) external;
 
     /// @notice Finalize a pending liquidation after spoke receipt.
@@ -53,6 +56,9 @@ interface IPositionBook {
             address seizeAsset,
             uint256 seizeAmount,
             address liquidator,
+            uint32 debtEid,
+            address debtAsset,
+            uint256 debtRepayAmount,
             bool exists,
             bool finalized
         );

@@ -64,6 +64,7 @@ contract SpokeController is ISpokeRepayController, OApp, OAppOptionsType3 {
     error OnlyLiquidityVault();
     error AssetNotMapped(address spokeOrCanonical);
     error VaultCallFailed();
+    error InsufficientReceiptGas(uint256 required, uint256 provided);
 
     // -----------------------------
     // Events
@@ -82,6 +83,8 @@ contract SpokeController is ISpokeRepayController, OApp, OAppOptionsType3 {
     event MessageSent(uint8 indexed msgType, MessagingReceipt receipt);
 
     event ReceiptSent(uint8 indexed msgType, bytes32 indexed requestId);
+
+    event MinReceiptGasSet(uint256 minReceiptGas);
 
     // -----------------------------
     // Admin / config
@@ -167,6 +170,15 @@ contract SpokeController is ISpokeRepayController, OApp, OAppOptionsType3 {
     {
         if (origin.srcEid != hubEid || origin.sender != trustedRemoteHub) {
             revert UntrustedHub(origin.srcEid, origin.sender);
+        }
+
+        // The original hub→spoke message must deliver enough native gas (via
+        // addExecutorLzReceiveOption) to fund the return receipt.  If it does
+        // not, revert so LayerZero stores the message for retry after the
+        // caller re-sends with adequate gas.
+        uint256 _minReceiptGas = minReceiptGas;
+        if (msg.value < _minReceiptGas) {
+            revert InsufficientReceiptGas(_minReceiptGas, msg.value);
         }
 
         bytes32 msgId = keccak256(abi.encodePacked(origin.srcEid, origin.sender, origin.nonce));
@@ -301,6 +313,7 @@ contract SpokeController is ISpokeRepayController, OApp, OAppOptionsType3 {
     // -----------------------------
     function onRepayNotified(bytes32 repayId, address payer, address onBehalfOf, address spokeAsset, uint256 amount)
         external
+        payable
         override
     {
         if (msg.sender != address(liquidityVault)) revert OnlyLiquidityVault();
@@ -335,6 +348,25 @@ contract SpokeController is ISpokeRepayController, OApp, OAppOptionsType3 {
     function configureSpokeEid(uint32 _spokeEid) external onlyOwner {
         if (_spokeEid == 0) revert InvalidAmount();
         spokeEid = _spokeEid;
+    }
+
+    // -----------------------------
+    // Receipt gas enforcement
+    // -----------------------------
+    /// @notice Minimum native gas that must be delivered with hub→spoke commands
+    ///         (via addExecutorLzReceiveOption) to fund the return receipt.
+    uint256 public minReceiptGas;
+
+    function setMinReceiptGas(uint256 _minReceiptGas) external onlyOwner {
+        minReceiptGas = _minReceiptGas;
+        emit MinReceiptGasSet(_minReceiptGas);
+    }
+
+    /// @notice Recover ETH trapped from LZ fee refunds or accidental sends.
+    function rescueETH(address to, uint256 amount) external onlyOwner {
+        if (to == address(0)) revert InvalidAddress();
+        (bool ok,) = to.call{value: amount}("");
+        require(ok, "ETH transfer failed");
     }
 
     /**
@@ -373,21 +405,15 @@ contract SpokeController is ISpokeRepayController, OApp, OAppOptionsType3 {
     // Outbound messaging helpers
     // -----------------------------
 
-    /// TODO: Replace with _sendMessageToHub, separate lzSend receipt term from payback receipt term
-    /// @dev Send a receipt to hub using stored hub config; uses empty options by default.
+    /// @dev Send a receipt to hub using native gas delivered with the inbound message.
+    ///      For hub→spoke commands, msg.value comes from addExecutorLzReceiveOption.
+    ///      For repay, msg.value is forwarded by LiquidityVault from the user.
+    ///      Refund address is this contract; use rescueETH to recover excess.
     function _sendReceipt(uint8 msgType, bytes memory payload, bytes32 requestId) internal {
-        // For receipts we often keep options empty and require caller to prepay msg.value to cover fees.
-        // In real systems you quote fees and pass options; for now we use defaults.
         bytes memory envelope = abi.encode(msgType, payload);
-
-        // With LZ V2 you should provide options/fee. For a minimal example we use:
-        // - options: empty
-        // - fee: nativeFee = msg.value, lzTokenFee = 0
-        // - refund: owner
         MessagingFee memory fee = MessagingFee({nativeFee: msg.value, lzTokenFee: 0});
 
-        //endpoint.send{value: msg.value}(hubEid, trustedRemoteHub, envelope, bytes(""), fee, owner);
-        _lzSend(hubEid, envelope, bytes(""), fee, msg.sender);
+        _lzSend(hubEid, envelope, bytes(""), fee, address(this));
         emit ReceiptSent(msgType, requestId);
     }
 

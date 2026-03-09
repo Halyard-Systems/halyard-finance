@@ -2,6 +2,20 @@
 pragma solidity ^0.8.24;
 
 import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
+
+/// @dev Minimal interface for AssetRegistry supply cap checks
+interface IAssetRegistryPB {
+    struct CollateralConfig {
+        bool isSupported;
+        uint16 ltvBps;
+        uint16 liqThresholdBps;
+        uint16 liqBonusBps;
+        uint8 decimals;
+        uint256 supplyCap;
+    }
+
+    function collateralConfig(uint32 eid, address asset) external view returns (CollateralConfig memory);
+}
 /**
  * PositionBook (Hub-side) - storage for user positions.
  *
@@ -45,6 +59,8 @@ contract PositionBook is AccessManaged {
     error CollateralOverflow(); // (rare) included for completeness
     error DebtAssetNotConfigured(); // if you choose to store allowed debt assets here (optional)
     error WithdrawAlreadyPending();
+    error SupplyCapExceeded(uint32 eid, address asset, uint256 cap, uint256 totalAfter);
+    error TooManyCollateralAssets(uint256 max);
 
     // ---------------------------------------------------------------------
     // Events
@@ -62,6 +78,8 @@ contract PositionBook is AccessManaged {
 
     event WithdrawPendingCreated(address indexed user, uint32 indexed srcEid, address asset, uint256 amount);
     event WithdrawPendingFinalized(address user, bool success);
+
+    event AssetRegistrySet(address indexed assetRegistry);
 
     event LiquidationPendingCreated(
         bytes32 indexed liqId,
@@ -103,10 +121,19 @@ contract PositionBook is AccessManaged {
         if (_authority == address(0)) revert InvalidAddress();
     }
 
+    function setAssetRegistry(address _assetRegistry) external restricted {
+        if (_assetRegistry == address(0)) revert InvalidAddress();
+        assetRegistry = IAssetRegistryPB(_assetRegistry);
+        emit AssetRegistrySet(_assetRegistry);
+    }
+
     struct ChainAsset {
         uint32 eid;
         address asset;
     }
+
+    /// @notice Maximum distinct (eid, asset) collateral pairs per user
+    uint256 public constant MAX_COLLATERAL_ASSETS = 20;
 
     // ---------------------------------------------------------------------
     // Canonical collateral balances (hub-side book)
@@ -121,8 +148,18 @@ contract PositionBook is AccessManaged {
     // reservedCollateral[user][eid][asset] => amount reserved for pending withdraw or pending seizure
     mapping(address => mapping(uint32 => mapping(address => uint256))) private _reservedCollateral;
 
+    // Global collateral totals for supply cap enforcement
+    // _globalCollateral[eid][asset] => total collateral across all users
+    mapping(uint32 => mapping(address => uint256)) private _globalCollateral;
+
+    IAssetRegistryPB public assetRegistry;
+
     function collateralOf(address user, uint32 eid, address asset) external view returns (uint256) {
         return _collateral[user][eid][asset];
+    }
+
+    function globalCollateralOf(uint32 eid, address asset) external view returns (uint256) {
+        return _globalCollateral[eid][asset];
     }
 
     function collateralAssetsOf(address user) external view returns (ChainAsset[] memory) {
@@ -148,10 +185,23 @@ contract PositionBook is AccessManaged {
         if (eid == 0) revert InvalidEid();
         if (amount == 0) revert InvalidAmount();
 
+        // Enforce supply cap if AssetRegistry is configured
+        if (address(assetRegistry) != address(0)) {
+            uint256 cap = assetRegistry.collateralConfig(eid, asset).supplyCap;
+            if (cap > 0) {
+                uint256 totalAfter = _globalCollateral[eid][asset] + amount;
+                if (totalAfter > cap) revert SupplyCapExceeded(eid, asset, cap, totalAfter);
+            }
+        }
+
+        _globalCollateral[eid][asset] += amount;
         _collateral[user][eid][asset] += amount;
 
         // Track this asset if not already tracked
         if (!_hasCollateralAsset[user][eid][asset]) {
+            if (_collateralAssets[user].length >= MAX_COLLATERAL_ASSETS) {
+                revert TooManyCollateralAssets(MAX_COLLATERAL_ASSETS);
+            }
             _collateralAssets[user].push(ChainAsset({eid: eid, asset: asset}));
             _hasCollateralAsset[user][eid][asset] = true;
         }
@@ -164,6 +214,7 @@ contract PositionBook is AccessManaged {
         uint256 bal = _collateral[user][eid][asset];
         if (bal < amount) revert CollateralUnderflow();
         _collateral[user][eid][asset] = bal - amount;
+        _globalCollateral[eid][asset] -= amount;
 
         // If balance is now zero, remove from tracking
         if (_collateral[user][eid][asset] == 0 && _hasCollateralAsset[user][eid][asset]) {
@@ -372,6 +423,9 @@ contract PositionBook is AccessManaged {
         address seizeAsset;
         uint256 seizeAmount;
         address liquidator;
+        uint32 debtEid; // chain where debt was borrowed
+        address debtAsset; // debt token to burn on success
+        uint256 debtRepayAmount; // nominal debt to burn on success
         bool exists;
         bool finalized;
     }
@@ -380,18 +434,25 @@ contract PositionBook is AccessManaged {
 
     /// @notice Create pending liquidation. Typically called by LiquidationEngine after it decides seize amounts.
     /// This reserves collateral so the user can’t withdraw it while seizure is in-flight.
+    /// Debt is NOT burned here — it is deferred until finalization to avoid permanent debt erasure
+    /// if the spoke seizure fails.
     function createPendingLiquidation(
         bytes32 liqId,
         address user,
         uint32 seizeEid,
         address seizeAsset,
         uint256 seizeAmount,
-        address liquidator
+        address liquidator,
+        uint32 debtEid,
+        address debtAsset,
+        uint256 debtRepayAmount
     ) external restricted {
         if (liqId == bytes32(0)) revert InvalidAmount();
-        if (user == address(0) || seizeAsset == address(0) || liquidator == address(0)) revert InvalidAddress();
-        if (seizeEid == 0) revert InvalidEid();
-        if (seizeAmount == 0) revert InvalidAmount();
+        if (user == address(0) || seizeAsset == address(0) || liquidator == address(0) || debtAsset == address(0)) {
+            revert InvalidAddress();
+        }
+        if (seizeEid == 0 || debtEid == 0) revert InvalidEid();
+        if (seizeAmount == 0 || debtRepayAmount == 0) revert InvalidAmount();
 
         PendingLiquidation storage p = pendingLiquidation[liqId];
         if (p.exists) revert NotPending(liqId);
@@ -407,6 +468,9 @@ contract PositionBook is AccessManaged {
             seizeAsset: seizeAsset,
             seizeAmount: seizeAmount,
             liquidator: liquidator,
+            debtEid: debtEid,
+            debtAsset: debtAsset,
+            debtRepayAmount: debtRepayAmount,
             exists: true,
             finalized: false
         });
@@ -415,14 +479,25 @@ contract PositionBook is AccessManaged {
     }
 
     /// @notice Finalize pending liquidation after spoke seizure receipt.
-    /// On success: debit collateral and drop reservation.
-    /// On failure: just drop reservation.
+    /// On success: debit collateral and drop reservation. Caller should burn debt.
+    /// On failure: just drop reservation. Debt is NOT burned.
     ///
-    /// Called by HubController upon COLLATERAL_SEIZED receipt.
+    /// Called by HubRouter upon COLLATERAL_SEIZED receipt.
     function finalizePendingLiquidation(bytes32 liqId, bool success)
         external
         restricted
-        returns (PendingLiquidation memory l)
+        returns (
+            address user,
+            uint32 seizeEid,
+            address seizeAsset,
+            uint256 seizeAmount,
+            address liquidator,
+            uint32 debtEid,
+            address debtAsset,
+            uint256 debtRepayAmount,
+            bool exists,
+            bool finalized
+        )
     {
         PendingLiquidation storage s = pendingLiquidation[liqId];
         if (!s.exists) revert UnknownPending(liqId);
@@ -439,7 +514,19 @@ contract PositionBook is AccessManaged {
         }
 
         emit LiquidationPendingFinalized(liqId, success);
-        return s;
+
+        return (
+            s.user,
+            s.seizeEid,
+            s.seizeAsset,
+            s.seizeAmount,
+            s.liquidator,
+            s.debtEid,
+            s.debtAsset,
+            s.debtRepayAmount,
+            s.exists,
+            s.finalized
+        );
     }
 
     // ---------------------------------------------------------------------

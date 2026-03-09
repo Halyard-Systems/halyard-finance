@@ -31,12 +31,20 @@ import {IOracle} from "../interfaces/IOracle.sol";
 /// -----------------------------------------------------------------------
 
 interface IPositionBook {
+    struct ChainAsset {
+        uint32 eid;
+        address asset;
+    }
+
     // balances
     function collateralOf(address user, uint32 eid, address asset) external view returns (uint256);
     function reservedCollateralOf(address user, uint32 eid, address asset) external view returns (uint256);
     function availableCollateralOf(address user, uint32 eid, address asset) external view returns (uint256);
 
     function reservedDebtOf(address user, uint32 eid, address asset) external view returns (uint256);
+
+    // position registry
+    function collateralAssetsOf(address user) external view returns (ChainAsset[] memory);
 
     // reservations & pendings (RiskEngine-only on PositionBook)
     function reserveCollateral(address user, uint32 eid, address asset, uint256 amount) external;
@@ -55,8 +63,19 @@ interface IPositionBook {
 }
 
 interface IDebtManager {
+    struct ChainAsset {
+        uint32 eid;
+        address asset;
+    }
+
     /// @notice Returns the user's nominal debt for `asset` on chain `eid` (including accrued interest).
     function debtOf(address user, uint32 eid, address asset) external view returns (uint256);
+
+    /// @notice Returns all (eid, asset) pairs the user has debt in.
+    function debtAssetsOf(address user) external view returns (ChainAsset[] memory);
+
+    /// @notice Accrue interest for an (eid, asset) pair, updating the stored borrow index.
+    function accrue(uint32 eid, address asset) external;
 }
 
 interface IAssetRegistry {
@@ -95,6 +114,9 @@ contract RiskEngine is AccessManaged, ReentrancyGuard {
     error WouldBeUndercollateralized(uint256 liqValueE18, uint256 nextDebtValueE18);
     error InsufficientAvailableCollateral(uint256 available, uint256 requested);
     error DuplicateCollateralSlot(uint32 eid, address asset);
+    error DuplicateDebtSlot(uint32 eid, address asset);
+    error IncompleteCollateralSlots(uint32 missingEid, address missingAsset);
+    error IncompleteDebtSlots(uint32 missingEid, address missingAsset);
 
     // -----------------------------
     // Events
@@ -287,6 +309,9 @@ contract RiskEngine is AccessManaged, ReentrancyGuard {
         if (amount == 0) revert InvalidAmount();
         if (srcEid == 0) revert InvalidAmount();
 
+        // Accrue interest so debtOf() reflects up-to-date borrow indices
+        _accrueDebtSlots(debtSlots);
+
         {
             // Supported debt asset on destination chain
             IAssetRegistry.DebtConfig memory dc = assetRegistry.debtConfig(srcEid, debtAsset);
@@ -330,6 +355,9 @@ contract RiskEngine is AccessManaged, ReentrancyGuard {
         if (amount == 0) revert InvalidAmount();
         if (srcEid == 0) revert InvalidAmount();
 
+        // Accrue interest so debtOf() reflects up-to-date borrow indices
+        _accrueDebtSlots(debtSlots);
+
         // Check supported collateral and available balance
         IAssetRegistry.CollateralConfig memory cc = assetRegistry.collateralConfig(srcEid, collateralAsset);
         if (!cc.isSupported) revert UnsupportedCollateral(srcEid, collateralAsset);
@@ -363,6 +391,9 @@ contract RiskEngine is AccessManaged, ReentrancyGuard {
         view
         returns (uint256 collateralValueE18, uint256 borrowPowerE18, uint256 liquidationValueE18)
     {
+        // Validate that all on-chain collateral positions are included in supplied slots
+        _validateCollateralCompleteness(user, collateralSlots);
+
         uint256 n = collateralSlots.length;
 
         // Track seen (eid, asset) pairs to prevent duplicate counting
@@ -411,15 +442,34 @@ contract RiskEngine is AccessManaged, ReentrancyGuard {
         }
     }
 
+    /// @notice Accrue interest for all debt slots so that debtOf() reads fresh indices.
+    function _accrueDebtSlots(DebtSlot[] calldata debtSlots) internal {
+        for (uint256 i = 0; i < debtSlots.length; i++) {
+            if (debtSlots[i].asset == address(0)) continue;
+            debtManager.accrue(debtSlots[i].eid, debtSlots[i].asset);
+        }
+    }
+
     // -----------------------------
     // Internal: debt sum (includes reservedDebt)
     // -----------------------------
     function _debtSum(address user, DebtSlot[] calldata debtSlots) internal view returns (uint256 debtValueE18) {
+        // Validate that all on-chain debt positions are included in supplied slots
+        _validateDebtCompleteness(user, debtSlots);
+
         uint256 n = debtSlots.length;
+
+        // Track seen (eid, asset) pairs to prevent duplicate counting
+        bytes32[] memory seenKeys = new bytes32[](n);
+        uint256 seenCount = 0;
 
         for (uint256 i = 0; i < n; i++) {
             DebtSlot calldata slot = debtSlots[i];
             if (slot.asset == address(0)) continue;
+
+            // Check for duplicates and add to seen list
+            seenKeys[seenCount] = _validateUniqueDebtSlot(seenKeys, seenCount, slot.eid, slot.asset);
+            seenCount++;
 
             IAssetRegistry.DebtConfig memory dc = assetRegistry.debtConfig(slot.eid, slot.asset);
             if (!dc.isSupported) revert UnsupportedDebtAsset(slot.asset);
@@ -430,6 +480,50 @@ contract RiskEngine is AccessManaged, ReentrancyGuard {
             if (totalNominal == 0) continue;
 
             debtValueE18 += _valueE18Token(slot.asset, totalNominal, dc.decimals);
+        }
+    }
+
+    /// @notice Validates that a debt slot hasn't been seen before and returns its unique key
+    /// @dev Reverts with DuplicateDebtSlot if the (eid, asset) pair already exists in seenKeys
+    function _validateUniqueDebtSlot(bytes32[] memory seenKeys, uint256 seenCount, uint32 eid, address asset)
+        internal
+        pure
+        returns (bytes32 key)
+    {
+        key = keccak256(abi.encodePacked(eid, asset));
+
+        for (uint256 j = 0; j < seenCount; j++) {
+            if (seenKeys[j] == key) revert DuplicateDebtSlot(eid, asset);
+        }
+    }
+
+    /// @notice Validates that every on-chain collateral position is present in the supplied slots.
+    function _validateCollateralCompleteness(address user, CollateralSlot[] calldata collateralSlots) internal view {
+        IPositionBook.ChainAsset[] memory onChain = positionBook.collateralAssetsOf(user);
+        for (uint256 i = 0; i < onChain.length; i++) {
+            bool found = false;
+            for (uint256 j = 0; j < collateralSlots.length; j++) {
+                if (collateralSlots[j].eid == onChain[i].eid && collateralSlots[j].asset == onChain[i].asset) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) revert IncompleteCollateralSlots(onChain[i].eid, onChain[i].asset);
+        }
+    }
+
+    /// @notice Validates that every on-chain debt position is present in the supplied slots.
+    function _validateDebtCompleteness(address user, DebtSlot[] calldata debtSlots) internal view {
+        IDebtManager.ChainAsset[] memory onChain = debtManager.debtAssetsOf(user);
+        for (uint256 i = 0; i < onChain.length; i++) {
+            bool found = false;
+            for (uint256 j = 0; j < debtSlots.length; j++) {
+                if (debtSlots[j].eid == onChain[i].eid && debtSlots[j].asset == onChain[i].asset) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) revert IncompleteDebtSlots(onChain[i].eid, onChain[i].asset);
         }
     }
 

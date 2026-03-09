@@ -7,11 +7,10 @@ import {MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 contract SpokeControllerTest is BaseTest {
     function test_ConfigureHub() public {
         vm.prank(admin);
-        // forge-lint: disable-next-line(unsafe-typecast)
-        spokeController.configureHub(1, bytes32("test"));
+        bytes32 testHub = bytes32(uint256(uint160(address(0xBEEF))));
+        spokeController.configureHub(1, testHub);
         assertEq(spokeController.hubEid(), 1);
-        // forge-lint: disable-next-line(unsafe-typecast)
-        assertEq(spokeController.trustedRemoteHub(), bytes32("test"));
+        assertEq(spokeController.trustedRemoteHub(), testHub);
     }
 
     function test_SetCollateralVault() public {
