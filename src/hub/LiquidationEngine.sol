@@ -224,16 +224,18 @@ contract LiquidationEngine is AccessManaged, ReentrancyGuard {
         IAssetRegistryLiq.DebtConfig memory dc = assetRegistry.debtConfig(debtEid, debtAsset);
         if (!dc.isSupported) revert UnsupportedDebtAsset(debtEid, debtAsset);
 
-        uint256 seizeAmount = _computeSeizeAmount(debtAsset, debtRepayAmount, dc.decimals, seizeAsset, cc);
+        // 3. Burn borrower's debt first to get actual amount burned (burnDebt clamps to user's real debt)
+        (, uint256 nominalBurned) = debtManager.burnDebt(user, debtEid, debtAsset, debtRepayAmount);
+        if (nominalBurned == 0) revert InvalidAmount();
 
-        // 3. Verify enough collateral is available
+        // 4. Compute seize amount based on actual debt burned, not caller-supplied amount
+        uint256 seizeAmount = _computeSeizeAmount(debtAsset, nominalBurned, dc.decimals, seizeAsset, cc);
+
+        // 5. Verify enough collateral is available
         uint256 available = positionBook.availableCollateralOf(user, seizeEid, seizeAsset);
         if (available < seizeAmount) revert InsufficientSeizableCollateral(available, seizeAmount);
 
-        // 4. Burn borrower's debt
-        debtManager.burnDebt(user, debtEid, debtAsset, debtRepayAmount);
-
-        // 5. Create pending liquidation (reserves collateral)
+        // 6. Create pending liquidation (reserves collateral)
         address liquidator = msg.sender;
         bytes32 liqId = keccak256(
             abi.encodePacked(liquidator, user, debtEid, debtAsset, debtRepayAmount, seizeEid, seizeAsset, block.number)
@@ -241,13 +243,13 @@ contract LiquidationEngine is AccessManaged, ReentrancyGuard {
 
         positionBook.createPendingLiquidation(liqId, user, seizeEid, seizeAsset, seizeAmount, liquidator);
 
-        // 6. Send CMD_SEIZE_COLLATERAL to spoke
+        // 7. Send CMD_SEIZE_COLLATERAL to spoke
         hubController.sendSeizeCommand{value: msg.value}(
             seizeEid, liqId, user, liquidator, seizeAsset, seizeAmount, options, fee, liquidator
         );
 
         emit LiquidationInitiated(
-            liqId, liquidator, user, debtEid, debtAsset, debtRepayAmount, seizeEid, seizeAsset, seizeAmount
+            liqId, liquidator, user, debtEid, debtAsset, nominalBurned, seizeEid, seizeAsset, seizeAmount
         );
     }
 
