@@ -32,7 +32,10 @@ interface IPositionBookLiq {
         uint32 seizeEid,
         address seizeAsset,
         uint256 seizeAmount,
-        address liquidator
+        address liquidator,
+        uint32 debtEid,
+        address debtAsset,
+        uint256 debtRepayAmount
     ) external;
 }
 
@@ -224,24 +227,29 @@ contract LiquidationEngine is AccessManaged, ReentrancyGuard {
         IAssetRegistryLiq.DebtConfig memory dc = assetRegistry.debtConfig(debtEid, debtAsset);
         if (!dc.isSupported) revert UnsupportedDebtAsset(debtEid, debtAsset);
 
-        // 3. Burn borrower's debt first to get actual amount burned (burnDebt clamps to user's real debt)
-        (, uint256 nominalBurned) = debtManager.burnDebt(user, debtEid, debtAsset, debtRepayAmount);
-        if (nominalBurned == 0) revert InvalidAmount();
+        // 3. Clamp repay amount to actual debt (prevents inflated seize — C-1 fix)
+        uint256 actualDebt = debtManager.debtOf(user, debtEid, debtAsset);
+        uint256 clampedRepay = debtRepayAmount > actualDebt ? actualDebt : debtRepayAmount;
+        if (clampedRepay == 0) revert InvalidAmount();
 
-        // 4. Compute seize amount based on actual debt burned, not caller-supplied amount
-        uint256 seizeAmount = _computeSeizeAmount(debtAsset, nominalBurned, dc.decimals, seizeAsset, cc);
+        // 4. Compute seize amount based on clamped repay, not caller-supplied amount
+        uint256 seizeAmount = _computeSeizeAmount(debtAsset, clampedRepay, dc.decimals, seizeAsset, cc);
 
         // 5. Verify enough collateral is available
         uint256 available = positionBook.availableCollateralOf(user, seizeEid, seizeAsset);
         if (available < seizeAmount) revert InsufficientSeizableCollateral(available, seizeAmount);
 
-        // 6. Create pending liquidation (reserves collateral)
+        // 6. Create pending liquidation (reserves collateral + stores debt info for deferred burn)
+        //    Debt is NOT burned here — deferred to finalizeLiquidation to prevent permanent
+        //    debt erasure if the spoke seizure fails (C-2 fix).
         address liquidator = msg.sender;
         bytes32 liqId = keccak256(
             abi.encodePacked(liquidator, user, debtEid, debtAsset, debtRepayAmount, seizeEid, seizeAsset, block.number)
         );
 
-        positionBook.createPendingLiquidation(liqId, user, seizeEid, seizeAsset, seizeAmount, liquidator);
+        positionBook.createPendingLiquidation(
+            liqId, user, seizeEid, seizeAsset, seizeAmount, liquidator, debtEid, debtAsset, clampedRepay
+        );
 
         // 7. Send CMD_SEIZE_COLLATERAL to spoke
         hubController.sendSeizeCommand{value: msg.value}(
@@ -249,7 +257,7 @@ contract LiquidationEngine is AccessManaged, ReentrancyGuard {
         );
 
         emit LiquidationInitiated(
-            liqId, liquidator, user, debtEid, debtAsset, nominalBurned, seizeEid, seizeAsset, seizeAmount
+            liqId, liquidator, user, debtEid, debtAsset, clampedRepay, seizeEid, seizeAsset, seizeAmount
         );
     }
 

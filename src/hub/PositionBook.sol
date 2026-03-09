@@ -372,6 +372,9 @@ contract PositionBook is AccessManaged {
         address seizeAsset;
         uint256 seizeAmount;
         address liquidator;
+        uint32 debtEid; // chain where debt was borrowed
+        address debtAsset; // debt token to burn on success
+        uint256 debtRepayAmount; // nominal debt to burn on success
         bool exists;
         bool finalized;
     }
@@ -380,18 +383,25 @@ contract PositionBook is AccessManaged {
 
     /// @notice Create pending liquidation. Typically called by LiquidationEngine after it decides seize amounts.
     /// This reserves collateral so the user can’t withdraw it while seizure is in-flight.
+    /// Debt is NOT burned here — it is deferred until finalization to avoid permanent debt erasure
+    /// if the spoke seizure fails.
     function createPendingLiquidation(
         bytes32 liqId,
         address user,
         uint32 seizeEid,
         address seizeAsset,
         uint256 seizeAmount,
-        address liquidator
+        address liquidator,
+        uint32 debtEid,
+        address debtAsset,
+        uint256 debtRepayAmount
     ) external restricted {
         if (liqId == bytes32(0)) revert InvalidAmount();
-        if (user == address(0) || seizeAsset == address(0) || liquidator == address(0)) revert InvalidAddress();
-        if (seizeEid == 0) revert InvalidEid();
-        if (seizeAmount == 0) revert InvalidAmount();
+        if (user == address(0) || seizeAsset == address(0) || liquidator == address(0) || debtAsset == address(0)) {
+            revert InvalidAddress();
+        }
+        if (seizeEid == 0 || debtEid == 0) revert InvalidEid();
+        if (seizeAmount == 0 || debtRepayAmount == 0) revert InvalidAmount();
 
         PendingLiquidation storage p = pendingLiquidation[liqId];
         if (p.exists) revert NotPending(liqId);
@@ -407,6 +417,9 @@ contract PositionBook is AccessManaged {
             seizeAsset: seizeAsset,
             seizeAmount: seizeAmount,
             liquidator: liquidator,
+            debtEid: debtEid,
+            debtAsset: debtAsset,
+            debtRepayAmount: debtRepayAmount,
             exists: true,
             finalized: false
         });
@@ -415,14 +428,25 @@ contract PositionBook is AccessManaged {
     }
 
     /// @notice Finalize pending liquidation after spoke seizure receipt.
-    /// On success: debit collateral and drop reservation.
-    /// On failure: just drop reservation.
+    /// On success: debit collateral and drop reservation. Caller should burn debt.
+    /// On failure: just drop reservation. Debt is NOT burned.
     ///
-    /// Called by HubController upon COLLATERAL_SEIZED receipt.
+    /// Called by HubRouter upon COLLATERAL_SEIZED receipt.
     function finalizePendingLiquidation(bytes32 liqId, bool success)
         external
         restricted
-        returns (PendingLiquidation memory l)
+        returns (
+            address user,
+            uint32 seizeEid,
+            address seizeAsset,
+            uint256 seizeAmount,
+            address liquidator,
+            uint32 debtEid,
+            address debtAsset,
+            uint256 debtRepayAmount,
+            bool exists,
+            bool finalized
+        )
     {
         PendingLiquidation storage s = pendingLiquidation[liqId];
         if (!s.exists) revert UnknownPending(liqId);
@@ -439,7 +463,19 @@ contract PositionBook is AccessManaged {
         }
 
         emit LiquidationPendingFinalized(liqId, success);
-        return s;
+
+        return (
+            s.user,
+            s.seizeEid,
+            s.seizeAsset,
+            s.seizeAmount,
+            s.liquidator,
+            s.debtEid,
+            s.debtAsset,
+            s.debtRepayAmount,
+            s.exists,
+            s.finalized
+        );
     }
 
     // ---------------------------------------------------------------------

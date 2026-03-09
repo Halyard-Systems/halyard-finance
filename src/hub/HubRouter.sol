@@ -269,11 +269,26 @@ contract HubRouter is Ownable, Pausable, AccessManaged {
     /**
      * @notice Finalize a liquidation after spoke sends COLLATERAL_SEIZED receipt
      * @dev Called by HubController after receiving COLLATERAL_SEIZED receipt.
-     *   On success: PositionBook debits collateral and clears reservation.
-     *   On failure: PositionBook just clears the reservation (debt was already burned).
+     *   On success: Burns deferred debt via DebtManager, debits collateral, clears reservation.
+     *   On failure: Just clears the reservation. Debt is NOT burned (seizure didn't happen).
      */
     function finalizeLiquidation(bytes32 liqId, bool success) external restricted {
-        positionBook.finalizePendingLiquidation(liqId, success);
+        (
+            address user,
+            ,
+            ,
+            ,
+            ,
+            uint32 debtEid,
+            address debtAsset,
+            uint256 debtRepayAmount,
+            ,
+        ) = positionBook.finalizePendingLiquidation(liqId, success);
+
+        // Only burn debt if spoke seizure succeeded — prevents permanent debt erasure on failure
+        if (success) {
+            debtManager.burnDebt(user, debtEid, debtAsset, debtRepayAmount);
+        }
 
         emit LiquidationFinalized(liqId, success);
     }
