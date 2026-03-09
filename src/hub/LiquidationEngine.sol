@@ -165,6 +165,9 @@ contract LiquidationEngine is AccessManaged, ReentrancyGuard {
     IOracle public oracle;
     IHubControllerLiq public hubController;
 
+    /// @notice Per-liquidator nonce to prevent deterministic ID collisions within the same block
+    mapping(address => uint256) public nonces;
+
     constructor(address _authority) AccessManaged(_authority) {}
 
     function setDependencies(
@@ -260,7 +263,7 @@ contract LiquidationEngine is AccessManaged, ReentrancyGuard {
         //    debt erasure if the spoke seizure fails (C-2 fix).
         address liquidator = msg.sender;
         bytes32 liqId = keccak256(
-            abi.encodePacked(liquidator, user, debtEid, debtAsset, debtRepayAmount, seizeEid, seizeAsset, block.number)
+            abi.encodePacked(liquidator, user, debtEid, debtAsset, debtRepayAmount, seizeEid, seizeAsset, block.number, nonces[liquidator]++)
         );
 
         positionBook.createPendingLiquidation(
