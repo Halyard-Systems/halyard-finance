@@ -196,4 +196,334 @@ contract RiskEngineTest is BaseTest {
         assertEq(positionBook.reservedCollateralOf(alice, 2, address(0x124)), 0);
         assertEq(positionBook.availableCollateralOf(alice, 2, address(0x124)), 20e18);
     }
+
+    // ---------------------------------------------------------------
+    // Helpers for slot completeness tests
+    // ---------------------------------------------------------------
+
+    function _mockOracle() internal {
+        vm.mockCall(mockOracle, abi.encodeWithSignature("getPriceE18(address)"), abi.encode(1000e18, block.timestamp));
+    }
+
+    function _creditCollateral(address user, uint32 eid, address asset, uint256 amount) internal {
+        vm.prank(address(hubController));
+        positionBook.creditCollateral(user, eid, asset, amount);
+    }
+
+    function _mintDebt(address user, uint32 eid, address asset, uint256 amount) internal {
+        vm.prank(address(hubRouter));
+        debtManager.mintDebt(user, eid, asset, amount);
+    }
+
+    // ---------------------------------------------------------------
+    // Slot completeness: Borrower omits debt slots
+    // ---------------------------------------------------------------
+
+    function test_RevertsBorrowWithEmptyDebtSlots_WhenDebtExists() public {
+        _mockOracle();
+
+        _creditCollateral(alice, 1, address(0x123), 100e18);
+        _mintDebt(alice, 1, address(0x123), 50e18);
+
+        RiskEngine.CollateralSlot[] memory collateralSlots = new RiskEngine.CollateralSlot[](1);
+        collateralSlots[0] = RiskEngine.CollateralSlot({eid: 1, asset: address(0x123)});
+
+        RiskEngine.DebtSlot[] memory emptyDebtSlots = new RiskEngine.DebtSlot[](0);
+
+        vm.prank(address(hubRouter));
+        vm.expectRevert(abi.encodeWithSelector(RiskEngine.IncompleteDebtSlots.selector, uint32(1), address(0x123)));
+        riskEngine.validateAndCreateBorrow(
+            bytes32(keccak256("exploit_borrow")),
+            alice,
+            1,
+            address(0x123),
+            10e18,
+            alice,
+            collateralSlots,
+            emptyDebtSlots
+        );
+    }
+
+    function test_RevertsBorrowWithPartialDebtSlots() public {
+        _mockOracle();
+        vm.mockCall(
+            mockOracle,
+            abi.encodeWithSignature("getPriceE18(address)", address(0x124)),
+            abi.encode(2000e18, block.timestamp)
+        );
+
+        _creditCollateral(alice, 1, address(0x123), 1000e18);
+        _mintDebt(alice, 1, address(0x123), 50e18);
+        _mintDebt(alice, 2, address(0x124), 30e18);
+
+        RiskEngine.CollateralSlot[] memory collateralSlots = new RiskEngine.CollateralSlot[](1);
+        collateralSlots[0] = RiskEngine.CollateralSlot({eid: 1, asset: address(0x123)});
+
+        RiskEngine.DebtSlot[] memory partialDebtSlots = new RiskEngine.DebtSlot[](1);
+        partialDebtSlots[0] = RiskEngine.DebtSlot({eid: 1, asset: address(0x123)});
+
+        vm.prank(address(hubRouter));
+        vm.expectRevert(abi.encodeWithSelector(RiskEngine.IncompleteDebtSlots.selector, uint32(2), address(0x124)));
+        riskEngine.validateAndCreateBorrow(
+            bytes32(keccak256("exploit_borrow_partial")),
+            alice,
+            1,
+            address(0x123),
+            10e18,
+            alice,
+            collateralSlots,
+            partialDebtSlots
+        );
+    }
+
+    function test_AllowsEmptyDebtSlots_WhenNoDebtExists() public {
+        _mockOracle();
+
+        _creditCollateral(alice, 1, address(0x123), 100e18);
+
+        RiskEngine.CollateralSlot[] memory collateralSlots = new RiskEngine.CollateralSlot[](1);
+        collateralSlots[0] = RiskEngine.CollateralSlot({eid: 1, asset: address(0x123)});
+
+        RiskEngine.DebtSlot[] memory emptyDebtSlots = new RiskEngine.DebtSlot[](0);
+
+        vm.prank(address(hubRouter));
+        riskEngine.validateAndCreateBorrow(
+            bytes32(keccak256("valid_borrow")), alice, 1, address(0x123), 10e18, alice, collateralSlots, emptyDebtSlots
+        );
+    }
+
+    function test_AllowsSuperset_DebtSlots() public {
+        _mockOracle();
+
+        _creditCollateral(alice, 1, address(0x123), 1000e18);
+        _mintDebt(alice, 1, address(0x123), 10e18);
+
+        RiskEngine.CollateralSlot[] memory collateralSlots = new RiskEngine.CollateralSlot[](1);
+        collateralSlots[0] = RiskEngine.CollateralSlot({eid: 1, asset: address(0x123)});
+
+        RiskEngine.DebtSlot[] memory supersetDebtSlots = new RiskEngine.DebtSlot[](2);
+        supersetDebtSlots[0] = RiskEngine.DebtSlot({eid: 1, asset: address(0x123)});
+        supersetDebtSlots[1] = RiskEngine.DebtSlot({eid: 2, asset: address(0x124)});
+
+        vm.prank(address(hubRouter));
+        riskEngine.validateAndCreateBorrow(
+            bytes32(keccak256("valid_superset_borrow")),
+            alice,
+            1,
+            address(0x123),
+            5e18,
+            alice,
+            collateralSlots,
+            supersetDebtSlots
+        );
+    }
+
+    // ---------------------------------------------------------------
+    // Slot completeness: Borrower omits collateral slots
+    // ---------------------------------------------------------------
+
+    function test_RevertsWithdrawWithEmptyCollateralSlots_WhenCollateralExists() public {
+        _mockOracle();
+
+        _creditCollateral(alice, 1, address(0x123), 100e18);
+
+        RiskEngine.CollateralSlot[] memory emptyCollateralSlots = new RiskEngine.CollateralSlot[](0);
+        RiskEngine.DebtSlot[] memory debtSlots = new RiskEngine.DebtSlot[](0);
+
+        vm.prank(address(hubRouter));
+        vm.expectRevert(
+            abi.encodeWithSelector(RiskEngine.IncompleteCollateralSlots.selector, uint32(1), address(0x123))
+        );
+        riskEngine.validateAndCreateWithdraw(
+            bytes32(keccak256("exploit_withdraw")),
+            alice,
+            1,
+            address(0x123),
+            10e18,
+            alice,
+            emptyCollateralSlots,
+            debtSlots
+        );
+    }
+
+    function test_RevertsWithPartialCollateralSlots() public {
+        _mockOracle();
+        vm.mockCall(
+            mockOracle,
+            abi.encodeWithSignature("getPriceE18(address)", address(0x124)),
+            abi.encode(2000e18, block.timestamp)
+        );
+
+        _creditCollateral(alice, 1, address(0x123), 100e18);
+        _creditCollateral(alice, 2, address(0x124), 50e18);
+
+        RiskEngine.CollateralSlot[] memory partialSlots = new RiskEngine.CollateralSlot[](1);
+        partialSlots[0] = RiskEngine.CollateralSlot({eid: 1, asset: address(0x123)});
+
+        RiskEngine.DebtSlot[] memory debtSlots = new RiskEngine.DebtSlot[](0);
+
+        vm.prank(address(hubRouter));
+        vm.expectRevert(
+            abi.encodeWithSelector(RiskEngine.IncompleteCollateralSlots.selector, uint32(2), address(0x124))
+        );
+        riskEngine.validateAndCreateWithdraw(
+            bytes32(keccak256("exploit_partial_collateral")),
+            alice,
+            1,
+            address(0x123),
+            10e18,
+            alice,
+            partialSlots,
+            debtSlots
+        );
+    }
+
+    function test_AllowsEmptyCollateralSlots_WhenNoCollateralExists() public {
+        _mockOracle();
+
+        RiskEngine.CollateralSlot[] memory emptySlots = new RiskEngine.CollateralSlot[](0);
+        RiskEngine.DebtSlot[] memory emptyDebtSlots = new RiskEngine.DebtSlot[](0);
+
+        (uint256 cv, uint256 bp, uint256 lv, uint256 dv, uint256 hf) =
+            riskEngine.accountData(alice, emptySlots, emptyDebtSlots);
+
+        assertEq(cv, 0);
+        assertEq(bp, 0);
+        assertEq(lv, 0);
+        assertEq(dv, 0);
+        assertEq(hf, type(uint256).max);
+    }
+
+    // ---------------------------------------------------------------
+    // Slot completeness: canBorrow / canWithdraw views
+    // ---------------------------------------------------------------
+
+    function test_canBorrowRevertsWithIncompleteDebtSlots() public {
+        _mockOracle();
+
+        _creditCollateral(alice, 1, address(0x123), 1000e18);
+        _mintDebt(alice, 1, address(0x123), 50e18);
+
+        RiskEngine.CollateralSlot[] memory collateralSlots = new RiskEngine.CollateralSlot[](1);
+        collateralSlots[0] = RiskEngine.CollateralSlot({eid: 1, asset: address(0x123)});
+
+        RiskEngine.DebtSlot[] memory emptyDebtSlots = new RiskEngine.DebtSlot[](0);
+
+        vm.expectRevert(abi.encodeWithSelector(RiskEngine.IncompleteDebtSlots.selector, uint32(1), address(0x123)));
+        riskEngine.canBorrow(alice, 1, address(0x123), 10e18, collateralSlots, emptyDebtSlots);
+    }
+
+    function test_canWithdrawRevertsWithIncompleteCollateralSlots() public {
+        _mockOracle();
+
+        _creditCollateral(alice, 1, address(0x123), 100e18);
+        _creditCollateral(alice, 2, address(0x124), 50e18);
+
+        RiskEngine.CollateralSlot[] memory partialSlots = new RiskEngine.CollateralSlot[](1);
+        partialSlots[0] = RiskEngine.CollateralSlot({eid: 1, asset: address(0x123)});
+
+        RiskEngine.DebtSlot[] memory debtSlots = new RiskEngine.DebtSlot[](0);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(RiskEngine.IncompleteCollateralSlots.selector, uint32(2), address(0x124))
+        );
+        riskEngine.canWithdraw(alice, 1, address(0x123), 10e18, partialSlots, debtSlots);
+    }
+
+    // ---------------------------------------------------------------
+    // Slot completeness: accountData view
+    // ---------------------------------------------------------------
+
+    function test_accountDataRevertsWithIncompleteSlots() public {
+        _mockOracle();
+
+        _creditCollateral(alice, 1, address(0x123), 100e18);
+        _mintDebt(alice, 1, address(0x123), 50e18);
+
+        // Missing collateral slot
+        RiskEngine.CollateralSlot[] memory emptyCollateral = new RiskEngine.CollateralSlot[](0);
+        RiskEngine.DebtSlot[] memory debtSlots = new RiskEngine.DebtSlot[](1);
+        debtSlots[0] = RiskEngine.DebtSlot({eid: 1, asset: address(0x123)});
+
+        vm.expectRevert(
+            abi.encodeWithSelector(RiskEngine.IncompleteCollateralSlots.selector, uint32(1), address(0x123))
+        );
+        riskEngine.accountData(alice, emptyCollateral, debtSlots);
+
+        // Missing debt slot
+        RiskEngine.CollateralSlot[] memory collateralSlots = new RiskEngine.CollateralSlot[](1);
+        collateralSlots[0] = RiskEngine.CollateralSlot({eid: 1, asset: address(0x123)});
+        RiskEngine.DebtSlot[] memory emptyDebt = new RiskEngine.DebtSlot[](0);
+
+        vm.expectRevert(abi.encodeWithSelector(RiskEngine.IncompleteDebtSlots.selector, uint32(1), address(0x123)));
+        riskEngine.accountData(alice, collateralSlots, emptyDebt);
+    }
+
+    // ---------------------------------------------------------------
+    // Duplicate debt slots
+    // ---------------------------------------------------------------
+
+    function test_RevertsDuplicateDebtSlots() public {
+        _mockOracle();
+
+        _creditCollateral(alice, 1, address(0x123), 1000e18);
+        _mintDebt(alice, 1, address(0x123), 50e18);
+
+        RiskEngine.CollateralSlot[] memory collateralSlots = new RiskEngine.CollateralSlot[](1);
+        collateralSlots[0] = RiskEngine.CollateralSlot({eid: 1, asset: address(0x123)});
+
+        RiskEngine.DebtSlot[] memory duplicateDebtSlots = new RiskEngine.DebtSlot[](3);
+        duplicateDebtSlots[0] = RiskEngine.DebtSlot({eid: 1, asset: address(0x123)});
+        duplicateDebtSlots[1] = RiskEngine.DebtSlot({eid: 1, asset: address(0x123)});
+        duplicateDebtSlots[2] = RiskEngine.DebtSlot({eid: 1, asset: address(0x123)});
+
+        vm.expectRevert(abi.encodeWithSelector(RiskEngine.DuplicateDebtSlot.selector, uint32(1), address(0x123)));
+        riskEngine.accountData(alice, collateralSlots, duplicateDebtSlots);
+    }
+
+    function test_RevertsDuplicateDebtSlots_canBorrow() public {
+        _mockOracle();
+
+        _creditCollateral(alice, 1, address(0x123), 1000e18);
+        _mintDebt(alice, 1, address(0x123), 50e18);
+
+        RiskEngine.CollateralSlot[] memory collateralSlots = new RiskEngine.CollateralSlot[](1);
+        collateralSlots[0] = RiskEngine.CollateralSlot({eid: 1, asset: address(0x123)});
+
+        RiskEngine.DebtSlot[] memory duplicateDebtSlots = new RiskEngine.DebtSlot[](2);
+        duplicateDebtSlots[0] = RiskEngine.DebtSlot({eid: 1, asset: address(0x123)});
+        duplicateDebtSlots[1] = RiskEngine.DebtSlot({eid: 1, asset: address(0x123)});
+
+        vm.expectRevert(abi.encodeWithSelector(RiskEngine.DuplicateDebtSlot.selector, uint32(1), address(0x123)));
+        riskEngine.canBorrow(alice, 1, address(0x123), 10e18, collateralSlots, duplicateDebtSlots);
+    }
+
+    // ---------------------------------------------------------------
+    // Slot completeness: successful flow
+    // ---------------------------------------------------------------
+
+    function test_BorrowSucceedsWithCompleteSlots() public {
+        _mockOracle();
+
+        _creditCollateral(alice, 1, address(0x123), 1000e18);
+        _mintDebt(alice, 1, address(0x123), 10e18);
+
+        RiskEngine.CollateralSlot[] memory collateralSlots = new RiskEngine.CollateralSlot[](1);
+        collateralSlots[0] = RiskEngine.CollateralSlot({eid: 1, asset: address(0x123)});
+
+        RiskEngine.DebtSlot[] memory debtSlots = new RiskEngine.DebtSlot[](1);
+        debtSlots[0] = RiskEngine.DebtSlot({eid: 1, asset: address(0x123)});
+
+        vm.prank(address(hubRouter));
+        riskEngine.validateAndCreateBorrow(
+            bytes32(keccak256("valid_complete_borrow")),
+            alice,
+            1,
+            address(0x123),
+            5e18,
+            alice,
+            collateralSlots,
+            debtSlots
+        );
+    }
 }
