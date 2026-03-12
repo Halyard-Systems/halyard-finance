@@ -1,7 +1,5 @@
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
-import type { MockAssetData } from '@/sample-data'
-
 // Helper for Shadcn components
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -17,7 +15,6 @@ export function fromWei(amount: bigint, decimals: number): number {
 
 // Helper function to format transaction error messages for better UX
 export function formatTransactionError(errorMessage: string): string {
-  // Extract the main error reason
   const reasonMatch = errorMessage.match(/reason: ([^.]+)/)
   const revertMatch = errorMessage.match(/execution reverted: ([^.]+)/)
 
@@ -29,12 +26,7 @@ export function formatTransactionError(errorMessage: string): string {
     return formatErrorReason(reason)
   }
 
-  // If no specific reason found, return a generic message
   return 'Transaction failed. Please try again or check your input.'
-}
-
-export function isNativeToken(token: MockAssetData): boolean {
-  return token.address === '0x0000000000000000000000000000000000000000'
 }
 
 // Helper function to format specific error reasons

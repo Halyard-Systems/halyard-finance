@@ -1,312 +1,157 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useAccount } from "wagmi";
 import { useQueryClient } from "@tanstack/react-query";
+
 import { Header } from "./components/Header";
 import { Connect } from "./components/Connect";
-import {
-  useReadAssets,
-  useReadDepositManagerBalances,
-  useReadBorrowManagerBalances,
-  useReadBorrowIndices,
-  useReadSupportedTokens,
-  useReadRay,
-} from "./lib/hooks";
-import type { Asset, Token } from "./lib/types";
-
 import { AccountSummary } from "./components/AccountSummary";
 import { Portfolio } from "./components/Portfolio";
 import { QuickActions } from "./components/QuickActions";
 import { TransactionForm } from "./components/TransactionForm";
+import { Liquidation } from "./components/Liquidation";
+import { PendingTransactions } from "./components/PendingTransactions";
 
-// Import both token files
-import MAINNET_TOKENS from "./tokens.json";
-import SEPOLIA_TOKENS from "./tokens_sepolia.json";
+import {
+  useUserSlots,
+  useAccountData,
+  useCollateralPositions,
+  useDebtPositions,
+} from "./lib/hooks";
+import type { ActionName } from "./lib/types";
 
-// Function to get tokens based on network
-const getTokens = (): Token[] => {
-  if (import.meta.env.VITE_NETWORK === "sepolia") {
-    return SEPOLIA_TOKENS;
-  }
-  // Default to mainnet tokens
-  return MAINNET_TOKENS;
-};
-
-const buildMarketRows = (
-  assets: Asset[],
-  tokens: Token[],
-  tokenIdMap: Map<string, `0x${string}`>,
-  userDeposits: bigint[],
-  userBorrows: bigint[],
-  setSelectedToken: (token: Token) => void,
-  setIsDepositModalOpen: (isOpen: boolean) => void,
-  setIsWithdrawModalOpen: (isOpen: boolean) => void,
-  setIsBorrowModalOpen: (isOpen: boolean) => void,
-  setIsRepayModalOpen: (isOpen: boolean) => void
-) => {
-  if (!assets) return [];
-
-  return assets.map((asset, index) => {
-    console.log("asset", asset);
-    console.log("tokens", tokens);
-    const token = tokens.find((token) => token.symbol === asset.symbol);
-    const tokenId = tokenIdMap.get(token?.symbol || "");
-    const userDeposit = userDeposits[index];
-    const userBorrow = userBorrows[index];
-
-    const { depositApy, borrowApy } = calculateAPY(asset);
-
-    return {
-      token: token!,
-      tokenId,
-      deposits: asset.totalDeposits,
-      borrows: asset.totalBorrows,
-      depositApy,
-      borrowApy,
-      userDeposit,
-      userBorrow,
-      onDeposit: () => {
-        setSelectedToken(token!);
-        setIsDepositModalOpen(true);
-      },
-      onWithdraw: () => {
-        setSelectedToken(token!);
-        setIsWithdrawModalOpen(true);
-      },
-      onBorrow: () => {
-        setSelectedToken(token!);
-        setIsBorrowModalOpen(true);
-      },
-      onRepay: () => {
-        setSelectedToken(token!);
-        setIsRepayModalOpen(true);
-      },
-    };
-  });
-};
-
-// TODO: Replace with contract interest rate model
-// Calculate APY from asset data
-const calculateAPY = (
-  asset: Asset | undefined
-): { depositApy: number; borrowApy: number } => {
-  if (!asset || asset.totalDeposits === 0n) {
-    return { depositApy: 0, borrowApy: 0 };
-  }
-
-  // Calculate utilization rate
-  const utilization =
-    Number((asset.totalBorrows * 10000n) / asset.totalDeposits) / 10000;
-
-  // Simple APY calculation based on utilization
-  // In a real implementation, you'd use the contract's interest rate model
-  const baseRate = 0.025; // 2.5% base rate
-  const utilizationMultiplier = 1 + utilization * 2; // Higher utilization = higher rates
-
-  const depositApy = baseRate * utilizationMultiplier * 100;
-  const borrowApy = depositApy * 1.5; // Borrow rate is typically higher than deposit rate
-
-  return { depositApy, borrowApy };
-};
+type Tab = "dashboard" | "liquidation";
 
 function App() {
   const queryClient = useQueryClient();
   const { address, isConnected } = useAccount();
 
-  // Supported tokens
-  const { data: tokenIds } = useReadSupportedTokens();
+  // Active tab
+  const [activeTab, setActiveTab] = useState<Tab>("dashboard");
 
-  // Map the token symbols to their IDs
-  const tokenIdMap = useMemo(() => {
-    const tokenMap = new Map<string, `0x${string}`>();
-    if (!tokenIds || !Array.isArray(tokenIds)) return tokenMap;
+  // Transaction modals
+  const [activeAction, setActiveAction] = useState<ActionName | null>(null);
 
-    const tokens = getTokens();
-    tokens.forEach((token, index) => {
-      const tokenId = tokenIds[index];
-      if (tokenId) {
-        tokenMap.set(token.symbol, tokenId as `0x${string}`);
-      }
-    });
-    return tokenMap;
-  }, [tokenIds]);
+  // Read user's position slots from hub chain
+  const {
+    collateralSlots,
+    debtSlots,
+    isLoading: slotsLoading,
+  } = useUserSlots(address as `0x${string}` | undefined);
 
-  // Asset data
-  const { data: assets } = useReadAssets(tokenIds as `0x${string}`[]);
-
-  // Deposits
-  const { data: depositManagerBalances } = useReadDepositManagerBalances(
-    address! as `0x${string}`,
-    tokenIds as `0x${string}`[]
+  // Account summary data from RiskEngine
+  const { accountData, isLoading: accountLoading } = useAccountData(
+    address as `0x${string}` | undefined,
+    collateralSlots,
+    debtSlots
   );
 
-  // Borrows (scaled)
-  const { data: borrowManagerBalances } = useReadBorrowManagerBalances(
-    address! as `0x${string}`,
-    tokenIds as `0x${string}`[]
+  // Detailed position data
+  const { positions: collateralPositions, isLoading: collateralLoading } =
+    useCollateralPositions(
+      address as `0x${string}` | undefined,
+      collateralSlots
+    );
+
+  const { positions: debtPositions, isLoading: debtLoading } = useDebtPositions(
+    address as `0x${string}` | undefined,
+    debtSlots
   );
 
-  // Borrow indices
-  const { data: borrowIndices } = useReadBorrowIndices(
-    tokenIds as `0x${string}`[]
-  );
-
-  // RAY constant
-  const { data: ray } = useReadRay();
-
-  // Calculate actual borrowed amounts (with time-based interest accrual)
-  const actualBorrows = useMemo(() => {
-    if (
-      !borrowManagerBalances ||
-      !borrowIndices ||
-      !assets ||
-      !tokenIds ||
-      !Array.isArray(tokenIds)
-    ) {
-      return new Array(0).fill(0n);
-    }
-
-    return borrowManagerBalances.map((balance, index) => {
-      const scaledBorrow = BigInt((balance as any).result || 0);
-      const borrowIndex = BigInt((borrowIndices[index] as any).result || 0);
-      const rayValue = BigInt((ray as any) || 0);
-
-      // If no borrows, return 0
-      if (scaledBorrow === 0n) {
-        return 0n;
-      }
-
-      // If borrow index is 0, it means no borrows have happened yet
-      // In this case, use RAY as the borrow index (matches contract initialization)
-      const effectiveBorrowIndex = borrowIndex === 0n ? rayValue : borrowIndex;
-
-      // Calculate actual borrow: (scaledBorrow * effectiveBorrowIndex) / RAY
-      return (scaledBorrow * effectiveBorrowIndex) / rayValue;
-    });
-  }, [borrowManagerBalances, borrowIndices, ray, tokenIds]);
-
-  const [selectedToken, setSelectedToken] = useState<Token>(getTokens()[0]);
-  const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
-  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
-  const [isBorrowModalOpen, setIsBorrowModalOpen] = useState(false);
-  const [isRepayModalOpen, setIsRepayModalOpen] = useState(false);
-
-  // Function to refresh all data after transaction completion
   const handleTransactionComplete = () => {
     queryClient.invalidateQueries();
   };
 
-  const marketRows = buildMarketRows(
-    assets ? assets!.map((asset) => asset.result as Asset) : [],
-    getTokens(),
-    tokenIdMap,
-    depositManagerBalances
-      ? depositManagerBalances!.map((balance) => balance.result as bigint)
-      : [],
-    actualBorrows,
-    // totalBorrowScaled
-    //   ? totalBorrowScaled!.map((item) => BigInt((item as any).result || 0))
-    //   : [],
-    // borrowIndices
-    //   ? borrowIndices!.map((item) => BigInt((item as any).result || 0))
-    //   : [],
-    setSelectedToken,
-    setIsDepositModalOpen,
-    setIsWithdrawModalOpen,
-    setIsBorrowModalOpen,
-    setIsRepayModalOpen
-  );
-
-  // Get selected token data for modals
-  const selectedTokenData = marketRows.find(
-    (data) => data.token.symbol === selectedToken.symbol
-  );
+  const openModal = (action: ActionName) => setActiveAction(action);
+  const closeModal = () => setActiveAction(null);
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <Header />
 
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {isConnected && (
+        {isConnected ? (
           <>
-            <AccountSummary />
-            <Portfolio />
-            <QuickActions
-              onDeposit={() => {
-                setSelectedToken(getTokens()[0]);
-                setIsDepositModalOpen(true);
-              }}
-              onWithdraw={() => {
-                setSelectedToken(getTokens()[0]);
-                setIsWithdrawModalOpen(true);
-              }}
-              onBorrow={() => {
-                setSelectedToken(getTokens()[0]);
-                setIsBorrowModalOpen(true);
-              }}
-              onRepay={() => {
-                setSelectedToken(getTokens()[0]);
-                setIsRepayModalOpen(true);
-              }}
-            />
+            {/* Tab Navigation */}
+            <div className="flex gap-4 mb-6">
+              <button
+                onClick={() => setActiveTab("dashboard")}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === "dashboard"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                }`}
+              >
+                Dashboard
+              </button>
+              <button
+                onClick={() => setActiveTab("liquidation")}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === "liquidation"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                }`}
+              >
+                Liquidation
+              </button>
+            </div>
+
+            {activeTab === "dashboard" && (
+              <>
+                <AccountSummary
+                  accountData={accountData}
+                  isLoading={accountLoading || slotsLoading}
+                />
+                <Portfolio
+                  collateralPositions={collateralPositions}
+                  debtPositions={debtPositions}
+                  isLoading={collateralLoading || debtLoading || slotsLoading}
+                />
+                <QuickActions
+                  onDeposit={() => openModal("Deposit")}
+                  onWithdraw={() => openModal("Withdraw")}
+                  onBorrow={() => openModal("Borrow")}
+                  onRepay={() => openModal("Repay")}
+                />
+              </>
+            )}
+
+            {activeTab === "liquidation" && <Liquidation />}
+
+            {/* Transaction Modal */}
+            {activeAction && (
+              <TransactionForm
+                isOpen={!!activeAction}
+                onClose={closeModal}
+                actionName={activeAction}
+                actionDescription={getActionDescription(activeAction)}
+                collateralSlots={collateralSlots}
+                debtSlots={debtSlots}
+                onTransactionComplete={handleTransactionComplete}
+              />
+            )}
+
+            {/* Pending Transaction Notifications */}
+            <PendingTransactions />
           </>
-        )}
-        {!isConnected && <Connect />}
-
-        {/* Modals */}
-        {/* TODO: maxTransactable for deposits, depends on selected token in wallet */}
-        {/* TODO: maxTransactable for borrow is the total borrowable amount, calcuated by deposits */}
-        {isDepositModalOpen && (
-          <TransactionForm
-            isOpen={isDepositModalOpen}
-            onClose={() => setIsDepositModalOpen(false)}
-            actionDescription="Enter the amount you would like to deposit."
-            actionName="Deposit"
-            maxTransactable={1000}
-            handleTransaction={() => {}}
-            onTransactionComplete={handleTransactionComplete}
-          />
-        )}
-
-        {isWithdrawModalOpen && (
-          <TransactionForm
-            isOpen={isWithdrawModalOpen}
-            onClose={() => setIsWithdrawModalOpen(false)}
-            actionDescription="Enter the amount you want to withdraw from your deposited collateral."
-            actionName="Withdraw"
-            maxTransactable={Number(selectedTokenData?.userDeposit || 0)}
-            handleTransaction={() => {}}
-            onTransactionComplete={handleTransactionComplete}
-          />
-        )}
-
-        {isBorrowModalOpen && (
-          <TransactionForm
-            isOpen={isBorrowModalOpen}
-            onClose={() => setIsBorrowModalOpen(false)}
-            actionDescription="Enter the amount you would like to borrow."
-            actionName="Borrow"
-            maxTransactable={1000}
-            handleTransaction={() => {}}
-            onTransactionComplete={handleTransactionComplete}
-          />
-        )}
-
-        {isRepayModalOpen && (
-          <TransactionForm
-            isOpen={isRepayModalOpen}
-            onClose={() => setIsRepayModalOpen(false)}
-            actionDescription="Enter the amount you would like to repay."
-            actionName="Repay"
-            maxTransactable={1000}
-            handleTransaction={() => {}}
-            onTransactionComplete={handleTransactionComplete}
-          />
+        ) : (
+          <Connect />
         )}
       </main>
     </div>
   );
+}
+
+function getActionDescription(action: ActionName): string {
+  switch (action) {
+    case "Deposit":
+      return "Deposit collateral on a spoke chain. Your deposit will be tracked on the hub chain.";
+    case "Withdraw":
+      return "Withdraw collateral from a spoke chain. Requires sufficient health factor.";
+    case "Borrow":
+      return "Borrow assets against your deposited collateral. Funds will be sent to the spoke chain.";
+    case "Repay":
+      return "Repay borrowed assets on a spoke chain to reduce your debt.";
+  }
 }
 
 export default App;

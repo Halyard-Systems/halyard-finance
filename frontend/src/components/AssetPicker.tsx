@@ -1,14 +1,14 @@
-import type { MockAssetData, MockChainData } from "@/sample-data";
 import { useState } from "react";
+import type { SpokeAsset, SpokeConfig } from "../lib/contracts";
 
 export interface AssetPickerProps {
-  selectedChain: MockChainData;
-  selectedAsset: MockAssetData;
-  onAssetSelect: (asset: MockAssetData) => void;
+  selectedSpoke: SpokeConfig;
+  selectedAsset: SpokeAsset;
+  onAssetSelect: (asset: SpokeAsset) => void;
 }
 
 export function AssetPicker({
-  selectedChain,
+  selectedSpoke,
   selectedAsset,
   onAssetSelect,
 }: AssetPickerProps) {
@@ -27,11 +27,11 @@ export function AssetPicker({
         >
           <div className="flex items-center space-x-2">
             <img
-              src={selectedAsset.logo}
-              alt={`${selectedAsset.logo} icon`}
+              src={selectedAsset.icon}
+              alt={`${selectedAsset.symbol} icon`}
               className="w-4 h-4"
             />
-            <span>{selectedAsset.ticker}</span>
+            <span>{selectedAsset.symbol}</span>
           </div>
           <svg
             className={`w-4 h-4 transition-transform ${
@@ -52,9 +52,9 @@ export function AssetPicker({
 
         {isAssetDropdownOpen && (
           <div className="absolute z-10 w-full mt-1 bg-background border border-input rounded-md shadow-lg max-h-60 overflow-y-auto">
-            {selectedChain.assets.map((asset) => (
+            {selectedSpoke.assets.map((asset) => (
               <button
-                key={asset.ticker}
+                key={asset.symbol}
                 type="button"
                 onClick={() => {
                   onAssetSelect(asset);
@@ -63,11 +63,11 @@ export function AssetPicker({
                 className="w-full px-3 py-2 text-left hover:bg-muted flex items-center space-x-2"
               >
                 <img
-                  src={asset.logo}
-                  alt={`${asset.ticker} icon`}
+                  src={asset.icon}
+                  alt={`${asset.symbol} icon`}
                   className="w-4 h-4"
                 />
-                <span>{asset.ticker}</span>
+                <span>{asset.symbol}</span>
               </button>
             ))}
           </div>

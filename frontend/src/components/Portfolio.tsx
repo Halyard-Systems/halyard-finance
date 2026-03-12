@@ -1,5 +1,4 @@
-import { portfolioData } from '@/sample-data'
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import {
   Table,
   TableBody,
@@ -7,83 +6,172 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from './ui/table'
+} from "./ui/table";
+import { getSpokeByEid } from "../lib/contracts";
+import type { CollateralPosition, DebtPosition } from "../lib/types";
+import { fromWei } from "../lib/utils";
 
-export function Portfolio() {
+interface PortfolioProps {
+  collateralPositions: CollateralPosition[];
+  debtPositions: DebtPosition[];
+  isLoading?: boolean;
+}
+
+// Group positions by eid (chain)
+function groupByEid<T extends { eid: number }>(items: T[]): Map<number, T[]> {
+  const map = new Map<number, T[]>();
+  for (const item of items) {
+    const group = map.get(item.eid) ?? [];
+    group.push(item);
+    map.set(item.eid, group);
+  }
+  return map;
+}
+
+export function Portfolio({
+  collateralPositions,
+  debtPositions,
+  isLoading,
+}: PortfolioProps) {
+  const hasPositions = collateralPositions.length > 0 || debtPositions.length > 0;
+
+  if (!hasPositions && !isLoading) {
+    return (
+      <div className="mb-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>Portfolio Overview</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground text-center py-4">
+              No positions yet. Deposit collateral to get started.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Collect all unique eids
+  const collateralByEid = groupByEid(collateralPositions);
+  const debtByEid = groupByEid(debtPositions);
+  const allEids = new Set([...collateralByEid.keys(), ...debtByEid.keys()]);
+
   return (
-    <div className='mb-8'>
+    <div className="mb-8">
       <Card>
         <CardHeader>
           <CardTitle>Portfolio Overview</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className='w-[150px]'>Chain</TableHead>
-                <TableHead className='w-[200px]'>Asset</TableHead>
-                <TableHead className='w-[120px] text-right'>Supplied</TableHead>
-                <TableHead className='w-[120px] text-right'>Borrowed</TableHead>
-                <TableHead className='w-[100px] text-right'>APY</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {portfolioData.map((chainData) => (
-                <TableRow key={chainData.name}>
-                  <TableCell className='font-medium align-top'>
-                    <div className='flex items-center'>
-                      <img
-                        src={`/${chainData.logo}`}
-                        alt={`${chainData.name} logo`}
-                        className='w-6 h-6 mr-3'
-                      />
-                      <span className='text-lg font-semibold'>
-                        {chainData.name}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell colSpan={4} className='p-0'>
-                    <Table>
-                      <TableBody>
-                        {chainData.assets.map((asset, assetIndex) => (
-                          <TableRow
-                            key={asset.ticker}
-                            className={
-                              assetIndex === chainData.assets.length - 1
-                                ? 'border-b-0'
-                                : ''
-                            }
-                          >
-                            <TableCell className='w-[200px] pl-8'>
-                              <div className='flex items-center'>
-                                <img
-                                  src={`/${asset.logo}`}
-                                  alt={`${asset.ticker} logo`}
-                                  className='w-3 h-3 mr-2'
-                                />
-                                {asset.ticker}
-                              </div>
-                            </TableCell>
-                            <TableCell className='w-[120px] text-right font-medium'>
-                              {asset.supplied}
-                            </TableCell>
-                            <TableCell className='w-[120px] text-right font-medium'>
-                              {asset.borrowed}
-                            </TableCell>
-                            <TableCell className='w-[100px] text-right font-medium text-green-600'>
-                              {asset.apy}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableCell>
+          {isLoading ? (
+            <p className="text-muted-foreground text-center py-4">Loading positions...</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[150px]">Chain</TableHead>
+                  <TableHead className="w-[200px]">Asset</TableHead>
+                  <TableHead className="w-[120px] text-right">Collateral</TableHead>
+                  <TableHead className="w-[120px] text-right">Available</TableHead>
+                  <TableHead className="w-[120px] text-right">Debt</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {[...allEids].map((eid) => {
+                  const spoke = getSpokeByEid(eid);
+                  const chainName = spoke?.name ?? `Chain ${eid}`;
+                  const chainLogo = spoke?.logo ?? "ethereum-eth-logo.svg";
+
+                  const collaterals = collateralByEid.get(eid) ?? [];
+                  const debts = debtByEid.get(eid) ?? [];
+
+                  // Merge by asset address
+                  const assetMap = new Map<string, { collateral?: CollateralPosition; debt?: DebtPosition }>();
+                  for (const c of collaterals) {
+                    const key = c.asset.toLowerCase();
+                    assetMap.set(key, { ...assetMap.get(key), collateral: c });
+                  }
+                  for (const d of debts) {
+                    const key = d.asset.toLowerCase();
+                    assetMap.set(key, { ...assetMap.get(key), debt: d });
+                  }
+
+                  const entries = [...assetMap.entries()];
+
+                  return entries.map(([assetAddr, { collateral, debt }], i) => {
+                    // Find asset symbol from spoke config
+                    const spokeAsset = spoke?.assets.find(
+                      (a) => a.canonicalAddress.toLowerCase() === assetAddr
+                    );
+                    const symbol = spokeAsset?.symbol ?? assetAddr.slice(0, 8);
+                    const decimals = spokeAsset?.decimals ?? 18;
+                    const icon = spokeAsset?.icon;
+
+                    return (
+                      <TableRow key={`${eid}-${assetAddr}`}>
+                        {i === 0 && (
+                          <TableCell
+                            className="font-medium align-top"
+                            rowSpan={entries.length}
+                          >
+                            <div className="flex items-center">
+                              <img
+                                src={`/${chainLogo}`}
+                                alt={`${chainName} logo`}
+                                className="w-6 h-6 mr-3"
+                              />
+                              <span className="text-lg font-semibold">
+                                {chainName}
+                              </span>
+                            </div>
+                          </TableCell>
+                        )}
+                        <TableCell>
+                          <div className="flex items-center">
+                            {icon && (
+                              <img
+                                src={`/${icon}`}
+                                alt={`${symbol} logo`}
+                                className="w-3 h-3 mr-2"
+                              />
+                            )}
+                            {symbol}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {collateral
+                            ? fromWei(collateral.balance, decimals).toLocaleString(
+                                undefined,
+                                { maximumFractionDigits: 4 }
+                              )
+                            : "--"}
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {collateral
+                            ? fromWei(collateral.available, decimals).toLocaleString(
+                                undefined,
+                                { maximumFractionDigits: 4 }
+                              )
+                            : "--"}
+                        </TableCell>
+                        <TableCell className="text-right font-medium text-red-600">
+                          {debt && debt.debt > 0n
+                            ? fromWei(debt.debt, decimals).toLocaleString(
+                                undefined,
+                                { maximumFractionDigits: 4 }
+                              )
+                            : "--"}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  });
+                })}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

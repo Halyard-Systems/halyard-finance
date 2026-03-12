@@ -76,7 +76,7 @@ arb-node:
 
 # Start the local Anvil node for the Ethereum chain
 eth-node:
-	anvil --fork-url https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY} --fork-block-number 22900000
+	anvil --fork-url https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY} --fork-block-number 22900000 --chain-id 31337
 
 # Run the unit tests
 tests:

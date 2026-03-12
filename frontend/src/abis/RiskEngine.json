@@ -1,0 +1,742 @@
+[
+  {
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "_authority",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "accountData",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "collateralSlots",
+        "type": "tuple[]",
+        "internalType": "struct RiskEngine.CollateralSlot[]",
+        "components": [
+          {
+            "name": "eid",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "asset",
+            "type": "address",
+            "internalType": "address"
+          }
+        ]
+      },
+      {
+        "name": "debtSlots",
+        "type": "tuple[]",
+        "internalType": "struct RiskEngine.DebtSlot[]",
+        "components": [
+          {
+            "name": "eid",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "asset",
+            "type": "address",
+            "internalType": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "collateralValueE18",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "borrowPowerE18",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "liquidationValueE18",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "debtValueE18",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "healthFactorE18",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "assetRegistry",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IAssetRegistry"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "authority",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "canBorrow",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "dstEid",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "debtAsset",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "borrowAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "collateralSlots",
+        "type": "tuple[]",
+        "internalType": "struct RiskEngine.CollateralSlot[]",
+        "components": [
+          {
+            "name": "eid",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "asset",
+            "type": "address",
+            "internalType": "address"
+          }
+        ]
+      },
+      {
+        "name": "debtSlots",
+        "type": "tuple[]",
+        "internalType": "struct RiskEngine.DebtSlot[]",
+        "components": [
+          {
+            "name": "eid",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "asset",
+            "type": "address",
+            "internalType": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "ok",
+        "type": "bool",
+        "internalType": "bool"
+      },
+      {
+        "name": "nextHealthFactorE18",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "canWithdraw",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "eid",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "collateralAsset",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "withdrawAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "collateralSlots",
+        "type": "tuple[]",
+        "internalType": "struct RiskEngine.CollateralSlot[]",
+        "components": [
+          {
+            "name": "eid",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "asset",
+            "type": "address",
+            "internalType": "address"
+          }
+        ]
+      },
+      {
+        "name": "debtSlots",
+        "type": "tuple[]",
+        "internalType": "struct RiskEngine.DebtSlot[]",
+        "components": [
+          {
+            "name": "eid",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "asset",
+            "type": "address",
+            "internalType": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "ok",
+        "type": "bool",
+        "internalType": "bool"
+      },
+      {
+        "name": "nextHealthFactorE18",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "debtManager",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IDebtManager"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "isConsumingScheduledOp",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes4",
+        "internalType": "bytes4"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "oracle",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IOracle"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "positionBook",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IPositionBook"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "setAuthority",
+    "inputs": [
+      {
+        "name": "newAuthority",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setDependencies",
+    "inputs": [
+      {
+        "name": "_positionBook",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_debtManager",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_assetRegistry",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_oracle",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "validateAndCreateBorrow",
+    "inputs": [
+      {
+        "name": "borrowId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "user",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "srcEid",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "debtAsset",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "receiver",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "collateralSlots",
+        "type": "tuple[]",
+        "internalType": "struct RiskEngine.CollateralSlot[]",
+        "components": [
+          {
+            "name": "eid",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "asset",
+            "type": "address",
+            "internalType": "address"
+          }
+        ]
+      },
+      {
+        "name": "debtSlots",
+        "type": "tuple[]",
+        "internalType": "struct RiskEngine.DebtSlot[]",
+        "components": [
+          {
+            "name": "eid",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "asset",
+            "type": "address",
+            "internalType": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "validateAndCreateWithdraw",
+    "inputs": [
+      {
+        "name": "withdrawId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "user",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "srcEid",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "collateralAsset",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "receiver",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "collateralSlots",
+        "type": "tuple[]",
+        "internalType": "struct RiskEngine.CollateralSlot[]",
+        "components": [
+          {
+            "name": "eid",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "asset",
+            "type": "address",
+            "internalType": "address"
+          }
+        ]
+      },
+      {
+        "name": "debtSlots",
+        "type": "tuple[]",
+        "internalType": "struct RiskEngine.DebtSlot[]",
+        "components": [
+          {
+            "name": "eid",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "asset",
+            "type": "address",
+            "internalType": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "event",
+    "name": "AuthorityUpdated",
+    "inputs": [
+      {
+        "name": "authority",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "DependenciesSet",
+    "inputs": [
+      {
+        "name": "positionBook",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "debtManager",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "assetRegistry",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "oracle",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "AccessManagedInvalidAuthority",
+    "inputs": [
+      {
+        "name": "authority",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "AccessManagedRequiredDelay",
+    "inputs": [
+      {
+        "name": "caller",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "delay",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "AccessManagedUnauthorized",
+    "inputs": [
+      {
+        "name": "caller",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "DuplicateCollateralSlot",
+    "inputs": [
+      {
+        "name": "eid",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "asset",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "DuplicateDebtSlot",
+    "inputs": [
+      {
+        "name": "eid",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "asset",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "IncompleteCollateralSlots",
+    "inputs": [
+      {
+        "name": "missingEid",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "missingAsset",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "IncompleteDebtSlots",
+    "inputs": [
+      {
+        "name": "missingEid",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "missingAsset",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InsufficientAvailableCollateral",
+    "inputs": [
+      {
+        "name": "available",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "requested",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InsufficientBorrowPower",
+    "inputs": [
+      {
+        "name": "borrowPowerE18",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "nextDebtValueE18",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InvalidAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidAmount",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "PriceUnavailable",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ReentrancyGuardReentrantCall",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "UnsupportedCollateral",
+    "inputs": [
+      {
+        "name": "eid",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "asset",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "UnsupportedDebtAsset",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "WouldBeUndercollateralized",
+    "inputs": [
+      {
+        "name": "liqValueE18",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "nextDebtValueE18",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  }
+]
