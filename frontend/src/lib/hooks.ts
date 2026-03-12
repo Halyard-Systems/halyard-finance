@@ -1,183 +1,270 @@
 import {
   useReadContract,
-  type UseReadContractReturnType,
   useReadContracts,
-  type UseReadContractsReturnType,
-} from 'wagmi'
-import type { Abi } from 'viem'
+  type UseReadContractReturnType,
+} from "wagmi";
+import type { Abi } from "viem";
 
-import DEPOSIT_MANAGER_ABI from '../abis/DepositManager.json'
-import BORROW_MANAGER_ABI from '../abis/BorrowManager.json'
-import ERC20_ABI from '../abis/ERC20.json'
-import type { Token } from './types'
+import POSITION_BOOK_ABI from "../abis/PositionBook.json";
+import DEBT_MANAGER_ABI from "../abis/DebtManager.json";
+import RISK_ENGINE_ABI from "../abis/RiskEngine.json";
+import ERC20_ABI from "../abis/ERC20.json";
 
-const DEPOSIT_MANAGER_ADDRESS = import.meta.env.VITE_DEPOSIT_MANAGER_ADDRESS
-const BORROW_MANAGER_ADDRESS = import.meta.env.VITE_BORROW_MANAGER_ADDRESS
+import { hubConfig } from "./contracts";
+import type {
+  AccountData,
+  ChainAsset,
+  CollateralPosition,
+  DebtPosition,
+} from "./types";
 
-// Read ERC20 balance of a token
-export const useReadERC20Balance = (
-  token: Token,
-  userAddress: string
-): UseReadContractReturnType => {
+// ─── ERC20 ──────────────────────────────────────────────────────────────────
+
+export function useERC20Balance(
+  tokenAddress: `0x${string}` | undefined,
+  userAddress: `0x${string}` | undefined,
+  chainId?: number
+): UseReadContractReturnType {
   return useReadContract({
-    address: token.address as `0x${string}`,
+    address: tokenAddress,
     abi: ERC20_ABI,
-    functionName: 'balanceOf',
-    args: [userAddress as `0x${string}`],
-  })
+    functionName: "balanceOf",
+    args: userAddress ? [userAddress] : undefined,
+    chainId,
+    scopeKey: tokenAddress ?? "none",
+    query: {
+      enabled: !!tokenAddress && !!userAddress,
+    },
+  });
 }
 
-// Read allowance of a token for the DepositManager contract
-export const useReadDepositManagerAllowance = (
-  address: string,
-  token: Token
-): UseReadContractReturnType => {
+export function useERC20Allowance(
+  tokenAddress: `0x${string}` | undefined,
+  ownerAddress: `0x${string}` | undefined,
+  spenderAddress: `0x${string}` | undefined,
+  chainId?: number
+): UseReadContractReturnType {
   return useReadContract({
-    address: token.address as `0x${string}`,
+    address: tokenAddress,
     abi: ERC20_ABI,
-    functionName: 'allowance',
-    args: [address, DEPOSIT_MANAGER_ADDRESS as `0x${string}`],
-  })
+    functionName: "allowance",
+    args: ownerAddress && spenderAddress ? [ownerAddress, spenderAddress] : undefined,
+    chainId,
+    query: { enabled: !!tokenAddress && !!ownerAddress && !!spenderAddress },
+  });
 }
 
-// Read user's deposited balance for a specific token
-export const useReadDepositManagerBalance = (
-  address: string,
-  tokenId: `0x${string}`
-): UseReadContractReturnType => {
-  return useReadContract({
-    address: DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
-    abi: DEPOSIT_MANAGER_ABI,
-    functionName: 'balanceOf',
-    args: [tokenId, address as `0x${string}`],
-  })
-}
+// ─── User Slots (Phase 1.1) ────────────────────────────────────────────────
 
-export const useReadDepositManagerBalances = (
-  address: `0x${string}`,
-  tokenIds: `0x${string}`[]
-): UseReadContractsReturnType => {
-  if (!tokenIds) tokenIds = []
+export function useUserSlots(userAddress: `0x${string}` | undefined) {
+  const collateralQuery = useReadContract({
+    address: hubConfig.positionBook,
+    abi: POSITION_BOOK_ABI as Abi,
+    functionName: "collateralAssetsOf",
+    args: userAddress ? [userAddress] : undefined,
+    chainId: hubConfig.chainId,
+    query: { enabled: !!userAddress },
+  });
 
-  return useReadContracts({
-    contracts: tokenIds.map((tokenId) => ({
-      address: DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
-      abi: DEPOSIT_MANAGER_ABI as Abi,
-      functionName: 'balanceOf',
-      args: [tokenId, address],
-    })),
-    query: {
-      enabled:
-        tokenIds.length > 0 && tokenIds !== undefined && address !== undefined,
+  const debtQuery = useReadContract({
+    address: hubConfig.debtManager,
+    abi: DEBT_MANAGER_ABI as Abi,
+    functionName: "debtAssetsOf",
+    args: userAddress ? [userAddress] : undefined,
+    chainId: hubConfig.chainId,
+    query: { enabled: !!userAddress },
+  });
+
+  const collateralSlots = (collateralQuery.data as ChainAsset[] | undefined) ?? [];
+  const debtSlots = (debtQuery.data as ChainAsset[] | undefined) ?? [];
+
+  return {
+    collateralSlots,
+    debtSlots,
+    isLoading: collateralQuery.isLoading || debtQuery.isLoading,
+    isError: collateralQuery.isError || debtQuery.isError,
+    refetch: () => {
+      collateralQuery.refetch();
+      debtQuery.refetch();
     },
-  })
+  };
 }
 
-// Read all assets
-export const useReadAssets = (
-  tokenIds: `0x${string}`[]
-): UseReadContractsReturnType => {
-  if (!tokenIds) tokenIds = []
+// ─── Account Data (Phase 1.2) ──────────────────────────────────────────────
 
-  return useReadContracts({
-    contracts: tokenIds.map((tokenId) => ({
-      address: DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
-      abi: DEPOSIT_MANAGER_ABI as Abi,
-      functionName: 'getAsset',
-      args: [tokenId],
-    })),
+export function useAccountData(
+  userAddress: `0x${string}` | undefined,
+  collateralSlots: ChainAsset[],
+  debtSlots: ChainAsset[]
+) {
+  const query = useReadContract({
+    address: hubConfig.riskEngine,
+    abi: RISK_ENGINE_ABI as Abi,
+    functionName: "accountData",
+    args: userAddress ? [userAddress, collateralSlots, debtSlots] : undefined,
+    chainId: hubConfig.chainId,
     query: {
-      enabled: tokenIds.length > 0 || tokenIds !== undefined,
+      enabled: !!userAddress && (collateralSlots.length > 0 || debtSlots.length > 0),
     },
-  })
+  });
+
+  const result = query.data as
+    | [bigint, bigint, bigint, bigint, bigint]
+    | undefined;
+
+  const accountData: AccountData | undefined = result
+    ? {
+        collateralValueE18: result[0],
+        borrowPowerE18: result[1],
+        liquidationValueE18: result[2],
+        debtValueE18: result[3],
+        healthFactorE18: result[4],
+      }
+    : undefined;
+
+  return {
+    accountData,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    refetch: query.refetch,
+  };
 }
 
-// Read all supported tokens
-export const useReadSupportedTokens = (): UseReadContractReturnType => {
-  return useReadContract({
-    address: DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
-    abi: DEPOSIT_MANAGER_ABI,
-    functionName: 'getSupportedTokens',
-    args: [],
-  })
+// ─── Position Detail Hooks (Phase 1.3) ─────────────────────────────────────
+
+export function useCollateralPositions(
+  userAddress: `0x${string}` | undefined,
+  slots: ChainAsset[]
+) {
+  const eids = slots.map((s) => s.eid);
+  const assets = slots.map((s) => s.asset);
+
+  const query = useReadContract({
+    address: hubConfig.positionBook,
+    abi: POSITION_BOOK_ABI as Abi,
+    functionName: "batchCollateralOf",
+    args: userAddress ? [userAddress, eids, assets] : undefined,
+    chainId: hubConfig.chainId,
+    query: { enabled: !!userAddress && slots.length > 0 },
+  });
+
+  const result = query.data as
+    | [bigint[], bigint[], bigint[]]
+    | undefined;
+
+  const positions: CollateralPosition[] = result
+    ? slots.map((slot, i) => ({
+        eid: slot.eid,
+        asset: slot.asset,
+        balance: result[0][i],
+        reserved: result[1][i],
+        available: result[2][i],
+      }))
+    : [];
+
+  return {
+    positions,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    refetch: query.refetch,
+  };
 }
 
-// Read borrow index for a specific token
-export const useReadBorrowIndex = (
-  tokenId: `0x${string}`
-): UseReadContractReturnType => {
-  return useReadContract({
-    address: BORROW_MANAGER_ADDRESS as `0x${string}`,
-    abi: BORROW_MANAGER_ABI,
-    functionName: 'borrowIndex',
-    args: [tokenId],
-  })
+export function useDebtPositions(
+  userAddress: `0x${string}` | undefined,
+  slots: ChainAsset[]
+) {
+  const contracts = slots.map((slot) => ({
+    address: hubConfig.debtManager as `0x${string}`,
+    abi: DEBT_MANAGER_ABI as Abi,
+    functionName: "debtOf" as const,
+    args: [userAddress!, slot.eid, slot.asset],
+    chainId: hubConfig.chainId,
+  }));
+
+  const query = useReadContracts({
+    contracts,
+    query: { enabled: !!userAddress && slots.length > 0 },
+  });
+
+  const positions: DebtPosition[] = query.data
+    ? slots.map((slot, i) => ({
+        eid: slot.eid,
+        asset: slot.asset,
+        debt: (query.data![i].result as bigint) ?? 0n,
+      }))
+    : [];
+
+  return {
+    positions,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    refetch: query.refetch,
+  };
 }
 
-// Read RAY constant from DepositManager
-export const useReadRay = (): UseReadContractReturnType => {
-  return useReadContract({
-    address: DEPOSIT_MANAGER_ADDRESS as `0x${string}`,
-    abi: DEPOSIT_MANAGER_ABI,
-    functionName: 'RAY',
-    args: [],
-  })
-}
+// ─── Risk Preview Hooks ────────────────────────────────────────────────────
 
-export const useReadBorrowManagerBalances = (
-  address: `0x${string}`,
-  tokenIds: `0x${string}`[]
-): UseReadContractsReturnType => {
-  if (!tokenIds) tokenIds = []
-
-  return useReadContracts({
-    contracts: tokenIds.map((tokenId) => ({
-      address: BORROW_MANAGER_ADDRESS as `0x${string}`,
-      abi: BORROW_MANAGER_ABI as Abi,
-      functionName: 'userBorrowScaled',
-      args: [tokenId, address],
-    })),
+export function useCanBorrow(
+  userAddress: `0x${string}` | undefined,
+  dstEid: number | undefined,
+  asset: `0x${string}` | undefined,
+  amount: bigint | undefined,
+  collateralSlots: ChainAsset[],
+  debtSlots: ChainAsset[]
+) {
+  const query = useReadContract({
+    address: hubConfig.riskEngine,
+    abi: RISK_ENGINE_ABI as Abi,
+    functionName: "canBorrow",
+    args:
+      userAddress && dstEid && asset && amount
+        ? [userAddress, dstEid, asset, amount, collateralSlots, debtSlots]
+        : undefined,
+    chainId: hubConfig.chainId,
     query: {
-      enabled:
-        tokenIds.length > 0 && tokenIds !== undefined && address !== undefined,
+      enabled: !!userAddress && !!dstEid && !!asset && !!amount && amount > 0n,
     },
-  })
+  });
+
+  const result = query.data as [boolean, bigint] | undefined;
+
+  return {
+    ok: result?.[0] ?? false,
+    nextHealthFactorE18: result?.[1] ?? 0n,
+    isLoading: query.isLoading,
+    isError: query.isError,
+  };
 }
 
-// Read borrow indices for all tokens
-export const useReadBorrowIndices = (
-  tokenIds: `0x${string}`[]
-): UseReadContractsReturnType => {
-  if (!tokenIds) tokenIds = []
-
-  return useReadContracts({
-    contracts: tokenIds.map((tokenId) => ({
-      address: BORROW_MANAGER_ADDRESS as `0x${string}`,
-      abi: BORROW_MANAGER_ABI as Abi,
-      functionName: 'borrowIndex',
-      args: [tokenId],
-    })),
+export function useCanWithdraw(
+  userAddress: `0x${string}` | undefined,
+  eid: number | undefined,
+  asset: `0x${string}` | undefined,
+  amount: bigint | undefined,
+  collateralSlots: ChainAsset[],
+  debtSlots: ChainAsset[]
+) {
+  const query = useReadContract({
+    address: hubConfig.riskEngine,
+    abi: RISK_ENGINE_ABI as Abi,
+    functionName: "canWithdraw",
+    args:
+      userAddress && eid && asset && amount
+        ? [userAddress, eid, asset, amount, collateralSlots, debtSlots]
+        : undefined,
+    chainId: hubConfig.chainId,
     query: {
-      enabled: tokenIds.length > 0 && tokenIds !== undefined,
+      enabled: !!userAddress && !!eid && !!asset && !!amount && amount > 0n,
     },
-  })
-}
+  });
 
-// Read total scaled borrows for all tokens
-export const useReadTotalBorrowScaled = (
-  tokenIds: `0x${string}`[]
-): UseReadContractsReturnType => {
-  if (!tokenIds) tokenIds = []
+  const result = query.data as [boolean, bigint] | undefined;
 
-  return useReadContracts({
-    contracts: tokenIds.map((tokenId) => ({
-      address: BORROW_MANAGER_ADDRESS as `0x${string}`,
-      abi: BORROW_MANAGER_ABI as Abi,
-      functionName: 'totalBorrowScaled',
-      args: [tokenId],
-    })),
-    query: {
-      enabled: tokenIds.length > 0 && tokenIds !== undefined,
-    },
-  })
+  return {
+    ok: result?.[0] ?? false,
+    nextHealthFactorE18: result?.[1] ?? 0n,
+    isLoading: query.isLoading,
+    isError: query.isError,
+  };
 }

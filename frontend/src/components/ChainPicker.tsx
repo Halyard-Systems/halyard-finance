@@ -1,38 +1,34 @@
-import type { MockChainData } from "@/sample-data";
+import type { SpokeConfig } from "../lib/contracts";
 
 interface ChainPickerProps {
-  portfolioData: MockChainData[];
-  selectedChain: MockChainData;
-  onChainSelect?: (chain: MockChainData) => void;
+  spokes: SpokeConfig[];
+  selectedSpoke: SpokeConfig;
+  onChainSelect?: (spoke: SpokeConfig) => void;
 }
 
 export function ChainPicker({
-  portfolioData,
-  selectedChain,
+  spokes,
+  selectedSpoke,
   onChainSelect,
 }: ChainPickerProps) {
-  const handleChainClick = (chain: MockChainData) => {
-    onChainSelect?.(chain);
-  };
-
   return (
     <>
       <label className="block text-sm font-medium text-card-foreground mb-2">
         Chain
       </label>
       <div className="flex items-center gap-4">
-        {portfolioData.map((chain) => (
+        {spokes.map((spoke) => (
           <div
-            key={chain.name}
-            onClick={() => handleChainClick(chain)}
+            key={spoke.chainId}
+            onClick={() => onChainSelect?.(spoke)}
             className={`flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors ${
-              selectedChain?.name === chain.name
+              selectedSpoke?.chainId === spoke.chainId
                 ? "border-2 border-primary bg-muted"
                 : "border-2 border-transparent hover:border-muted"
             }`}
-            title={chain.name}
+            title={spoke.name}
           >
-            <img src={chain.logo} alt={chain.name} className="w-6 h-6" />
+            <img src={spoke.logo} alt={spoke.name} className="w-6 h-6" />
           </div>
         ))}
       </div>

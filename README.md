@@ -127,25 +127,69 @@ To add a new token, run `make add-token-testnet` with the `ADD_TOKEN_*` DepositM
 
 ## Architecture
 
-Halyard Finance operates with a hub and spoke design. Spokes manage liquidity and collateral on their respective networks, while the hub maintains an accounting ledger across spokes. Actions (deposit, borrow, repay, withdraw, liquidate) take place on a spoke, require a LayerZero message to be processed on the hub before they can be executed.
+Halyard Finance operates with a hub-and-spoke design. Spokes manage liquidity and collateral on their respective networks, while the hub maintains a central accounting ledger across all spokes. Actions (deposit, borrow, repay, withdraw, liquidate) originate on either a spoke or the hub and require LayerZero messages to coordinate state across chains.
+
+### Contracts
+
+**Hub (Ethereum):**
+- **HubRouter** — User-facing entrypoint for withdraw, borrow, and repay requests
+- **HubController** — LayerZero message router; sends commands to and receives receipts from spokes
+- **PositionBook** — Central ledger for per-user collateral balances across all chains
+- **DebtManager** — Debt accounting with compound interest accrual (RAY/1e27 precision)
+- **RiskEngine** — Health factor validation for borrows and withdrawals using oracle prices
+- **LiquidationEngine** — Orchestrates liquidations of undercollateralized positions
+- **AssetRegistry** — Configuration store for asset risk parameters (LTV, liquidation threshold, caps)
+- **PythOracleAdapter** — Wraps Pyth Network oracles with freshness/confidence checks
+
+**Spoke (Multi-chain):**
+- **SpokeController** — LayerZero receiver/sender; executes hub commands and sends receipts
+- **CollateralVault** — Custodian of user collateral deposits
+- **LiquidityVault** — Custodian of borrowable liquidity; handles repayments
 
 ### Deposit
 
     1. User calls SpokeController#depositAndNotify
     2. Spoke pulls tokens from msg.sender
-    3. Spoke updates user's local balance via CollaterVault#deposit
-    4. Spoke sends a DEPOSIT_CREDITED message to the HubController
-    5. User's total balance is updated in PositionBook#creditCollateral
+    3. Spoke updates user's local balance via CollateralVault#deposit
+    4. Spoke sends a DEPOSIT_CREDITED message to HubController
+    5. HubController calls PositionBook#creditCollateral to update the user's total balance
+
+### Borrow
+
+    1. User calls HubRouter#borrowAndNotify
+    2. HubRouter calls RiskEngine#validateAndCreateBorrow
+    3. RiskEngine accrues all debt indices, computes borrow power from collateral and oracle prices
+    4. If the borrow keeps the health factor >= 1.0, PositionBook reserves the debt headroom
+    5. HubController sends CMD_RELEASE_BORROW to the spoke
+    6. SpokeController receives the command and calls LiquidityVault#releaseBorrow to transfer tokens to the user
+    7. SpokeController sends BORROW_RELEASED receipt to HubController
+    8. HubRouter#finalizeBorrow mints scaled debt via DebtManager and clears the reservation
+
+### Repay
+
+    1. User calls LiquidityVault#repay with the token amount
+    2. LiquidityVault pulls tokens from the user
+    3. SpokeController sends REPAY_RECEIVED message to HubController
+    4. HubRouter#finalizeRepay calls DebtManager#burnDebt to reduce the user's scaled debt
 
 ### Withdraw
 
     1. User calls HubRouter#withdrawAndNotify
-    2. HubRouter calls HubController#sendWithdrawCommand
-    3. HubController calls RiskEngine#checkWithdrawAllowed
-    4. RiskEngine calls PositionBook#totalPosition
-    5. RiskEngine calls Pyth for pricing
-    6. If position * pricing allows withdrawal, hubController calls PositionBook#reserveCollateral
-    7. HubController send CMD_RELEASE_WITHDRAW message to spoke
-    8. On CMD_RELEASE_WITHDRAW message receipt, SpokeController calls CollateralVault.withdrawByController
-    9. SpokeController sends WITHDRAW_RELEASE msg to HubController
-    10. When WITHDRAW_RELEASE is received, HubController calls PositionBook#debitCollateral
+    2. HubRouter calls RiskEngine#validateAndCreateWithdraw
+    3. RiskEngine verifies collateral is available and that the withdrawal keeps the health factor >= 1.0
+    4. PositionBook reserves the collateral and creates a pending withdrawal
+    5. HubController sends CMD_RELEASE_WITHDRAW to the spoke
+    6. SpokeController calls CollateralVault#withdrawByController to transfer tokens to the user
+    7. SpokeController sends WITHDRAW_RELEASED receipt to HubController
+    8. HubRouter#finalizeWithdraw debits collateral in PositionBook and clears the reservation
+
+### Liquidation
+
+    1. Liquidator calls LiquidationEngine#liquidate with the undercollateralized user's debt and collateral details
+    2. LiquidationEngine computes the health factor; reverts if >= 1.0
+    3. Seize amount is calculated as: (debtRepayValue * (1 + liquidationBonus)) / collateralPrice
+    4. PositionBook reserves the collateral to seize and creates a pending liquidation (debt burn is deferred)
+    5. HubController sends CMD_SEIZE_COLLATERAL to the spoke
+    6. SpokeController calls CollateralVault#seizeByController to transfer collateral to the liquidator
+    7. SpokeController sends COLLATERAL_SEIZED receipt to HubController
+    8. HubRouter#finalizeLiquidation burns the repaid debt via DebtManager, debits collateral in PositionBook, and clears the reservation
