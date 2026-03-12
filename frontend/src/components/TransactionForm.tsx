@@ -17,7 +17,6 @@ import { AssetPicker } from "./AssetPicker";
 import { useTransactionFlow } from "../lib/writeHooks";
 import { useCanBorrow, useCanWithdraw, useERC20Balance } from "../lib/hooks";
 import type { ActionName, ChainAsset, MessagingFee } from "../lib/types";
-import { GAS_LIMITS } from "../lib/layerzero";
 
 interface TransactionFormProps {
   actionName: ActionName;

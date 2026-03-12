@@ -7,7 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from "./ui/table";
-import { getSpokeByEid, spokeConfigs } from "../lib/contracts";
+import { getSpokeByEid } from "../lib/contracts";
 import type { CollateralPosition, DebtPosition } from "../lib/types";
 import { fromWei } from "../lib/utils";
 
