@@ -422,18 +422,12 @@ contract MockLZEndpointLocal {
         eidOf[oapp] = eid;
     }
 
-    function send(
-        MessagingParams calldata params,
-        address
-    ) external payable returns (MessagingReceipt memory receipt) {
+    function send(MessagingParams calldata params, address) external payable returns (MessagingReceipt memory receipt) {
         _nonce++;
         bytes32 guid = keccak256(abi.encodePacked(_nonce, block.timestamp));
 
-        receipt = MessagingReceipt({
-            guid: guid,
-            nonce: _nonce,
-            fee: MessagingFee({nativeFee: msg.value, lzTokenFee: 0})
-        });
+        receipt =
+            MessagingReceipt({guid: guid, nonce: _nonce, fee: MessagingFee({nativeFee: msg.value, lzTokenFee: 0})});
 
         // Relay the message to the destination OApp's lzReceive
         address receiver = address(uint160(uint256(params.receiver)));
@@ -441,25 +435,14 @@ contract MockLZEndpointLocal {
 
         if (srcEid != 0 && receiver.code.length > 0) {
             ILayerZeroReceiverLocal.Origin memory origin = ILayerZeroReceiverLocal.Origin({
-                srcEid: srcEid,
-                sender: bytes32(uint256(uint160(msg.sender))),
-                nonce: _nonce
+                srcEid: srcEid, sender: bytes32(uint256(uint160(msg.sender))), nonce: _nonce
             });
 
-            ILayerZeroReceiverLocal(receiver).lzReceive(
-                origin,
-                guid,
-                params.message,
-                address(this),
-                ""
-            );
+            ILayerZeroReceiverLocal(receiver).lzReceive(origin, guid, params.message, address(this), "");
         }
     }
 
-    function quote(
-        MessagingParams calldata,
-        address
-    ) external pure returns (MessagingFee memory) {
+    function quote(MessagingParams calldata, address) external pure returns (MessagingFee memory) {
         return MessagingFee({nativeFee: 0.01 ether, lzTokenFee: 0});
     }
 
