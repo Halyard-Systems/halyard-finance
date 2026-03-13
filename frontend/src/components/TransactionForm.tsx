@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useAccount } from "wagmi";
-import { parseUnits, formatUnits } from "viem";
+import { useAccount, useReadContract } from "wagmi";
+import { parseUnits, formatUnits, type Abi } from "viem";
 import { Button } from "./ui/button";
 import {
   Dialog,
@@ -17,6 +17,7 @@ import { AssetPicker } from "./AssetPicker";
 import { useTransactionFlow } from "../lib/writeHooks";
 import { useCanBorrow, useCanWithdraw, useERC20Balance } from "../lib/hooks";
 import type { ActionName, ChainAsset, MessagingFee } from "../lib/types";
+import ERC20_ABI from "../abis/ERC20.json";
 
 interface TransactionFormProps {
   actionName: ActionName;
@@ -119,6 +120,28 @@ export function TransactionForm({
   const walletBalance = balanceResult.data as bigint | undefined;
   const balanceLoading = balanceResult.isLoading;
 
+  // Determine the spender that needs approval (deposit → collateralVault, repay → liquidityVault)
+  const needsApproval = actionName === "Deposit" || actionName === "Repay";
+  const spenderAddress = useMemo(() => {
+    if (!selectedSpoke || !needsApproval) return undefined;
+    return actionName === "Deposit"
+      ? selectedSpoke.collateralVault
+      : selectedSpoke.liquidityVault;
+  }, [selectedSpoke, actionName, needsApproval]);
+
+  // Read current allowance
+  const allowanceResult = useReadContract({
+    address: selectedAsset?.spokeAddress,
+    abi: ERC20_ABI as Abi,
+    functionName: "allowance",
+    args: address && spenderAddress ? [address, spenderAddress] : undefined,
+    chainId: selectedSpoke?.chainId,
+    query: { enabled: !!selectedAsset && !!address && !!spenderAddress },
+  });
+  const currentAllowance = (allowanceResult.data as bigint) ?? 0n;
+  const needsApprovalStep =
+    needsApproval && parsedAmount !== undefined && parsedAmount > 0n && currentAllowance < parsedAmount;
+
   const formattedBalance = useMemo(() => {
     if (!selectedAsset) return undefined;
     if (walletBalance === undefined) return undefined;
@@ -154,13 +177,34 @@ export function TransactionForm({
     }
   }, [isOpen]);
 
-  // Auto-close on confirmed
+  // Refetch allowance after approval confirms
   useEffect(() => {
     if (txFlow.status === "confirmed") {
+      allowanceResult.refetch();
+    }
+  }, [txFlow.status]);
+
+  // Auto-close on confirmed (only for the main tx, not approval)
+  useEffect(() => {
+    if (txFlow.status === "confirmed" && !needsApprovalStep) {
       onTransactionComplete?.();
       setTimeout(onClose, 1500);
     }
-  }, [txFlow.status, onTransactionComplete, onClose]);
+  }, [txFlow.status, needsApprovalStep, onTransactionComplete, onClose]);
+
+  const handleApprove = async () => {
+    if (!selectedSpoke || !selectedAsset || !spenderAddress) return;
+    setLocalError(null);
+    try {
+      await txFlow.approve(
+        selectedAsset.spokeAddress,
+        spenderAddress,
+        selectedSpoke.chainId
+      );
+    } catch {
+      // Error captured in txFlow
+    }
+  };
 
   const handleSubmit = async () => {
     if (!address || !selectedSpoke || !selectedAsset || !parsedAmount) {
@@ -180,6 +224,7 @@ export function TransactionForm({
     }
 
     setLocalError(null);
+    txFlow.reset();
 
     try {
       const fee = DEFAULT_LZ_FEE;
@@ -189,7 +234,6 @@ export function TransactionForm({
           await txFlow.deposit(
             selectedSpoke,
             selectedAsset.canonicalAddress,
-            selectedAsset.spokeAddress,
             parsedAmount,
             fee
           );
@@ -391,15 +435,27 @@ export function TransactionForm({
           <Button variant="outline" onClick={onClose} className="flex-1" disabled={isProcessing}>
             Cancel
           </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={isProcessing || !parsedAmount || txFlow.status === "confirmed"}
-            className="flex-1"
-          >
-            {isProcessing
-              ? STATUS_LABELS[txFlow.status]
-              : `${actionName} ${selectedAsset?.symbol}`}
-          </Button>
+          {needsApprovalStep ? (
+            <Button
+              onClick={handleApprove}
+              disabled={isProcessing || !parsedAmount}
+              className="flex-1"
+            >
+              {isProcessing
+                ? STATUS_LABELS[txFlow.status]
+                : `Approve ${selectedAsset?.symbol}`}
+            </Button>
+          ) : (
+            <Button
+              onClick={handleSubmit}
+              disabled={isProcessing || !parsedAmount || txFlow.status === "confirmed"}
+              className="flex-1"
+            >
+              {isProcessing
+                ? STATUS_LABELS[txFlow.status]
+                : `${actionName} ${selectedAsset?.symbol}`}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

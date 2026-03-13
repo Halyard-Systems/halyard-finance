@@ -81,7 +81,7 @@ export function Portfolio({
                 {[...allEids].map((eid) => {
                   const spoke = getSpokeByEid(eid);
                   const chainName = spoke?.name ?? `Chain ${eid}`;
-                  const chainLogo = spoke?.logo ?? "ethereum-eth-logo.svg";
+                  const chainLogo = spoke?.logo ?? "/ethereum-eth-logo.svg";
 
                   const collaterals = collateralByEid.get(eid) ?? [];
                   const debts = debtByEid.get(eid) ?? [];
@@ -117,7 +117,7 @@ export function Portfolio({
                           >
                             <div className="flex items-center">
                               <img
-                                src={`/${chainLogo}`}
+                                src={chainLogo}
                                 alt={`${chainName} logo`}
                                 className="w-6 h-6 mr-3"
                               />
@@ -131,7 +131,7 @@ export function Portfolio({
                           <div className="flex items-center">
                             {icon && (
                               <img
-                                src={`/${icon}`}
+                                src={icon}
                                 alt={`${symbol} logo`}
                                 className="w-3 h-3 mr-2"
                               />
