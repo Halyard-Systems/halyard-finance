@@ -24,6 +24,29 @@ define deploy_testnet_script
 		-vvvv
 endef
 
+# Deploy testnet spoke script helper (sources chain-specific env file)
+define deploy_spoke_script
+	set -a; source $(1); set +a
+	if [ -z "$$ALCHEMY_API_KEY" ]; then \
+		echo "Error: ALCHEMY_API_KEY environment variable is required"; \
+		exit 1; \
+	fi
+	if [ -z "$$TESTNET_DEPLOYER_ADDRESS" ]; then \
+		echo "Error: TESTNET_DEPLOYER_ADDRESS environment variable is required"; \
+		exit 1; \
+	fi
+	if [ -z "$$TESTNET_DEPLOYER_PRIVATE_KEY" ]; then \
+		echo "Error: TESTNET_DEPLOYER_PRIVATE_KEY environment variable is required"; \
+		exit 1; \
+	fi
+	forge script $(2) \
+		--rpc-url $(3) \
+		--sender $$TESTNET_DEPLOYER_ADDRESS \
+		--private-key $$TESTNET_DEPLOYER_PRIVATE_KEY \
+		--broadcast \
+		-vvvv
+endef
+
 # Add a token to the testnet DepositManager contract configuration
 add-token-testnet:
 	$(call deploy_testnet_script,script/AddTokenToDepositManager.s.sol:AddTokenToDepositManagerScript)
@@ -69,6 +92,35 @@ mint-mock-erc20:
 		--gas-price 30000000000 \
 		--broadcast \
 		-vvvv
+
+# Deploy hub + 3 spokes (ETH, ARB, BASE) to local Anvil node
+deploy-local-multi:
+	forge script script/LocalDeploymentMultiSpoke.s.sol:LocalDeploymentMultiSpokeScript \
+		--rpc-url http://127.0.0.1:8545 \
+		--sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
+		--private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+		--broadcast \
+		-vvvv
+
+# Deploy ETH spoke on Sepolia (requires .env.sepolia)
+deploy-spoke-sepolia:
+	$(call deploy_spoke_script,.env.sepolia,script/testnet/DeploySpokeSepolia.s.sol:DeploySpokeSepoliaScript,https://eth-sepolia.g.alchemy.com/v2/$$ALCHEMY_API_KEY)
+
+# Deploy ARB spoke on Arbitrum Sepolia (requires .env.arb-sepolia)
+deploy-spoke-arb-sepolia:
+	$(call deploy_spoke_script,.env.arb-sepolia,script/testnet/DeploySpokeArbSepolia.s.sol:DeploySpokeArbSepoliaScript,https://arb-sepolia.g.alchemy.com/v2/$$ALCHEMY_API_KEY)
+
+# Deploy BASE spoke on Base Sepolia (requires .env.base-sepolia)
+deploy-spoke-base-sepolia:
+	$(call deploy_spoke_script,.env.base-sepolia,script/testnet/DeploySpokeBaseSepolia.s.sol:DeploySpokeBaseSepoliaScript,https://base-sepolia.g.alchemy.com/v2/$$ALCHEMY_API_KEY)
+
+# Register all 3 spokes on the hub (runs on Sepolia, requires .env.sepolia)
+register-spokes-hub:
+	$(call deploy_testnet_script,script/testnet/RegisterSpokesOnHub.s.sol:RegisterSpokesOnHubScript)
+
+# Start the local Anvil node for the Base chain
+base-node:
+	anvil --fork-url https://base-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY} --fork-block-number 30000000 -p 8547
 
 # Start the local Anvil node for the Arbitrum chain
 arb-node:
