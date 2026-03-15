@@ -7,7 +7,7 @@ import {
   useWaitForTransactionReceipt,
   useWatchContractEvent,
 } from "wagmi";
-import { keccak256, encodePacked, maxUint256, type Abi } from "viem";
+import { keccak256, encodePacked, maxUint256 } from "viem";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { localWalletClient } from "./wagmi";
@@ -34,7 +34,7 @@ export function useTokenApproval(
 
   const allowanceQuery = useReadContract({
     address: tokenAddress,
-    abi: ERC20_ABI as Abi,
+    abi: ERC20_ABI,
     functionName: "allowance",
     args: userAddress && spenderAddress ? [userAddress, spenderAddress] : undefined,
     chainId,
@@ -48,7 +48,7 @@ export function useTokenApproval(
       if (!tokenAddress || !spenderAddress) throw new Error("Missing token or spender");
       return writeContractAsync({
         address: tokenAddress,
-        abi: ERC20_ABI as Abi,
+        abi: ERC20_ABI,
         functionName: "approve",
         args: [spenderAddress, amount],
         chainId,
@@ -143,7 +143,7 @@ export function useTransactionFlow() {
         setStatus("approving");
         const hash = await sendTx({
           address: tokenAddress,
-          abi: ERC20_ABI as Abi,
+          abi: ERC20_ABI,
           functionName: "approve",
           args: [spender, maxUint256],
           chainId,
@@ -185,7 +185,7 @@ export function useTransactionFlow() {
         setStatus("sending");
         const hash = await sendTx({
           address: spoke.spokeController,
-          abi: SPOKE_CONTROLLER_ABI as Abi,
+          abi: SPOKE_CONTROLLER_ABI,
           functionName: "depositAndNotify",
           args: [depositId, canonicalAsset, amount, options, fee],
           value: fee.nativeFee,
@@ -228,7 +228,7 @@ export function useTransactionFlow() {
         setStatus("sending");
         const hash = await sendTx({
           address: spoke.liquidityVault,
-          abi: LIQUIDITY_VAULT_ABI as Abi,
+          abi: LIQUIDITY_VAULT_ABI,
           functionName: "repay",
           args: [repayId, spokeTokenAddress, amount, onBehalfOf],
           value: fee.nativeFee,
@@ -272,7 +272,7 @@ export function useTransactionFlow() {
         setStatus("sending");
         const hash = await sendTx({
           address: hubConfig.hubRouter,
-          abi: HUB_ROUTER_ABI as Abi,
+          abi: HUB_ROUTER_ABI,
           functionName: "borrowAndNotify",
           args: [dstEid, asset, amount, collateralSlots, debtSlots, options, fee],
           value: fee.nativeFee,
@@ -316,7 +316,7 @@ export function useTransactionFlow() {
         setStatus("sending");
         const hash = await sendTx({
           address: hubConfig.hubRouter,
-          abi: HUB_ROUTER_ABI as Abi,
+          abi: HUB_ROUTER_ABI,
           functionName: "withdrawAndNotify",
           args: [dstEid, asset, amount, collateralSlots, debtSlots, options, fee],
           value: fee.nativeFee,
@@ -363,7 +363,7 @@ export function useTransactionFlow() {
         setStatus("sending");
         const hash = await sendTx({
           address: hubConfig.liquidationEngine,
-          abi: LIQUIDATION_ENGINE_ABI as Abi,
+          abi: LIQUIDATION_ENGINE_ABI,
           functionName: "liquidate",
           args: [
             user,
@@ -435,7 +435,7 @@ export function useHubEventRefetch() {
   // Deposit: PositionBook.CollateralCredited(address user, uint32 eid, address asset, uint256 amount)
   useWatchContractEvent({
     address: hubConfig.positionBook,
-    abi: POSITION_BOOK_ABI as Abi,
+    abi: POSITION_BOOK_ABI,
     eventName: "CollateralCredited",
     onLogs: matchesUser,
     enabled: !!address,
@@ -444,7 +444,7 @@ export function useHubEventRefetch() {
   // Repay: HubRouter.RepayFinalized(bytes32 repayId, address user, ...)
   useWatchContractEvent({
     address: hubConfig.hubRouter,
-    abi: HUB_ROUTER_ABI as Abi,
+    abi: HUB_ROUTER_ABI,
     eventName: "RepayFinalized",
     onLogs: matchesUser,
     enabled: !!address,
@@ -453,7 +453,7 @@ export function useHubEventRefetch() {
   // Borrow: HubRouter.BorrowFinalized(bytes32 borrowId, address user, bool success)
   useWatchContractEvent({
     address: hubConfig.hubRouter,
-    abi: HUB_ROUTER_ABI as Abi,
+    abi: HUB_ROUTER_ABI,
     eventName: "BorrowFinalized",
     onLogs: matchesUser,
     enabled: !!address,
@@ -462,7 +462,7 @@ export function useHubEventRefetch() {
   // Withdraw: HubRouter.WithdrawFinalized(bytes32 withdrawId, address user, bool success)
   useWatchContractEvent({
     address: hubConfig.hubRouter,
-    abi: HUB_ROUTER_ABI as Abi,
+    abi: HUB_ROUTER_ABI,
     eventName: "WithdrawFinalized",
     onLogs: matchesUser,
     enabled: !!address,
@@ -471,7 +471,7 @@ export function useHubEventRefetch() {
   // Liquidation: HubRouter.LiquidationFinalized(bytes32 liqId, bool success)
   useWatchContractEvent({
     address: hubConfig.hubRouter,
-    abi: HUB_ROUTER_ABI as Abi,
+    abi: HUB_ROUTER_ABI,
     eventName: "LiquidationFinalized",
     onLogs() {
       // LiquidationFinalized doesn't have a user arg, so always invalidate
