@@ -6,7 +6,7 @@ import {
   useReadContract,
   useWaitForTransactionReceipt,
 } from "wagmi";
-import { keccak256, encodePacked, type Abi } from "viem";
+import { keccak256, encodePacked } from "viem";
 
 import ERC20_ABI from "../abis/ERC20.json";
 import SPOKE_CONTROLLER_ABI from "../abis/SpokeController.json";
@@ -29,7 +29,7 @@ export function useTokenApproval(
 
   const allowanceQuery = useReadContract({
     address: tokenAddress,
-    abi: ERC20_ABI as Abi,
+    abi: ERC20_ABI,
     functionName: "allowance",
     args: userAddress && spenderAddress ? [userAddress, spenderAddress] : undefined,
     chainId,
@@ -43,7 +43,7 @@ export function useTokenApproval(
       if (!tokenAddress || !spenderAddress) throw new Error("Missing token or spender");
       return writeContractAsync({
         address: tokenAddress,
-        abi: ERC20_ABI as Abi,
+        abi: ERC20_ABI,
         functionName: "approve",
         args: [spenderAddress, amount],
         chainId,
@@ -120,7 +120,7 @@ export function useTransactionFlow() {
         setStatus("approving");
         await writeContractAsync({
           address: spokeTokenAddress,
-          abi: ERC20_ABI as Abi,
+          abi: ERC20_ABI,
           functionName: "approve",
           args: [spoke.collateralVault, amount],
           chainId: spoke.chainId,
@@ -136,7 +136,7 @@ export function useTransactionFlow() {
         setStatus("sending");
         const hash = await writeContractAsync({
           address: spoke.spokeController,
-          abi: SPOKE_CONTROLLER_ABI as Abi,
+          abi: SPOKE_CONTROLLER_ABI,
           functionName: "depositAndNotify",
           args: [depositId, canonicalAsset, amount, options, fee],
           value: fee.nativeFee,
@@ -178,7 +178,7 @@ export function useTransactionFlow() {
         setStatus("approving");
         await writeContractAsync({
           address: spokeTokenAddress,
-          abi: ERC20_ABI as Abi,
+          abi: ERC20_ABI,
           functionName: "approve",
           args: [spoke.liquidityVault, amount],
           chainId: spoke.chainId,
@@ -189,7 +189,7 @@ export function useTransactionFlow() {
         setStatus("sending");
         const hash = await writeContractAsync({
           address: spoke.liquidityVault,
-          abi: LIQUIDITY_VAULT_ABI as Abi,
+          abi: LIQUIDITY_VAULT_ABI,
           functionName: "repay",
           args: [repayId, spokeTokenAddress, amount, onBehalfOf],
           value: fee.nativeFee,
@@ -233,7 +233,7 @@ export function useTransactionFlow() {
         setStatus("sending");
         const hash = await writeContractAsync({
           address: hubConfig.hubRouter,
-          abi: HUB_ROUTER_ABI as Abi,
+          abi: HUB_ROUTER_ABI,
           functionName: "borrowAndNotify",
           args: [dstEid, asset, amount, collateralSlots, debtSlots, options, fee],
           value: fee.nativeFee,
@@ -277,7 +277,7 @@ export function useTransactionFlow() {
         setStatus("sending");
         const hash = await writeContractAsync({
           address: hubConfig.hubRouter,
-          abi: HUB_ROUTER_ABI as Abi,
+          abi: HUB_ROUTER_ABI,
           functionName: "withdrawAndNotify",
           args: [dstEid, asset, amount, collateralSlots, debtSlots, options, fee],
           value: fee.nativeFee,
@@ -324,7 +324,7 @@ export function useTransactionFlow() {
         setStatus("sending");
         const hash = await writeContractAsync({
           address: hubConfig.liquidationEngine,
-          abi: LIQUIDATION_ENGINE_ABI as Abi,
+          abi: LIQUIDATION_ENGINE_ABI,
           functionName: "liquidate",
           args: [
             user,
