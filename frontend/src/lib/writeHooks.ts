@@ -95,11 +95,11 @@ export function useTransactionFlow() {
 
   // Use local wallet client (bypasses MetaMask nonce issues) or fall back to wagmi hook
   const sendTx = useCallback(
-    async (args: Parameters<typeof writeContractAsync>[0]) => {
+    async (args: Parameters<typeof writeContractAsync>[0] & { value?: bigint }) => {
       if (localWalletClient) {
         return localWalletClient.writeContract(args as any);
       }
-      return writeContractAsync(args);
+      return writeContractAsync(args as any);
     },
     [writeContractAsync]
   );
