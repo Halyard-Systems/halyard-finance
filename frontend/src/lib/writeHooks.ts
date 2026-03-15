@@ -94,8 +94,17 @@ export function useTransactionFlow() {
   const { writeContractAsync } = useWriteContract();
 
   // Use local wallet client (bypasses MetaMask nonce issues) or fall back to wagmi hook
+  type SendTxArgs = {
+    address: `0x${string}`;
+    abi: readonly unknown[];
+    functionName: string;
+    args?: readonly unknown[];
+    value?: bigint;
+    chainId?: number;
+  };
+
   const sendTx = useCallback(
-    async (args: Parameters<typeof writeContractAsync>[0] & { value?: bigint }) => {
+    async (args: SendTxArgs) => {
       if (localWalletClient) {
         return localWalletClient.writeContract(args as any);
       }
