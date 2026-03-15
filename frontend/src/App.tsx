@@ -17,6 +17,7 @@ import {
   useCollateralPositions,
   useDebtPositions,
 } from "./lib/hooks";
+import { useHubEventRefetch } from "./lib/writeHooks";
 import type { ActionName } from "./lib/types";
 
 type Tab = "dashboard" | "liquidation";
@@ -56,6 +57,9 @@ function App() {
     address as `0x${string}` | undefined,
     debtSlots
   );
+
+  // Watch hub-chain events to refetch data when cross-chain messages land
+  useHubEventRefetch();
 
   const handleTransactionComplete = () => {
     queryClient.invalidateQueries();

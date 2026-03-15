@@ -205,6 +205,10 @@ contract LocalDeploymentEthScript is Script {
         hubController.setPeer(spokeEid, bytes32(uint256(uint160(address(spokeController)))));
         hubController.setHubRouter(address(hubRouter));
 
+        // Register OApps with mock endpoint so it can relay messages
+        mockLzEndpoint.registerOApp(address(hubController), hubEid);
+        mockLzEndpoint.registerOApp(address(spokeController), spokeEid);
+
         console.log("Spoke configured");
 
         // ============================================================
@@ -385,18 +389,91 @@ contract LocalDeploymentEthScript is Script {
     }
 }
 
-/// @notice Minimal mock LZ endpoint for local deployment (accepts ETH, no-ops on all calls)
+/// @notice Mock LZ endpoint for local deployment that relays messages in the same tx.
+///         When `send()` is called, it immediately calls `lzReceive()` on the destination
+///         OApp so cross-chain messaging works on a single Anvil chain.
 contract MockLZEndpointLocal {
+    uint64 private _nonce;
+
+    /// @dev Maps OApp address → its LayerZero endpoint ID
+    mapping(address => uint32) public eidOf;
+
+    struct MessagingParams {
+        uint32 dstEid;
+        bytes32 receiver;
+        bytes message;
+        bytes options;
+        bool payInLzToken;
+    }
+
+    struct MessagingFee {
+        uint256 nativeFee;
+        uint256 lzTokenFee;
+    }
+
+    struct MessagingReceipt {
+        bytes32 guid;
+        uint64 nonce;
+        MessagingFee fee;
+    }
+
+    /// @notice Register an OApp so the endpoint knows its EID for relaying
+    function registerOApp(address oapp, uint32 eid) external {
+        eidOf[oapp] = eid;
+    }
+
+    function send(MessagingParams calldata params, address) external payable returns (MessagingReceipt memory receipt) {
+        _nonce++;
+        bytes32 guid = keccak256(abi.encodePacked(_nonce, block.timestamp));
+
+        receipt =
+            MessagingReceipt({guid: guid, nonce: _nonce, fee: MessagingFee({nativeFee: msg.value, lzTokenFee: 0})});
+
+        // Relay the message to the destination OApp's lzReceive
+        address receiver = address(uint160(uint256(params.receiver)));
+        uint32 srcEid = eidOf[msg.sender];
+
+        if (srcEid != 0 && receiver.code.length > 0) {
+            ILayerZeroReceiverLocal.Origin memory origin = ILayerZeroReceiverLocal.Origin({
+                srcEid: srcEid, sender: bytes32(uint256(uint160(msg.sender))), nonce: _nonce
+            });
+
+            ILayerZeroReceiverLocal(receiver).lzReceive(origin, guid, params.message, address(this), "");
+        }
+    }
+
+    function quote(MessagingParams calldata, address) external pure returns (MessagingFee memory) {
+        return MessagingFee({nativeFee: 0.01 ether, lzTokenFee: 0});
+    }
+
+    function setDelegate(address) external {}
+
     receive() external payable {}
     fallback() external payable {}
 }
 
+interface ILayerZeroReceiverLocal {
+    struct Origin {
+        uint32 srcEid;
+        bytes32 sender;
+        uint64 nonce;
+    }
+
+    function lzReceive(
+        Origin calldata _origin,
+        bytes32 _guid,
+        bytes calldata _message,
+        address _executor,
+        bytes calldata _extraData
+    ) external payable;
+}
+
 /// @notice Minimal mock oracle for local deployment
-/// @dev Returns a fixed price of $1 (1e18) for any asset. Override getPrice for custom values.
+/// @dev Returns a fixed price of $1 (1e18) for any asset.
 contract MockOracleLocal {
     /// @notice Returns price in 1e18 format. Defaults to $1 for all assets.
-    function getPrice(address) external pure returns (uint256) {
-        return 1e18;
+    function getPriceE18(address) external view returns (uint256 priceE18, uint256 lastUpdatedAt) {
+        return (1e18, block.timestamp);
     }
 
     receive() external payable {}

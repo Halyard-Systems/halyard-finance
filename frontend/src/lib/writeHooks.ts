@@ -1,18 +1,23 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   useWriteContract,
   useSwitchChain,
   useAccount,
   useReadContract,
   useWaitForTransactionReceipt,
+  useWatchContractEvent,
 } from "wagmi";
-import { keccak256, encodePacked } from "viem";
+import { keccak256, encodePacked, maxUint256 } from "viem";
+import { useQueryClient } from "@tanstack/react-query";
+
+import { localWalletClient } from "./wagmi";
 
 import ERC20_ABI from "../abis/ERC20.json";
 import SPOKE_CONTROLLER_ABI from "../abis/SpokeController.json";
 import LIQUIDITY_VAULT_ABI from "../abis/LiquidityVault.json";
 import HUB_ROUTER_ABI from "../abis/HubRouter.json";
 import LIQUIDATION_ENGINE_ABI from "../abis/LiquidationEngine.json";
+import POSITION_BOOK_ABI from "../abis/PositionBook.json";
 
 import { hubConfig, type SpokeConfig } from "./contracts";
 import type { ChainAsset, MessagingFee, TransactionStatus } from "./types";
@@ -88,7 +93,38 @@ export function useTransactionFlow() {
   const { switchChainAsync } = useSwitchChain();
   const { writeContractAsync } = useWriteContract();
 
+  // Use local wallet client (bypasses MetaMask nonce issues) or fall back to wagmi hook
+  type SendTxArgs = {
+    address: `0x${string}`;
+    abi: readonly unknown[];
+    functionName: string;
+    args?: readonly unknown[];
+    value?: bigint;
+    chainId?: number;
+  };
+
+  const sendTx = useCallback(
+    async (args: SendTxArgs) => {
+      if (localWalletClient) {
+        return localWalletClient.writeContract(args as any);
+      }
+      return writeContractAsync(args as any);
+    },
+    [writeContractAsync]
+  );
+
   const receipt = useWaitForTransactionReceipt({ hash: txHash });
+
+  // Transition to confirmed/failed based on the on-chain receipt status
+  useEffect(() => {
+    if (status !== "pending" || !receipt.data) return;
+    if (receipt.data.status === "reverted") {
+      setStatus("failed");
+      setError("Transaction reverted on-chain");
+    } else if (receipt.data.status === "success") {
+      setStatus("confirmed");
+    }
+  }, [status, receipt.data]);
 
   const reset = useCallback(() => {
     setStatus("idle");
@@ -96,13 +132,50 @@ export function useTransactionFlow() {
     setTxHash(undefined);
   }, []);
 
+  // ─── Approve (standalone, user-triggered) ────────────────────────────
+
+  const approve = useCallback(
+    async (
+      tokenAddress: `0x${string}`,
+      spender: `0x${string}`,
+      chainId: number
+    ) => {
+      if (!address) throw new Error("Wallet not connected");
+      try {
+        setError(null);
+
+        if (currentChainId !== chainId) {
+          setStatus("switching-chain");
+          await switchChainAsync({ chainId });
+        }
+
+        setStatus("approving");
+        const hash = await sendTx({
+          address: tokenAddress,
+          abi: ERC20_ABI,
+          functionName: "approve",
+          args: [spender, maxUint256],
+          chainId,
+        });
+
+        setTxHash(hash);
+        setStatus("pending");
+        return hash;
+      } catch (err: any) {
+        setStatus("failed");
+        setError(err?.shortMessage || err?.message || "Transaction failed");
+        throw err;
+      }
+    },
+    [address, currentChainId, switchChainAsync, sendTx]
+  );
+
   // ─── Deposit (spoke chain) ─────────────────────────────────────────────
 
   const deposit = useCallback(
     async (
       spoke: SpokeConfig,
       canonicalAsset: `0x${string}`,
-      spokeTokenAddress: `0x${string}`,
       amount: bigint,
       fee: MessagingFee
     ) => {
@@ -110,31 +183,16 @@ export function useTransactionFlow() {
       try {
         setError(null);
 
-        // Switch chain if needed
         if (currentChainId !== spoke.chainId) {
           setStatus("switching-chain");
           await switchChainAsync({ chainId: spoke.chainId });
         }
 
-        // Approve CollateralVault to spend token
-        setStatus("approving");
-        await writeContractAsync({
-          address: spokeTokenAddress,
-          abi: ERC20_ABI,
-          functionName: "approve",
-          args: [spoke.collateralVault, amount],
-          chainId: spoke.chainId,
-        });
-
-        // Generate deposit ID
         const depositId = generateOperationId("deposit", address, Date.now());
-
-        // Build LZ options
         const options = buildLzOptions(GAS_LIMITS.deposit);
 
-        // Send deposit tx
         setStatus("sending");
-        const hash = await writeContractAsync({
+        const hash = await sendTx({
           address: spoke.spokeController,
           abi: SPOKE_CONTROLLER_ABI,
           functionName: "depositAndNotify",
@@ -152,7 +210,7 @@ export function useTransactionFlow() {
         throw err;
       }
     },
-    [address, currentChainId, switchChainAsync, writeContractAsync]
+    [address, currentChainId, switchChainAsync, sendTx]
   );
 
   // ─── Repay (spoke chain) ───────────────────────────────────────────────
@@ -174,20 +232,10 @@ export function useTransactionFlow() {
           await switchChainAsync({ chainId: spoke.chainId });
         }
 
-        // Approve LiquidityVault
-        setStatus("approving");
-        await writeContractAsync({
-          address: spokeTokenAddress,
-          abi: ERC20_ABI,
-          functionName: "approve",
-          args: [spoke.liquidityVault, amount],
-          chainId: spoke.chainId,
-        });
-
         const repayId = generateOperationId("repay", address, Date.now());
 
         setStatus("sending");
-        const hash = await writeContractAsync({
+        const hash = await sendTx({
           address: spoke.liquidityVault,
           abi: LIQUIDITY_VAULT_ABI,
           functionName: "repay",
@@ -205,7 +253,7 @@ export function useTransactionFlow() {
         throw err;
       }
     },
-    [address, currentChainId, switchChainAsync, writeContractAsync]
+    [address, currentChainId, switchChainAsync, sendTx]
   );
 
   // ─── Borrow (hub chain) ────────────────────────────────────────────────
@@ -231,7 +279,7 @@ export function useTransactionFlow() {
         const options = buildLzOptions(GAS_LIMITS.borrow);
 
         setStatus("sending");
-        const hash = await writeContractAsync({
+        const hash = await sendTx({
           address: hubConfig.hubRouter,
           abi: HUB_ROUTER_ABI,
           functionName: "borrowAndNotify",
@@ -249,7 +297,7 @@ export function useTransactionFlow() {
         throw err;
       }
     },
-    [address, currentChainId, switchChainAsync, writeContractAsync]
+    [address, currentChainId, switchChainAsync, sendTx]
   );
 
   // ─── Withdraw (hub chain) ──────────────────────────────────────────────
@@ -275,7 +323,7 @@ export function useTransactionFlow() {
         const options = buildLzOptions(GAS_LIMITS.withdraw);
 
         setStatus("sending");
-        const hash = await writeContractAsync({
+        const hash = await sendTx({
           address: hubConfig.hubRouter,
           abi: HUB_ROUTER_ABI,
           functionName: "withdrawAndNotify",
@@ -293,7 +341,7 @@ export function useTransactionFlow() {
         throw err;
       }
     },
-    [address, currentChainId, switchChainAsync, writeContractAsync]
+    [address, currentChainId, switchChainAsync, sendTx]
   );
 
   // ─── Liquidate (hub chain) ─────────────────────────────────────────────
@@ -322,7 +370,7 @@ export function useTransactionFlow() {
         const options = buildLzOptions(GAS_LIMITS.liquidation);
 
         setStatus("sending");
-        const hash = await writeContractAsync({
+        const hash = await sendTx({
           address: hubConfig.liquidationEngine,
           abi: LIQUIDATION_ENGINE_ABI,
           functionName: "liquidate",
@@ -351,7 +399,7 @@ export function useTransactionFlow() {
         throw err;
       }
     },
-    [address, currentChainId, switchChainAsync, writeContractAsync]
+    [address, currentChainId, switchChainAsync, sendTx]
   );
 
   return {
@@ -360,10 +408,84 @@ export function useTransactionFlow() {
     txHash,
     receipt,
     reset,
+    approve,
     deposit,
     repay,
     borrow,
     withdraw,
     liquidate,
   };
+}
+
+// ─── Hub event watcher — invalidates queries when cross-chain messages land ──
+
+export function useHubEventRefetch() {
+  const { address } = useAccount();
+  const queryClient = useQueryClient();
+
+  const invalidate = useCallback(() => {
+    queryClient.invalidateQueries();
+  }, [queryClient]);
+
+  const matchesUser = useCallback(
+    (logs: any[]) => {
+      if (!address) return;
+      for (const log of logs) {
+        const user = log.args?.user as string | undefined;
+        if (!user || user.toLowerCase() === address.toLowerCase()) {
+          invalidate();
+          return;
+        }
+      }
+    },
+    [address, invalidate]
+  );
+
+  // Deposit: PositionBook.CollateralCredited(address user, uint32 eid, address asset, uint256 amount)
+  useWatchContractEvent({
+    address: hubConfig.positionBook,
+    abi: POSITION_BOOK_ABI,
+    eventName: "CollateralCredited",
+    onLogs: matchesUser,
+    enabled: !!address,
+  });
+
+  // Repay: HubRouter.RepayFinalized(bytes32 repayId, address user, ...)
+  useWatchContractEvent({
+    address: hubConfig.hubRouter,
+    abi: HUB_ROUTER_ABI,
+    eventName: "RepayFinalized",
+    onLogs: matchesUser,
+    enabled: !!address,
+  });
+
+  // Borrow: HubRouter.BorrowFinalized(bytes32 borrowId, address user, bool success)
+  useWatchContractEvent({
+    address: hubConfig.hubRouter,
+    abi: HUB_ROUTER_ABI,
+    eventName: "BorrowFinalized",
+    onLogs: matchesUser,
+    enabled: !!address,
+  });
+
+  // Withdraw: HubRouter.WithdrawFinalized(bytes32 withdrawId, address user, bool success)
+  useWatchContractEvent({
+    address: hubConfig.hubRouter,
+    abi: HUB_ROUTER_ABI,
+    eventName: "WithdrawFinalized",
+    onLogs: matchesUser,
+    enabled: !!address,
+  });
+
+  // Liquidation: HubRouter.LiquidationFinalized(bytes32 liqId, bool success)
+  useWatchContractEvent({
+    address: hubConfig.hubRouter,
+    abi: HUB_ROUTER_ABI,
+    eventName: "LiquidationFinalized",
+    onLogs() {
+      // LiquidationFinalized doesn't have a user arg, so always invalidate
+      invalidate();
+    },
+    enabled: !!address,
+  });
 }
