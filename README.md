@@ -10,7 +10,17 @@ The local development environment is based on a node with a mainnet fork; see th
 
 Alchemy is recommended for the node connection; set the ALCHEMY_API_KEY before running the node to fork for a deployable environment.
 
-#### Start the Development Environment
+### Setup
+
+After cloning, configure git to use the shared hooks directory:
+
+```shell
+git config core.hooksPath .githooks
+```
+
+This enables the pre-commit hook that runs `forge fmt --check` before each commit, matching the CI formatting check.
+
+### Start the Development Environment
 
 Three terminals/processes are required:
 

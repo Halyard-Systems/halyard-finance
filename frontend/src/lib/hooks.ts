@@ -23,7 +23,8 @@ import type {
 export function useERC20Balance(
   tokenAddress: `0x${string}` | undefined,
   userAddress: `0x${string}` | undefined,
-  chainId?: number
+  chainId?: number,
+  lzEid?: number
 ): UseReadContractReturnType {
   return useReadContract({
     address: tokenAddress,
@@ -31,7 +32,7 @@ export function useERC20Balance(
     functionName: "balanceOf",
     args: userAddress ? [userAddress] : undefined,
     chainId,
-    scopeKey: tokenAddress ?? "none",
+    scopeKey: `${lzEid ?? chainId ?? "default"}-${tokenAddress ?? "none"}`,
     query: {
       enabled: !!tokenAddress && !!userAddress,
     },

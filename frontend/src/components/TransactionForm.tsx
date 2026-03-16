@@ -114,7 +114,8 @@ export function TransactionForm({
   const balanceResult = useERC20Balance(
     selectedAsset?.spokeAddress,
     address,
-    selectedSpoke?.chainId
+    selectedSpoke?.chainId,
+    selectedSpoke?.lzEid
   );
 
   const walletBalance = balanceResult.data as bigint | undefined;

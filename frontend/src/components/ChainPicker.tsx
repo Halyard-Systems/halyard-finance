@@ -19,10 +19,10 @@ export function ChainPicker({
       <div className="flex items-center gap-4">
         {spokes.map((spoke) => (
           <div
-            key={spoke.chainId}
+            key={spoke.lzEid}
             onClick={() => onChainSelect?.(spoke)}
             className={`flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors ${
-              selectedSpoke?.chainId === spoke.chainId
+              selectedSpoke?.lzEid === spoke.lzEid
                 ? "border-2 border-primary bg-muted"
                 : "border-2 border-transparent hover:border-muted"
             }`}
