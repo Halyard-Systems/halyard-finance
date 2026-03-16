@@ -138,7 +138,14 @@ contract LocalDeploymentMultiSpokeScript is Script {
         // 6. Set up access control permissions
         // ============================================================
         _setupPermissions(
-            accessManager, hubController, hubRouter, positionBook, riskEngine, debtManager, liquidationEngine, assetRegistry
+            accessManager,
+            hubController,
+            hubRouter,
+            positionBook,
+            riskEngine,
+            debtManager,
+            liquidationEngine,
+            assetRegistry
         );
         console.log("Permissions configured");
 
@@ -157,22 +164,25 @@ contract LocalDeploymentMultiSpokeScript is Script {
         // ============================================================
 
         // --- ETH Spoke ---
-        (SpokeController scEth, CollateralVault cvEth, LiquidityVault lvEth) =
-            _deploySpoke(deployer, address(mockLzEndpoint), hubController, HUB_EID, ETH_EID, address(usdcEth), address(wethEth));
+        (SpokeController scEth, CollateralVault cvEth, LiquidityVault lvEth) = _deploySpoke(
+            deployer, address(mockLzEndpoint), hubController, HUB_EID, ETH_EID, address(usdcEth), address(wethEth)
+        );
         console.log("ETH SpokeController:", address(scEth));
         console.log("ETH CollateralVault:", address(cvEth));
         console.log("ETH LiquidityVault:", address(lvEth));
 
         // --- ARB Spoke ---
-        (SpokeController scArb, CollateralVault cvArb, LiquidityVault lvArb) =
-            _deploySpoke(deployer, address(mockLzEndpoint), hubController, HUB_EID, ARB_EID, address(usdcArb), address(wethArb));
+        (SpokeController scArb, CollateralVault cvArb, LiquidityVault lvArb) = _deploySpoke(
+            deployer, address(mockLzEndpoint), hubController, HUB_EID, ARB_EID, address(usdcArb), address(wethArb)
+        );
         console.log("ARB SpokeController:", address(scArb));
         console.log("ARB CollateralVault:", address(cvArb));
         console.log("ARB LiquidityVault:", address(lvArb));
 
         // --- BASE Spoke ---
-        (SpokeController scBase, CollateralVault cvBase, LiquidityVault lvBase) =
-            _deploySpoke(deployer, address(mockLzEndpoint), hubController, HUB_EID, BASE_EID, address(usdcBase), address(wethBase));
+        (SpokeController scBase, CollateralVault cvBase, LiquidityVault lvBase) = _deploySpoke(
+            deployer, address(mockLzEndpoint), hubController, HUB_EID, BASE_EID, address(usdcBase), address(wethBase)
+        );
         console.log("BASE SpokeController:", address(scBase));
         console.log("BASE CollateralVault:", address(cvBase));
         console.log("BASE LiquidityVault:", address(lvBase));

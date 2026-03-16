@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+# Run forge fmt --check on staged .sol files
+staged_sol_files=$(git diff --cached --name-only --diff-filter=ACM -- '*.sol')
+
+if [ -n "$staged_sol_files" ]; then
+    forge fmt --check 2>&1
+    if [ $? -ne 0 ]; then
+        echo ""
+        echo "forge fmt check failed. Run 'forge fmt' to fix formatting, then re-stage and commit."
+        exit 1
+    fi
+fi

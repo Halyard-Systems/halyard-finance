@@ -17,12 +17,22 @@ contract CrossSpokeWithdrawTest is MultiSpokeBaseTest {
         _mockOraclePrice(canonicalTokenArb, 1e18);
 
         _depositAndCredit(
-            spokeControllerEth, collateralVaultEth, mockTokenEth,
-            alice, bytes32("dep_eth"), canonicalTokenEth, depositEth
+            spokeControllerEth,
+            collateralVaultEth,
+            mockTokenEth,
+            alice,
+            bytes32("dep_eth"),
+            canonicalTokenEth,
+            depositEth
         );
         _depositAndCredit(
-            spokeControllerArb, collateralVaultArb, mockTokenArb,
-            alice, bytes32("dep_arb"), canonicalTokenArb, depositArb
+            spokeControllerArb,
+            collateralVaultArb,
+            mockTokenArb,
+            alice,
+            bytes32("dep_arb"),
+            canonicalTokenArb,
+            depositArb
         );
 
         // Withdraw from ETH spoke (no debt, so full withdrawal should work)
@@ -63,8 +73,13 @@ contract CrossSpokeWithdrawTest is MultiSpokeBaseTest {
 
         // Deposit on ETH
         _depositAndCredit(
-            spokeControllerEth, collateralVaultEth, mockTokenEth,
-            alice, bytes32("dep_eth"), canonicalTokenEth, depositAmount
+            spokeControllerEth,
+            collateralVaultEth,
+            mockTokenEth,
+            alice,
+            bytes32("dep_eth"),
+            canonicalTokenEth,
+            depositAmount
         );
 
         // Borrow from ARB using ETH collateral

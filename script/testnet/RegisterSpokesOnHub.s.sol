@@ -73,12 +73,7 @@ contract RegisterSpokesOnHubScript is Script {
             eid,
             usdc,
             AssetRegistry.CollateralConfig({
-                isSupported: true,
-                ltvBps: 8000,
-                liqThresholdBps: 8500,
-                liqBonusBps: 500,
-                decimals: 6,
-                supplyCap: 0
+                isSupported: true, ltvBps: 8000, liqThresholdBps: 8500, liqBonusBps: 500, decimals: 6, supplyCap: 0
             })
         );
 
@@ -87,12 +82,7 @@ contract RegisterSpokesOnHubScript is Script {
             eid,
             weth,
             AssetRegistry.CollateralConfig({
-                isSupported: true,
-                ltvBps: 7500,
-                liqThresholdBps: 8000,
-                liqBonusBps: 500,
-                decimals: 18,
-                supplyCap: 0
+                isSupported: true, ltvBps: 7500, liqThresholdBps: 8000, liqBonusBps: 500, decimals: 18, supplyCap: 0
             })
         );
 

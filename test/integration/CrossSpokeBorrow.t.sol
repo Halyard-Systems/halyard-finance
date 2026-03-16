@@ -17,8 +17,13 @@ contract CrossSpokeBorrowTest is MultiSpokeBaseTest {
 
         // Deposit collateral on ETH spoke
         _depositAndCredit(
-            spokeControllerEth, collateralVaultEth, mockTokenEth,
-            alice, bytes32("dep_eth"), canonicalTokenEth, depositAmount
+            spokeControllerEth,
+            collateralVaultEth,
+            mockTokenEth,
+            alice,
+            bytes32("dep_eth"),
+            canonicalTokenEth,
+            depositAmount
         );
 
         // Build slots: collateral on ETH, debt on ARB
@@ -63,12 +68,22 @@ contract CrossSpokeBorrowTest is MultiSpokeBaseTest {
         _mockOraclePrice(canonicalTokenArb, 1e18);
 
         _depositAndCredit(
-            spokeControllerEth, collateralVaultEth, mockTokenEth,
-            alice, bytes32("dep_eth"), canonicalTokenEth, depositEth
+            spokeControllerEth,
+            collateralVaultEth,
+            mockTokenEth,
+            alice,
+            bytes32("dep_eth"),
+            canonicalTokenEth,
+            depositEth
         );
         _depositAndCredit(
-            spokeControllerBase, collateralVaultBase, mockTokenBase,
-            alice, bytes32("dep_base"), canonicalTokenBase, depositBase
+            spokeControllerBase,
+            collateralVaultBase,
+            mockTokenBase,
+            alice,
+            bytes32("dep_base"),
+            canonicalTokenBase,
+            depositBase
         );
 
         // Collateral from 2 spokes, debt on 1
@@ -107,8 +122,13 @@ contract CrossSpokeBorrowTest is MultiSpokeBaseTest {
         _mockOraclePrice(canonicalTokenArb, 1e18);
 
         _depositAndCredit(
-            spokeControllerEth, collateralVaultEth, mockTokenEth,
-            alice, bytes32("dep_eth"), canonicalTokenEth, depositAmount
+            spokeControllerEth,
+            collateralVaultEth,
+            mockTokenEth,
+            alice,
+            bytes32("dep_eth"),
+            canonicalTokenEth,
+            depositAmount
         );
 
         IRiskEngine.CollateralSlot[] memory collateralSlots = new IRiskEngine.CollateralSlot[](1);

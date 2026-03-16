@@ -211,22 +211,13 @@ contract MultiSpokeBaseTest is Test {
     // Internal helpers
     // ================================================================
 
-    function _setupSpokeTokenApprovals(
-        SpokeController sc,
-        MockERC20 token,
-        CollateralVault cv
-    ) internal {
+    function _setupSpokeTokenApprovals(SpokeController sc, MockERC20 token, CollateralVault cv) internal {
         token.mint(address(sc), 1_000_000e18);
         vm.prank(address(sc));
         token.approve(address(cv), type(uint256).max);
     }
 
-    function _setupUserApprovals(
-        address user,
-        MockERC20 token,
-        CollateralVault cv,
-        LiquidityVault lv
-    ) internal {
+    function _setupUserApprovals(address user, MockERC20 token, CollateralVault cv, LiquidityVault lv) internal {
         vm.prank(user);
         token.approve(address(cv), type(uint256).max);
         vm.prank(user);
@@ -408,11 +399,7 @@ contract MultiSpokeBaseTest is Test {
         vm.mockCall(
             address(mockLzEndpoint),
             abi.encodeWithSignature("send((uint32,bytes32,bytes,bytes,bool),address)"),
-            abi.encode(
-                bytes32(uint256(1)),
-                uint64(1),
-                MessagingFee({nativeFee: 0, lzTokenFee: 0})
-            )
+            abi.encode(bytes32(uint256(1)), uint64(1), MessagingFee({nativeFee: 0, lzTokenFee: 0}))
         );
     }
 
@@ -423,13 +410,9 @@ contract MultiSpokeBaseTest is Test {
     }
 
     /// @notice Simulate deposit receipt on a specific spoke
-    function _simulateDepositReceipt(
-        SpokeController sc,
-        bytes32 depositId,
-        address user,
-        address asset,
-        uint256 amount
-    ) internal {
+    function _simulateDepositReceipt(SpokeController sc, bytes32 depositId, address user, address asset, uint256 amount)
+        internal
+    {
         uint32 srcEid = sc.spokeEid();
         bytes32 spokeSender = bytes32(uint256(uint160(address(sc))));
 
@@ -438,11 +421,7 @@ contract MultiSpokeBaseTest is Test {
 
         vm.prank(address(mockLzEndpoint));
         hubController.lzReceive(
-            Origin({srcEid: srcEid, sender: spokeSender, nonce: 1}),
-            bytes32(uint256(1)),
-            message,
-            address(0),
-            bytes("")
+            Origin({srcEid: srcEid, sender: spokeSender, nonce: 1}), bytes32(uint256(1)), message, address(0), bytes("")
         );
     }
 
@@ -463,11 +442,7 @@ contract MultiSpokeBaseTest is Test {
 
         vm.prank(address(mockLzEndpoint));
         hubController.lzReceive(
-            Origin({srcEid: srcEid, sender: spokeSender, nonce: 3}),
-            bytes32(uint256(3)),
-            message,
-            address(0),
-            bytes("")
+            Origin({srcEid: srcEid, sender: spokeSender, nonce: 3}), bytes32(uint256(3)), message, address(0), bytes("")
         );
     }
 
@@ -490,11 +465,7 @@ contract MultiSpokeBaseTest is Test {
 
         vm.prank(address(mockLzEndpoint));
         hubController.lzReceive(
-            Origin({srcEid: srcEid, sender: spokeSender, nonce: 2}),
-            bytes32(uint256(2)),
-            message,
-            address(0),
-            bytes("")
+            Origin({srcEid: srcEid, sender: spokeSender, nonce: 2}), bytes32(uint256(2)), message, address(0), bytes("")
         );
     }
 
@@ -516,22 +487,14 @@ contract MultiSpokeBaseTest is Test {
 
         vm.prank(address(mockLzEndpoint));
         hubController.lzReceive(
-            Origin({srcEid: srcEid, sender: spokeSender, nonce: 5}),
-            bytes32(uint256(5)),
-            message,
-            address(0),
-            bytes("")
+            Origin({srcEid: srcEid, sender: spokeSender, nonce: 5}), bytes32(uint256(5)), message, address(0), bytes("")
         );
     }
 
     /// @notice Simulate repay receipt from a specific spoke
-    function _simulateRepayReceipt(
-        SpokeController sc,
-        bytes32 repayId,
-        address user,
-        address asset,
-        uint256 amount
-    ) internal {
+    function _simulateRepayReceipt(SpokeController sc, bytes32 repayId, address user, address asset, uint256 amount)
+        internal
+    {
         uint32 srcEid = sc.spokeEid();
         bytes32 spokeSender = bytes32(uint256(uint160(address(sc))));
 
@@ -540,11 +503,7 @@ contract MultiSpokeBaseTest is Test {
 
         vm.prank(address(mockLzEndpoint));
         hubController.lzReceive(
-            Origin({srcEid: srcEid, sender: spokeSender, nonce: 4}),
-            bytes32(uint256(4)),
-            message,
-            address(0),
-            bytes("")
+            Origin({srcEid: srcEid, sender: spokeSender, nonce: 4}), bytes32(uint256(4)), message, address(0), bytes("")
         );
     }
 

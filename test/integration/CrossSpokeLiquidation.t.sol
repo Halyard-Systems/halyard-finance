@@ -18,8 +18,13 @@ contract CrossSpokeLiquidationTest is MultiSpokeBaseTest {
 
         // Alice deposits on ETH spoke
         _depositAndCredit(
-            spokeControllerEth, collateralVaultEth, mockTokenEth,
-            alice, bytes32("dep_eth"), canonicalTokenEth, depositAmount
+            spokeControllerEth,
+            collateralVaultEth,
+            mockTokenEth,
+            alice,
+            bytes32("dep_eth"),
+            canonicalTokenEth,
+            depositAmount
         );
 
         // Alice borrows from ARB spoke using ETH collateral
@@ -64,9 +69,15 @@ contract CrossSpokeLiquidationTest is MultiSpokeBaseTest {
         vm.prank(bob);
         liquidationEngine.liquidate{value: 0.1 ether}(
             alice,
-            arbEid, canonicalTokenArb, debtToRepay, // debt to repay (ARB spoke)
-            ethEid, canonicalTokenEth,                // collateral to seize (ETH spoke)
-            liqColSlots, liqDebtSlots, bytes(""), fee
+            arbEid,
+            canonicalTokenArb,
+            debtToRepay, // debt to repay (ARB spoke)
+            ethEid,
+            canonicalTokenEth, // collateral to seize (ETH spoke)
+            liqColSlots,
+            liqDebtSlots,
+            bytes(""),
+            fee
         );
 
         // Collateral should be reserved on ETH spoke
@@ -75,10 +86,15 @@ contract CrossSpokeLiquidationTest is MultiSpokeBaseTest {
         // Compute expected liqId
         bytes32 liqId = keccak256(
             abi.encodePacked(
-                bob, alice,
-                arbEid, canonicalTokenArb, debtToRepay,
-                ethEid, canonicalTokenEth,
-                block.number, liquidationEngine.nonces(bob) - 1
+                bob,
+                alice,
+                arbEid,
+                canonicalTokenArb,
+                debtToRepay,
+                ethEid,
+                canonicalTokenEth,
+                block.number,
+                liquidationEngine.nonces(bob) - 1
             )
         );
 
@@ -108,8 +124,13 @@ contract CrossSpokeLiquidationTest is MultiSpokeBaseTest {
         _mockOraclePrice(canonicalTokenArb, 1e18);
 
         _depositAndCredit(
-            spokeControllerEth, collateralVaultEth, mockTokenEth,
-            alice, bytes32("dep_eth"), canonicalTokenEth, depositAmount
+            spokeControllerEth,
+            collateralVaultEth,
+            mockTokenEth,
+            alice,
+            bytes32("dep_eth"),
+            canonicalTokenEth,
+            depositAmount
         );
 
         IRiskEngine.CollateralSlot[] memory riskColSlots = new IRiskEngine.CollateralSlot[](1);
@@ -141,9 +162,15 @@ contract CrossSpokeLiquidationTest is MultiSpokeBaseTest {
         vm.expectRevert(); // NotLiquidatable
         liquidationEngine.liquidate{value: 0.1 ether}(
             alice,
-            arbEid, canonicalTokenArb, 20e18,
-            ethEid, canonicalTokenEth,
-            liqColSlots, liqDebtSlots, bytes(""), fee
+            arbEid,
+            canonicalTokenArb,
+            20e18,
+            ethEid,
+            canonicalTokenEth,
+            liqColSlots,
+            liqDebtSlots,
+            bytes(""),
+            fee
         );
     }
 }

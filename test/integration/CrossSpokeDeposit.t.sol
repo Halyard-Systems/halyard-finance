@@ -12,14 +12,24 @@ contract CrossSpokeDepositTest is MultiSpokeBaseTest {
 
         // Deposit on ETH spoke
         _depositAndCredit(
-            spokeControllerEth, collateralVaultEth, mockTokenEth,
-            alice, bytes32("dep_eth_1"), canonicalTokenEth, depositAmountEth
+            spokeControllerEth,
+            collateralVaultEth,
+            mockTokenEth,
+            alice,
+            bytes32("dep_eth_1"),
+            canonicalTokenEth,
+            depositAmountEth
         );
 
         // Deposit on ARB spoke
         _depositAndCredit(
-            spokeControllerArb, collateralVaultArb, mockTokenArb,
-            alice, bytes32("dep_arb_1"), canonicalTokenArb, depositAmountArb
+            spokeControllerArb,
+            collateralVaultArb,
+            mockTokenArb,
+            alice,
+            bytes32("dep_arb_1"),
+            canonicalTokenArb,
+            depositAmountArb
         );
 
         // Verify hub tracks both positions independently
@@ -37,16 +47,31 @@ contract CrossSpokeDepositTest is MultiSpokeBaseTest {
         uint256 amountBase = 300e18;
 
         _depositAndCredit(
-            spokeControllerEth, collateralVaultEth, mockTokenEth,
-            alice, bytes32("dep_eth"), canonicalTokenEth, amountEth
+            spokeControllerEth,
+            collateralVaultEth,
+            mockTokenEth,
+            alice,
+            bytes32("dep_eth"),
+            canonicalTokenEth,
+            amountEth
         );
         _depositAndCredit(
-            spokeControllerArb, collateralVaultArb, mockTokenArb,
-            alice, bytes32("dep_arb"), canonicalTokenArb, amountArb
+            spokeControllerArb,
+            collateralVaultArb,
+            mockTokenArb,
+            alice,
+            bytes32("dep_arb"),
+            canonicalTokenArb,
+            amountArb
         );
         _depositAndCredit(
-            spokeControllerBase, collateralVaultBase, mockTokenBase,
-            alice, bytes32("dep_base"), canonicalTokenBase, amountBase
+            spokeControllerBase,
+            collateralVaultBase,
+            mockTokenBase,
+            alice,
+            bytes32("dep_base"),
+            canonicalTokenBase,
+            amountBase
         );
 
         assertEq(positionBook.collateralOf(alice, ethEid, canonicalTokenEth), amountEth);
@@ -60,12 +85,16 @@ contract CrossSpokeDepositTest is MultiSpokeBaseTest {
         uint256 bobAmount = 200e18;
 
         _depositAndCredit(
-            spokeControllerEth, collateralVaultEth, mockTokenEth,
-            alice, bytes32("alice_dep"), canonicalTokenEth, aliceAmount
+            spokeControllerEth,
+            collateralVaultEth,
+            mockTokenEth,
+            alice,
+            bytes32("alice_dep"),
+            canonicalTokenEth,
+            aliceAmount
         );
         _depositAndCredit(
-            spokeControllerArb, collateralVaultArb, mockTokenArb,
-            bob, bytes32("bob_dep"), canonicalTokenArb, bobAmount
+            spokeControllerArb, collateralVaultArb, mockTokenArb, bob, bytes32("bob_dep"), canonicalTokenArb, bobAmount
         );
 
         // Alice has collateral only on ETH spoke
