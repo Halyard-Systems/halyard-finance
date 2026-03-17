@@ -82,8 +82,10 @@ contract LocalDeploymentEthScript is Script {
         LiquidationEngine liquidationEngine = new LiquidationEngine(address(accessManager));
         console.log("LiquidationEngine:", address(liquidationEngine));
 
-        // Deploy a mock oracle (just a contract that can receive calls)
+        // Deploy a mock oracle with realistic prices
         MockOracleLocal mockOracle = new MockOracleLocal();
+        mockOracle.setPrice(address(usdc), 1e18);    // $1
+        mockOracle.setPrice(address(weth), 2000e18);  // $2,000
         console.log("MockOracle:", address(mockOracle));
 
         // ============================================================
@@ -468,12 +470,18 @@ interface ILayerZeroReceiverLocal {
     ) external payable;
 }
 
-/// @notice Minimal mock oracle for local deployment
-/// @dev Returns a fixed price of $1 (1e18) for any asset.
+/// @notice Configurable mock oracle for local deployment
+/// @dev Supports per-asset prices. Falls back to $1 (1e18) for unconfigured assets.
 contract MockOracleLocal {
-    /// @notice Returns price in 1e18 format. Defaults to $1 for all assets.
-    function getPriceE18(address) external view returns (uint256 priceE18, uint256 lastUpdatedAt) {
-        return (1e18, block.timestamp);
+    mapping(address => uint256) public prices;
+
+    function setPrice(address asset, uint256 priceE18) external {
+        prices[asset] = priceE18;
+    }
+
+    function getPriceE18(address asset) external view returns (uint256 priceE18, uint256 lastUpdatedAt) {
+        uint256 p = prices[asset];
+        return (p == 0 ? 1e18 : p, block.timestamp);
     }
 
     receive() external payable {}

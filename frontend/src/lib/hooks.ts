@@ -8,6 +8,7 @@ import type { Abi } from "viem";
 import POSITION_BOOK_ABI from "../abis/PositionBook.json";
 import DEBT_MANAGER_ABI from "../abis/DebtManager.json";
 import RISK_ENGINE_ABI from "../abis/RiskEngine.json";
+import PYTH_ORACLE_ADAPTER_ABI from "../abis/PythOracleAdapter.json";
 import ERC20_ABI from "../abis/ERC20.json";
 
 import { hubConfig } from "./contracts";
@@ -201,6 +202,28 @@ export function useDebtPositions(
     isLoading: query.isLoading,
     isError: query.isError,
     refetch: query.refetch,
+  };
+}
+
+// ─── Asset Price Hook ──────────────────────────────────────────────────────
+
+export function useAssetPrice(asset: `0x${string}` | undefined) {
+  const query = useReadContract({
+    address: hubConfig.pythOracleAdapter,
+    abi: PYTH_ORACLE_ADAPTER_ABI as Abi,
+    functionName: "getPriceE18",
+    args: asset ? [asset] : undefined,
+    chainId: hubConfig.chainId,
+    query: { enabled: !!asset },
+  });
+
+  const result = query.data as [bigint, bigint] | undefined;
+
+  return {
+    priceE18: result?.[0],
+    lastUpdatedAt: result?.[1],
+    isLoading: query.isLoading,
+    isError: query.isError,
   };
 }
 
