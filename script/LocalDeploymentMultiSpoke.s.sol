@@ -107,12 +107,12 @@ contract LocalDeploymentMultiSpokeScript is Script {
 
         MockOracleLocal mockOracle = new MockOracleLocal();
         // Set realistic prices for all spoke tokens
-        mockOracle.setPrice(address(usdcEth), 1e18);     // $1
-        mockOracle.setPrice(address(wethEth), 2000e18);   // $2,000
-        mockOracle.setPrice(address(usdcArb), 1e18);      // $1
-        mockOracle.setPrice(address(wethArb), 2000e18);    // $2,000
-        mockOracle.setPrice(address(usdcBase), 1e18);      // $1
-        mockOracle.setPrice(address(wethBase), 2000e18);   // $2,000
+        mockOracle.setPrice(address(usdcEth), 1e18); // $1
+        mockOracle.setPrice(address(wethEth), 2000e18); // $2,000
+        mockOracle.setPrice(address(usdcArb), 1e18); // $1
+        mockOracle.setPrice(address(wethArb), 2000e18); // $2,000
+        mockOracle.setPrice(address(usdcBase), 1e18); // $1
+        mockOracle.setPrice(address(wethBase), 2000e18); // $2,000
         console.log("MockOracle:", address(mockOracle));
 
         // ============================================================

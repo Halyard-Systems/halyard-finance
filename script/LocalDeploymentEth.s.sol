@@ -84,8 +84,8 @@ contract LocalDeploymentEthScript is Script {
 
         // Deploy a mock oracle with realistic prices
         MockOracleLocal mockOracle = new MockOracleLocal();
-        mockOracle.setPrice(address(usdc), 1e18);    // $1
-        mockOracle.setPrice(address(weth), 2000e18);  // $2,000
+        mockOracle.setPrice(address(usdc), 1e18); // $1
+        mockOracle.setPrice(address(weth), 2000e18); // $2,000
         console.log("MockOracle:", address(mockOracle));
 
         // ============================================================
