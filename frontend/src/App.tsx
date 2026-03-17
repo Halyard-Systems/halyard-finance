@@ -130,6 +130,8 @@ function App() {
                 actionDescription={getActionDescription(activeAction)}
                 collateralSlots={collateralSlots}
                 debtSlots={debtSlots}
+                collateralPositions={collateralPositions}
+                accountData={accountData}
                 onTransactionComplete={handleTransactionComplete}
               />
             )}

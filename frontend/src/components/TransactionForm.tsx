@@ -15,8 +15,8 @@ import { spokeConfigs, type SpokeConfig, type SpokeAsset } from "../lib/contract
 import { ChainPicker } from "./ChainPicker";
 import { AssetPicker } from "./AssetPicker";
 import { useTransactionFlow } from "../lib/writeHooks";
-import { useCanBorrow, useCanWithdraw, useERC20Balance } from "../lib/hooks";
-import type { ActionName, ChainAsset, MessagingFee } from "../lib/types";
+import { useCanBorrow, useCanWithdraw, useERC20Balance, useAssetPrice } from "../lib/hooks";
+import type { AccountData, ActionName, ChainAsset, CollateralPosition, MessagingFee } from "../lib/types";
 import ERC20_ABI from "../abis/ERC20.json";
 
 interface TransactionFormProps {
@@ -26,6 +26,8 @@ interface TransactionFormProps {
   onClose: () => void;
   collateralSlots: ChainAsset[];
   debtSlots: ChainAsset[];
+  collateralPositions?: CollateralPosition[];
+  accountData?: AccountData;
   onTransactionComplete?: () => void;
 }
 
@@ -53,6 +55,8 @@ export function TransactionForm({
   onClose,
   collateralSlots,
   debtSlots,
+  collateralPositions,
+  accountData,
   onTransactionComplete,
 }: TransactionFormProps) {
   const { address } = useAccount();
@@ -143,11 +147,49 @@ export function TransactionForm({
   const needsApprovalStep =
     needsApproval && parsedAmount !== undefined && parsedAmount > 0n && currentAllowance < parsedAmount;
 
+  // For withdraw: find matching collateral position's available amount
+  const withdrawableBalance = useMemo(() => {
+    if (actionName !== "Withdraw" || !selectedSpoke || !selectedAsset || !collateralPositions) {
+      return undefined;
+    }
+    const match = collateralPositions.find(
+      (p) =>
+        p.eid === selectedSpoke.lzEid &&
+        p.asset.toLowerCase() === selectedAsset.canonicalAddress.toLowerCase()
+    );
+    return match?.available;
+  }, [actionName, selectedSpoke, selectedAsset, collateralPositions]);
+
+  // For borrow: calculate max borrowable from borrow power and asset price
+  const assetPrice = useAssetPrice(
+    actionName === "Borrow" ? selectedAsset?.canonicalAddress : undefined
+  );
+
+  const borrowableBalance = useMemo(() => {
+    if (actionName !== "Borrow" || !accountData || !selectedAsset || !assetPrice.priceE18) {
+      return undefined;
+    }
+    const { borrowPowerE18, debtValueE18 } = accountData;
+    // Remaining borrow power = borrowPower - existing debt (both in USD E18)
+    const remainingPowerE18 = borrowPowerE18 > debtValueE18
+      ? borrowPowerE18 - debtValueE18
+      : 0n;
+    if (remainingPowerE18 === 0n) return 0n;
+    // Convert USD value to token amount: remainingPower / price, adjusted for decimals
+    return remainingPowerE18 * 10n ** BigInt(selectedAsset.decimals) / assetPrice.priceE18;
+  }, [actionName, accountData, selectedAsset, assetPrice.priceE18]);
+
+  const displayBalance = actionName === "Withdraw"
+    ? withdrawableBalance
+    : actionName === "Borrow"
+    ? borrowableBalance
+    : walletBalance;
+
   const formattedBalance = useMemo(() => {
     if (!selectedAsset) return undefined;
-    if (walletBalance === undefined) return undefined;
-    return formatUnits(walletBalance, selectedAsset.decimals);
-  }, [walletBalance, selectedAsset]);
+    if (displayBalance === undefined) return undefined;
+    return formatUnits(displayBalance, selectedAsset.decimals);
+  }, [displayBalance, selectedAsset]);
 
   // Projected health factor display
   const projectedHF = useMemo(() => {
@@ -321,7 +363,7 @@ export function TransactionForm({
               {address && (
                 <span className="text-xs text-muted-foreground">
                   Available:{" "}
-                  {balanceLoading ? (
+                  {(balanceLoading || assetPrice.isLoading) && actionName !== "Withdraw" ? (
                     <span className="animate-pulse">...</span>
                   ) : formattedBalance !== undefined ? (
                     <button
