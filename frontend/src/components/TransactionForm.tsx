@@ -62,6 +62,7 @@ export function TransactionForm({
 
   const [amount, setAmount] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
+  const [lastTxWasApproval, setLastTxWasApproval] = useState(false);
 
   // For Repay: compute which chains/assets have debt
   const debtEids = useMemo(() => {
@@ -329,6 +330,7 @@ export function TransactionForm({
     if (isOpen) {
       setAmount("");
       setLocalError(null);
+      setLastTxWasApproval(false);
       txFlow.reset();
 
       if (actionName === "Repay" && availableSpokes.length > 0) {
@@ -342,24 +344,30 @@ export function TransactionForm({
     }
   }, [isOpen]);
 
-  // Refetch allowance after approval confirms
+  // After approval confirms, refetch allowance and reset flow so user can submit
   useEffect(() => {
-    if (txFlow.status === "confirmed") {
+    if (txFlow.status === "confirmed" && lastTxWasApproval) {
       allowanceResult.refetch();
+      // Small delay so the user sees "confirmed" before resetting
+      setTimeout(() => {
+        txFlow.reset();
+        setLastTxWasApproval(false);
+      }, 800);
     }
-  }, [txFlow.status]);
+  }, [txFlow.status, lastTxWasApproval]);
 
   // Auto-close on confirmed (only for the main tx, not approval)
   useEffect(() => {
-    if (txFlow.status === "confirmed" && !needsApprovalStep) {
+    if (txFlow.status === "confirmed" && !lastTxWasApproval) {
       onTransactionComplete?.();
       setTimeout(onClose, 1500);
     }
-  }, [txFlow.status, needsApprovalStep, onTransactionComplete, onClose]);
+  }, [txFlow.status, lastTxWasApproval, onTransactionComplete, onClose]);
 
   const handleApprove = async () => {
     if (!selectedSpoke || !selectedAsset || !spenderAddress) return;
     setLocalError(null);
+    setLastTxWasApproval(true);
     try {
       await txFlow.approve(
         selectedAsset.spokeAddress,
@@ -394,6 +402,7 @@ export function TransactionForm({
     }
 
     setLocalError(null);
+    setLastTxWasApproval(false);
     txFlow.reset();
 
     try {
