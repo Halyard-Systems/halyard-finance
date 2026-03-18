@@ -298,6 +298,16 @@ export function useCanWithdraw(
 
 // ─── LZ Fee Quote Hooks ─────────────────────────────────────────────────
 
+function parseMessagingFee(data: unknown): MessagingFee | undefined {
+  if (!data) return undefined;
+  // wagmi returns named struct fields as an object
+  const d = data as { nativeFee?: bigint; lzTokenFee?: bigint };
+  if (d.nativeFee !== undefined) {
+    return { nativeFee: d.nativeFee, lzTokenFee: d.lzTokenFee ?? 0n };
+  }
+  return undefined;
+}
+
 export function useQuoteDeposit(
   spokeController: `0x${string}` | undefined,
   chainId: number | undefined,
@@ -312,11 +322,7 @@ export function useQuoteDeposit(
     query: { enabled: !!spokeController && !!options },
   });
 
-  const result = query.data as [bigint, bigint] | undefined;
-  const fee: MessagingFee | undefined = result
-    ? { nativeFee: result[0], lzTokenFee: result[1] }
-    : undefined;
-
+  const fee = parseMessagingFee(query.data);
   return { fee, isLoading: query.isLoading, isError: query.isError };
 }
 
@@ -330,14 +336,10 @@ export function useQuoteHubCommand(
     functionName: "quoteCommand",
     args: dstEid && options ? [dstEid, options] : undefined,
     chainId: hubConfig.chainId,
-    query: { enabled: !!dstEid && !!options },
+    query: { enabled: !!hubConfig.hubController && !!dstEid && !!options },
   });
 
-  const result = query.data as [bigint, bigint] | undefined;
-  const fee: MessagingFee | undefined = result
-    ? { nativeFee: result[0], lzTokenFee: result[1] }
-    : undefined;
-
+  const fee = parseMessagingFee(query.data);
   return { fee, isLoading: query.isLoading, isError: query.isError };
 }
 
@@ -354,10 +356,6 @@ export function useQuoteRepayReceipt(
     query: { enabled: !!spokeController },
   });
 
-  const result = query.data as [bigint, bigint] | undefined;
-  const fee: MessagingFee | undefined = result
-    ? { nativeFee: result[0], lzTokenFee: result[1] }
-    : undefined;
-
+  const fee = parseMessagingFee(query.data);
   return { fee, isLoading: query.isLoading, isError: query.isError };
 }
