@@ -1,4 +1,5 @@
 import { encodePacked } from "viem";
+import type { MessagingFee } from "./types";
 
 // LayerZero V2 executor option types
 const EXECUTOR_WORKER_ID = 1;
@@ -35,3 +36,11 @@ export const GAS_LIMITS = {
   withdraw: 300_000n,
   liquidation: 400_000n,
 } as const;
+
+/** Apply a percentage buffer to a quoted LZ fee (default 10%) */
+export function applyFeeBuffer(fee: MessagingFee, bufferBps = 1000n): MessagingFee {
+  return {
+    nativeFee: fee.nativeFee + (fee.nativeFee * bufferBps) / 10000n,
+    lzTokenFee: fee.lzTokenFee,
+  };
+}

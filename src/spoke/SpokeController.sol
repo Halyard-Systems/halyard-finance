@@ -428,4 +428,22 @@ contract SpokeController is ISpokeRepayController, OApp, OAppOptionsType3 {
         MessagingReceipt memory receipt = _lzSend(hubEid, envelope, options, fee, refundAddress);
         emit MessageSent(msgType, receipt);
     }
+
+    // -----------------------------
+    // Fee quoting (view)
+    // -----------------------------
+
+    /// @notice Quote the LZ fee for a deposit notification (spoke -> hub)
+    function quoteDeposit(bytes calldata options) external view returns (MessagingFee memory) {
+        bytes memory payload = abi.encode(bytes32(0), address(0), spokeEid, address(0), uint256(0));
+        bytes memory envelope = abi.encode(uint8(IMessageTypes.MsgType.DEPOSIT_CREDITED), payload);
+        return _quote(hubEid, envelope, options, false);
+    }
+
+    /// @notice Quote the LZ fee for a repay receipt (spoke -> hub, empty options)
+    function quoteRepayReceipt() external view returns (MessagingFee memory) {
+        bytes memory payload = abi.encode(bytes32(0), address(0), spokeEid, address(0), uint256(0));
+        bytes memory envelope = abi.encode(uint8(IMessageTypes.MsgType.REPAY_RECEIVED), payload);
+        return _quote(hubEid, envelope, bytes(""), false);
+    }
 }

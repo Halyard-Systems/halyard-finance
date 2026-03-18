@@ -47,4 +47,7 @@ interface IHubController {
         MessagingFee calldata fee,
         address refundAddress
     ) external payable;
+
+    /// @notice Quote the LZ fee for any hub->spoke command
+    function quoteCommand(uint32 dstEid, bytes calldata options) external view returns (MessagingFee memory);
 }

@@ -15,9 +15,10 @@ import { spokeConfigs, getSpokeByEid, type SpokeConfig, type SpokeAsset } from "
 import { ChainPicker } from "./ChainPicker";
 import { AssetPicker } from "./AssetPicker";
 import { useTransactionFlow } from "../lib/writeHooks";
-import { useCanBorrow, useCanWithdraw, useERC20Balance, useAssetPrice } from "../lib/hooks";
+import { useCanBorrow, useCanWithdraw, useERC20Balance, useAssetPrice, useQuoteDeposit, useQuoteHubCommand, useQuoteRepayReceipt } from "../lib/hooks";
 import type { AccountData, ActionName, ChainAsset, CollateralPosition, DebtPosition, MessagingFee } from "../lib/types";
 import { fromWei } from "../lib/utils";
+import { buildLzOptions, GAS_LIMITS, applyFeeBuffer } from "../lib/layerzero";
 import ERC20_ABI from "../abis/ERC20.json";
 
 interface TransactionFormProps {
@@ -42,12 +43,6 @@ const STATUS_LABELS: Record<string, string> = {
   pending: "Waiting for confirmation...",
   confirmed: "Transaction confirmed!",
   failed: "Transaction failed",
-};
-
-// Estimated LZ fee (conservative default — users should have enough ETH)
-const DEFAULT_LZ_FEE: MessagingFee = {
-  nativeFee: parseUnits("0.01", 18),
-  lzTokenFee: 0n,
 };
 
 export function TransactionForm({
@@ -272,8 +267,62 @@ export function TransactionForm({
     return true;
   }, [actionName, canBorrowResult.ok, canWithdrawResult.ok]);
 
-  // Estimated LZ fee display
-  const estimatedFeeEth = Number(DEFAULT_LZ_FEE.nativeFee) / 1e18;
+  // LZ options and fee quoting
+  const lzOptions = useMemo(() => {
+    switch (actionName) {
+      case "Deposit": return buildLzOptions(GAS_LIMITS.deposit);
+      case "Borrow": return buildLzOptions(GAS_LIMITS.borrow);
+      case "Withdraw": return buildLzOptions(GAS_LIMITS.withdraw);
+      case "Repay": return undefined; // repay receipt uses empty options
+    }
+  }, [actionName]);
+
+  const depositQuote = useQuoteDeposit(
+    actionName === "Deposit" ? selectedSpoke?.spokeController : undefined,
+    actionName === "Deposit" ? selectedSpoke?.chainId : undefined,
+    actionName === "Deposit" ? lzOptions : undefined
+  );
+
+  const hubCommandQuote = useQuoteHubCommand(
+    actionName === "Borrow" || actionName === "Withdraw" ? selectedSpoke?.lzEid : undefined,
+    actionName === "Borrow" || actionName === "Withdraw" ? lzOptions : undefined
+  );
+
+  const repayQuote = useQuoteRepayReceipt(
+    actionName === "Repay" ? selectedSpoke?.spokeController : undefined,
+    actionName === "Repay" ? selectedSpoke?.chainId : undefined
+  );
+
+  const { quotedFee, feeLoading, feeError } = useMemo(() => {
+    let raw: MessagingFee | undefined;
+    let loading = false;
+    let error = false;
+    switch (actionName) {
+      case "Deposit":
+        raw = depositQuote.fee;
+        loading = depositQuote.isLoading;
+        error = depositQuote.isError;
+        break;
+      case "Borrow":
+      case "Withdraw":
+        raw = hubCommandQuote.fee;
+        loading = hubCommandQuote.isLoading;
+        error = hubCommandQuote.isError;
+        break;
+      case "Repay":
+        raw = repayQuote.fee;
+        loading = repayQuote.isLoading;
+        error = repayQuote.isError;
+        break;
+    }
+    return {
+      quotedFee: raw ? applyFeeBuffer(raw) : undefined,
+      feeLoading: loading,
+      feeError: error,
+    };
+  }, [actionName, depositQuote, hubCommandQuote, repayQuote]);
+
+  const estimatedFeeEth = quotedFee ? Number(quotedFee.nativeFee) / 1e18 : undefined;
 
   // Clear state when modal opens; for Repay auto-select first debt position
   useEffect(() => {
@@ -339,11 +388,16 @@ export function TransactionForm({
       return;
     }
 
+    if (!quotedFee) {
+      setLocalError("Unable to quote cross-chain fee. Please try again.");
+      return;
+    }
+
     setLocalError(null);
     txFlow.reset();
 
     try {
-      const fee = DEFAULT_LZ_FEE;
+      const fee = quotedFee;
 
       switch (actionName) {
         case "Deposit":
@@ -534,11 +588,15 @@ export function TransactionForm({
           </div>
 
           {/* LZ Fee Estimate */}
-          {(actionName === "Deposit" || actionName === "Borrow" || actionName === "Withdraw") && (
-            <div className="text-xs text-muted-foreground">
-              Estimated cross-chain fee: ~{estimatedFeeEth.toFixed(4)} ETH
-            </div>
-          )}
+          <div className="text-xs text-muted-foreground">
+            {feeLoading ? (
+              <span className="animate-pulse">Quoting cross-chain fee...</span>
+            ) : feeError ? (
+              <span className="text-red-500">Unable to quote fee</span>
+            ) : estimatedFeeEth !== undefined ? (
+              <>Estimated cross-chain fee: ~{estimatedFeeEth.toFixed(4)} ETH</>
+            ) : null}
+          </div>
 
           {/* Projected Health Factor */}
           {projectedHF !== undefined && projectedHF > 0n && parsedAmount && parsedAmount > 0n && (
@@ -631,7 +689,7 @@ export function TransactionForm({
           ) : (
             <Button
               onClick={handleSubmit}
-              disabled={isProcessing || !parsedAmount || txFlow.status === "confirmed"}
+              disabled={isProcessing || !parsedAmount || txFlow.status === "confirmed" || feeLoading || !quotedFee}
               className="flex-1"
             >
               {isProcessing
