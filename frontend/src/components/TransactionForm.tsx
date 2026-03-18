@@ -11,12 +11,13 @@ import {
   DialogDescription,
 } from "./ui/dialog";
 
-import { spokeConfigs, type SpokeConfig, type SpokeAsset } from "../lib/contracts";
+import { spokeConfigs, getSpokeByEid, type SpokeConfig, type SpokeAsset } from "../lib/contracts";
 import { ChainPicker } from "./ChainPicker";
 import { AssetPicker } from "./AssetPicker";
 import { useTransactionFlow } from "../lib/writeHooks";
 import { useCanBorrow, useCanWithdraw, useERC20Balance, useAssetPrice } from "../lib/hooks";
-import type { AccountData, ActionName, ChainAsset, CollateralPosition, MessagingFee } from "../lib/types";
+import type { AccountData, ActionName, ChainAsset, CollateralPosition, DebtPosition, MessagingFee } from "../lib/types";
+import { fromWei } from "../lib/utils";
 import ERC20_ABI from "../abis/ERC20.json";
 
 interface TransactionFormProps {
@@ -27,6 +28,7 @@ interface TransactionFormProps {
   collateralSlots: ChainAsset[];
   debtSlots: ChainAsset[];
   collateralPositions?: CollateralPosition[];
+  debtPositions?: DebtPosition[];
   accountData?: AccountData;
   onTransactionComplete?: () => void;
 }
@@ -56,6 +58,7 @@ export function TransactionForm({
   collateralSlots,
   debtSlots,
   collateralPositions,
+  debtPositions,
   accountData,
   onTransactionComplete,
 }: TransactionFormProps) {
@@ -64,6 +67,45 @@ export function TransactionForm({
 
   const [amount, setAmount] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
+
+  // For Repay: compute which chains/assets have debt
+  const debtEids = useMemo(() => {
+    if (actionName !== "Repay" || !debtPositions) return new Set<number>();
+    return new Set(debtPositions.filter((d) => d.debt > 0n).map((d) => d.eid));
+  }, [actionName, debtPositions]);
+
+  const debtAssetsByEid = useMemo(() => {
+    if (actionName !== "Repay" || !debtPositions) return new Map<number, Set<string>>();
+    const map = new Map<number, Set<string>>();
+    for (const d of debtPositions) {
+      if (d.debt <= 0n) continue;
+      const set = map.get(d.eid) ?? new Set<string>();
+      set.add(d.asset.toLowerCase());
+      map.set(d.eid, set);
+    }
+    return map;
+  }, [actionName, debtPositions]);
+
+  // For Repay: filter spokes and assets to only those with debt
+  const availableSpokes = useMemo(() => {
+    if (actionName !== "Repay") return spokeConfigs;
+    return spokeConfigs.filter((s) => debtEids.has(s.lzEid));
+  }, [actionName, debtEids]);
+
+  const filteredSpokeForAssets = useCallback(
+    (spoke: SpokeConfig): SpokeConfig => {
+      if (actionName !== "Repay") return spoke;
+      const debtAssets = debtAssetsByEid.get(spoke.lzEid);
+      if (!debtAssets) return { ...spoke, assets: [] };
+      return {
+        ...spoke,
+        assets: spoke.assets.filter((a) =>
+          debtAssets.has(a.canonicalAddress.toLowerCase())
+        ),
+      };
+    },
+    [actionName, debtAssetsByEid]
+  );
 
   // Chain & asset selection
   const [selectedSpoke, setSelectedSpoke] = useState<SpokeConfig>(
@@ -76,13 +118,20 @@ export function TransactionForm({
   const handleSpokeChange = useCallback(
     (spoke: SpokeConfig) => {
       setSelectedSpoke(spoke);
-      // Try to find the same asset on the new chain, else first asset
-      const sameAsset = spoke.assets.find(
-        (a) => a.symbol === selectedAsset?.symbol
-      );
-      setSelectedAsset(sameAsset || spoke.assets[0]);
+      if (actionName === "Repay") {
+        const filtered = filteredSpokeForAssets(spoke);
+        const sameAsset = filtered.assets.find(
+          (a) => a.symbol === selectedAsset?.symbol
+        );
+        setSelectedAsset(sameAsset || filtered.assets[0]);
+      } else {
+        const sameAsset = spoke.assets.find(
+          (a) => a.symbol === selectedAsset?.symbol
+        );
+        setSelectedAsset(sameAsset || spoke.assets[0]);
+      }
     },
-    [selectedAsset]
+    [selectedAsset, actionName, filteredSpokeForAssets]
   );
 
   // Parse amount to bigint
@@ -160,6 +209,19 @@ export function TransactionForm({
     return match?.available;
   }, [actionName, selectedSpoke, selectedAsset, collateralPositions]);
 
+  // For repay: find matching debt position amount
+  const repayableBalance = useMemo(() => {
+    if (actionName !== "Repay" || !selectedSpoke || !selectedAsset || !debtPositions) {
+      return undefined;
+    }
+    const match = debtPositions.find(
+      (d) =>
+        d.eid === selectedSpoke.lzEid &&
+        d.asset.toLowerCase() === selectedAsset.canonicalAddress.toLowerCase()
+    );
+    return match?.debt;
+  }, [actionName, selectedSpoke, selectedAsset, debtPositions]);
+
   // For borrow: calculate max borrowable from borrow power and asset price
   const assetPrice = useAssetPrice(
     actionName === "Borrow" ? selectedAsset?.canonicalAddress : undefined
@@ -183,6 +245,8 @@ export function TransactionForm({
     ? withdrawableBalance
     : actionName === "Borrow"
     ? borrowableBalance
+    : actionName === "Repay"
+    ? repayableBalance
     : walletBalance;
 
   const formattedBalance = useMemo(() => {
@@ -211,12 +275,21 @@ export function TransactionForm({
   // Estimated LZ fee display
   const estimatedFeeEth = Number(DEFAULT_LZ_FEE.nativeFee) / 1e18;
 
-  // Clear state when modal opens
+  // Clear state when modal opens; for Repay auto-select first debt position
   useEffect(() => {
     if (isOpen) {
       setAmount("");
       setLocalError(null);
       txFlow.reset();
+
+      if (actionName === "Repay" && availableSpokes.length > 0) {
+        const firstSpoke = availableSpokes[0];
+        setSelectedSpoke(firstSpoke);
+        const filtered = filteredSpokeForAssets(firstSpoke);
+        if (filtered.assets.length > 0) {
+          setSelectedAsset(filtered.assets[0]);
+        }
+      }
     }
   }, [isOpen]);
 
@@ -336,10 +409,77 @@ export function TransactionForm({
         </DialogHeader>
 
         <div className="space-y-4 min-w-0">
+          {/* Debt Summary for Repay */}
+          {actionName === "Repay" && debtPositions && debtPositions.some((d) => d.debt > 0n) && (
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-card-foreground">
+                Outstanding Debts
+              </label>
+              <div className="border border-input rounded-md divide-y divide-input">
+                {debtPositions
+                  .filter((d) => d.debt > 0n)
+                  .map((d) => {
+                    const spoke = getSpokeByEid(d.eid);
+                    const asset = spoke?.assets.find(
+                      (a) => a.canonicalAddress.toLowerCase() === d.asset.toLowerCase()
+                    );
+                    const isSelected =
+                      selectedSpoke?.lzEid === d.eid &&
+                      selectedAsset?.canonicalAddress.toLowerCase() === d.asset.toLowerCase();
+                    return (
+                      <button
+                        key={`${d.eid}-${d.asset}`}
+                        type="button"
+                        className={`w-full px-3 py-2 flex items-center justify-between text-sm transition-colors ${
+                          isSelected
+                            ? "bg-primary/10 text-primary"
+                            : "hover:bg-muted text-foreground"
+                        }`}
+                        onClick={() => {
+                          if (spoke) {
+                            setSelectedSpoke(spoke);
+                            if (asset) setSelectedAsset(asset);
+                          }
+                        }}
+                        disabled={isProcessing}
+                      >
+                        <div className="flex items-center gap-2">
+                          {spoke && (
+                            <img src={spoke.logo} alt={spoke.name} className="w-4 h-4" />
+                          )}
+                          <span>{spoke?.name ?? `Chain ${d.eid}`}</span>
+                          {asset && (
+                            <>
+                              <span className="text-muted-foreground">/</span>
+                              <img src={asset.icon} alt={asset.symbol} className="w-3 h-3" />
+                              <span>{asset.symbol}</span>
+                            </>
+                          )}
+                        </div>
+                        <span className="font-medium text-red-600">
+                          {fromWei(d.debt, asset?.decimals ?? 18).toLocaleString(undefined, {
+                            maximumFractionDigits: 6,
+                          })}{" "}
+                          {asset?.symbol ?? ""}
+                        </span>
+                      </button>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+
+          {/* No debt notice for Repay */}
+          {actionName === "Repay" && (!debtPositions || !debtPositions.some((d) => d.debt > 0n)) && (
+            <div className="text-sm text-muted-foreground bg-muted p-3 rounded-md text-center">
+              No outstanding debts to repay.
+            </div>
+          )}
+
           {/* Chain Selection */}
-          {spokeConfigs.length > 0 && (
+          {(actionName !== "Repay" ? spokeConfigs.length > 0 : availableSpokes.length > 0) && (
             <ChainPicker
-              spokes={spokeConfigs}
+              spokes={actionName === "Repay" ? availableSpokes : spokeConfigs}
               selectedSpoke={selectedSpoke}
               onChainSelect={handleSpokeChange}
             />
@@ -348,7 +488,7 @@ export function TransactionForm({
           {/* Asset Selection */}
           {selectedSpoke && selectedAsset && (
             <AssetPicker
-              selectedSpoke={selectedSpoke}
+              selectedSpoke={actionName === "Repay" ? filteredSpokeForAssets(selectedSpoke) : selectedSpoke}
               selectedAsset={selectedAsset}
               onAssetSelect={setSelectedAsset}
             />
@@ -362,7 +502,7 @@ export function TransactionForm({
               </label>
               {address && (
                 <span className="text-xs text-muted-foreground">
-                  Available:{" "}
+                  {actionName === "Repay" ? "Owed:" : "Available:"}{" "}
                   {(balanceLoading || assetPrice.isLoading) && actionName !== "Withdraw" ? (
                     <span className="animate-pulse">...</span>
                   ) : formattedBalance !== undefined ? (
