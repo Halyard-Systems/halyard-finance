@@ -131,6 +131,7 @@ function App() {
                 collateralSlots={collateralSlots}
                 debtSlots={debtSlots}
                 collateralPositions={collateralPositions}
+                debtPositions={debtPositions}
                 accountData={accountData}
                 onTransactionComplete={handleTransactionComplete}
               />
