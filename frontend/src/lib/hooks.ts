@@ -10,6 +10,8 @@ import DEBT_MANAGER_ABI from "../abis/DebtManager.json";
 import RISK_ENGINE_ABI from "../abis/RiskEngine.json";
 import PYTH_ORACLE_ADAPTER_ABI from "../abis/PythOracleAdapter.json";
 import ERC20_ABI from "../abis/ERC20.json";
+import SPOKE_CONTROLLER_ABI from "../abis/SpokeController.json";
+import HUB_CONTROLLER_ABI from "../abis/HubController.json";
 
 import { hubConfig } from "./contracts";
 import type {
@@ -17,6 +19,7 @@ import type {
   ChainAsset,
   CollateralPosition,
   DebtPosition,
+  MessagingFee,
 } from "./types";
 
 // ─── ERC20 ──────────────────────────────────────────────────────────────────
@@ -291,4 +294,70 @@ export function useCanWithdraw(
     isLoading: query.isLoading,
     isError: query.isError,
   };
+}
+
+// ─── LZ Fee Quote Hooks ─────────────────────────────────────────────────
+
+export function useQuoteDeposit(
+  spokeController: `0x${string}` | undefined,
+  chainId: number | undefined,
+  options: `0x${string}` | undefined
+) {
+  const query = useReadContract({
+    address: spokeController,
+    abi: SPOKE_CONTROLLER_ABI as Abi,
+    functionName: "quoteDeposit",
+    args: options ? [options] : undefined,
+    chainId,
+    query: { enabled: !!spokeController && !!options },
+  });
+
+  const result = query.data as [bigint, bigint] | undefined;
+  const fee: MessagingFee | undefined = result
+    ? { nativeFee: result[0], lzTokenFee: result[1] }
+    : undefined;
+
+  return { fee, isLoading: query.isLoading, isError: query.isError };
+}
+
+export function useQuoteHubCommand(
+  dstEid: number | undefined,
+  options: `0x${string}` | undefined
+) {
+  const query = useReadContract({
+    address: hubConfig.hubController,
+    abi: HUB_CONTROLLER_ABI as Abi,
+    functionName: "quoteCommand",
+    args: dstEid && options ? [dstEid, options] : undefined,
+    chainId: hubConfig.chainId,
+    query: { enabled: !!dstEid && !!options },
+  });
+
+  const result = query.data as [bigint, bigint] | undefined;
+  const fee: MessagingFee | undefined = result
+    ? { nativeFee: result[0], lzTokenFee: result[1] }
+    : undefined;
+
+  return { fee, isLoading: query.isLoading, isError: query.isError };
+}
+
+export function useQuoteRepayReceipt(
+  spokeController: `0x${string}` | undefined,
+  chainId: number | undefined
+) {
+  const query = useReadContract({
+    address: spokeController,
+    abi: SPOKE_CONTROLLER_ABI as Abi,
+    functionName: "quoteRepayReceipt",
+    args: [],
+    chainId,
+    query: { enabled: !!spokeController },
+  });
+
+  const result = query.data as [bigint, bigint] | undefined;
+  const fee: MessagingFee | undefined = result
+    ? { nativeFee: result[0], lzTokenFee: result[1] }
+    : undefined;
+
+  return { fee, isLoading: query.isLoading, isError: query.isError };
 }

@@ -116,6 +116,14 @@ contract HubController is AccessManaged, OApp, OAppOptionsType3 {
         return spokeEids.length;
     }
 
+    /// @notice Quote the LZ fee for any hub->spoke command (borrow, withdraw, seize)
+    /// @dev All three command types have identical payload structure and encoded size
+    function quoteCommand(uint32 dstEid, bytes calldata options) external view returns (MessagingFee memory) {
+        bytes memory payload = abi.encode(bytes32(0), address(0), address(0), address(0), uint256(0));
+        bytes memory message = abi.encode(uint8(0), payload);
+        return _quote(dstEid, message, options, false);
+    }
+
     // ──────────────────────────────────────────────────────────────────────────────
     // Receive business logic
     //

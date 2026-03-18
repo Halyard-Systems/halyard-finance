@@ -53,4 +53,32 @@ contract SpokeControllerTest is BaseTest {
 
         assertEq(collateralVault.lockedBalanceOf(alice, address(mockToken)), 100);
     }
+
+    function test_quoteDeposit() public {
+        bytes memory options = hex"0003010011010000000000000000000000000000030d40";
+
+        // Mock the LZ endpoint's quote function to return a known fee
+        vm.mockCall(
+            address(mockLzEndpoint),
+            abi.encodeWithSelector(bytes4(keccak256("quote((uint32,bytes32,bytes,bytes,bool),address)"))),
+            abi.encode(uint256(0.003 ether), uint256(0))
+        );
+
+        MessagingFee memory fee = spokeController.quoteDeposit(options);
+        assertEq(fee.nativeFee, 0.003 ether);
+        assertEq(fee.lzTokenFee, 0);
+    }
+
+    function test_quoteRepayReceipt() public {
+        // Mock the LZ endpoint's quote function to return a known fee
+        vm.mockCall(
+            address(mockLzEndpoint),
+            abi.encodeWithSelector(bytes4(keccak256("quote((uint32,bytes32,bytes,bytes,bool),address)"))),
+            abi.encode(uint256(0.001 ether), uint256(0))
+        );
+
+        MessagingFee memory fee = spokeController.quoteRepayReceipt();
+        assertEq(fee.nativeFee, 0.001 ether);
+        assertEq(fee.lzTokenFee, 0);
+    }
 }

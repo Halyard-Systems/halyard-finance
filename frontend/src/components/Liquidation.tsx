@@ -10,9 +10,10 @@ import {
   useAccountData,
   useCollateralPositions,
   useDebtPositions,
+  useQuoteHubCommand,
 } from "../lib/hooks";
 import { useTransactionFlow } from "../lib/writeHooks";
-import type { MessagingFee } from "../lib/types";
+import { buildLzOptions, GAS_LIMITS, applyFeeBuffer } from "../lib/layerzero";
 
 export function Liquidation() {
   const [targetAddress, setTargetAddress] = useState("");
@@ -53,14 +54,18 @@ export function Liquidation() {
     }
   };
 
+  // Dynamic fee quoting for liquidation
+  const liquidationOptions = useMemo(() => buildLzOptions(GAS_LIMITS.liquidation), []);
+  const liqQuote = useQuoteHubCommand(seizeSpoke?.lzEid, liquidationOptions);
+  const liqFee = useMemo(
+    () => (liqQuote.fee ? applyFeeBuffer(liqQuote.fee) : undefined),
+    [liqQuote.fee]
+  );
+
   const handleLiquidate = async () => {
-    if (!lookupAddress || !debtAsset || !seizeAsset || !repayAmount) return;
+    if (!lookupAddress || !debtAsset || !seizeAsset || !repayAmount || !liqFee) return;
 
     const parsedRepay = parseUnits(repayAmount, debtAsset.decimals);
-    const fee: MessagingFee = {
-      nativeFee: parseUnits("0.02", 18),
-      lzTokenFee: 0n,
-    };
 
     await txFlow.liquidate(
       lookupAddress,
@@ -71,7 +76,7 @@ export function Liquidation() {
       seizeAsset.canonicalAddress,
       collateralSlots,
       debtSlots,
-      fee
+      liqFee
     );
   };
 
@@ -208,6 +213,17 @@ export function Liquidation() {
                     )}
                   </div>
 
+                  {/* Fee estimate */}
+                  <div className="text-xs text-muted-foreground">
+                    {liqQuote.isLoading ? (
+                      <span className="animate-pulse">Quoting cross-chain fee...</span>
+                    ) : liqQuote.isError ? (
+                      <span className="text-red-500">Unable to quote fee</span>
+                    ) : liqFee ? (
+                      <>Estimated fee: ~{(Number(liqFee.nativeFee) / 1e18).toFixed(4)} ETH</>
+                    ) : null}
+                  </div>
+
                   {/* Error */}
                   {txFlow.error && (
                     <div className="text-sm text-red-500">{txFlow.error}</div>
@@ -216,7 +232,7 @@ export function Liquidation() {
                   <Button
                     onClick={handleLiquidate}
                     variant="destructive"
-                    disabled={!repayAmount || txFlow.status !== "idle"}
+                    disabled={!repayAmount || txFlow.status !== "idle" || liqQuote.isLoading || !liqFee}
                   >
                     {txFlow.status === "idle"
                       ? "Execute Liquidation"

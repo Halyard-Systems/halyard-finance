@@ -9,6 +9,7 @@ export interface HubConfig {
   debtManager: `0x${string}`;
   liquidationEngine: `0x${string}`;
   pythOracleAdapter: `0x${string}`;
+  hubController: `0x${string}`;
 }
 
 export interface SpokeAsset {
@@ -67,6 +68,8 @@ export const hubConfig: HubConfig = {
     .VITE_LIQUIDATION_ENGINE_ADDRESS as `0x${string}`,
   pythOracleAdapter: import.meta.env
     .VITE_PYTH_ORACLE_ADAPTER_ADDRESS as `0x${string}`,
+  hubController: import.meta.env
+    .VITE_HUB_CONTROLLER_ADDRESS as `0x${string}`,
 };
 
 // Parse spoke configs from env
