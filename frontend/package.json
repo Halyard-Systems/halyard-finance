@@ -17,7 +17,7 @@
     "@radix-ui/react-dialog": "^1.1.14",
     "@radix-ui/react-slot": "^1.2.3",
     "@reduxjs/toolkit": "^2.8.2",
-    "@tailwindcss/vite": "^4.1.11",
+    "@tailwindcss/vite": "^4.3.1",
     "@tanstack/react-query": "^5.83.0",
     "@wagmi/connectors": "^5.8.5",
     "@wagmi/core": "^2.17.3",
@@ -37,7 +37,7 @@
     "@types/node": "^24.0.13",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
-    "@vitejs/plugin-react": "^4.6.0",
+    "@vitejs/plugin-react": "^6.0.2",
     "autoprefixer": "^10.4.21",
     "eslint": "^9.30.1",
     "eslint-plugin-react-hooks": "^5.2.0",
@@ -47,6 +47,6 @@
     "tailwindcss": "^4.1.11",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.35.1",
-    "vite": "^7.0.8"
+    "vite": "^8.0.16"
   }
 }
